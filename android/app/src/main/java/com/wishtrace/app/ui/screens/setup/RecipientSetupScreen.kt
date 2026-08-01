@@ -1,9 +1,6 @@
 package com.wishtrace.app.ui.screens.setup
 
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
@@ -17,7 +14,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -33,14 +29,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Lightbulb
-import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -82,7 +76,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishtrace.app.ui.components.ErrorBanner
 import com.wishtrace.app.ui.components.PrimaryAction
-import com.wishtrace.app.ui.components.RecipientAvatar
 import com.wishtrace.app.ui.components.ScreenTopBar
 import com.wishtrace.app.ui.components.rememberWishTraceMotionEnabled
 import com.wishtrace.app.ui.theme.BlueSurface
@@ -138,7 +131,6 @@ fun RecipientSetupRoute(
         },
         onNameChange = viewModel::updateName,
         onRelationshipChange = viewModel::updateRelationship,
-        onPhotoChange = viewModel::updatePhoto,
         onDateChange = viewModel::updateDate,
         onInterestToggle = viewModel::toggleInterest,
         onDislikesChange = viewModel::updateDislikes,
@@ -158,7 +150,6 @@ fun RecipientSetupScreen(
     onBack: () -> Unit,
     onNameChange: (String) -> Unit,
     onRelationshipChange: (String) -> Unit,
-    onPhotoChange: (String?) -> Unit,
     onDateChange: (LocalDate) -> Unit,
     onInterestToggle: (String) -> Unit,
     onDislikesChange: (String) -> Unit,
@@ -170,11 +161,6 @@ fun RecipientSetupScreen(
 ) {
     val focusManager = LocalFocusManager.current
     val motionEnabled = rememberWishTraceMotionEnabled()
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri != null) onPhotoChange(uri.toString())
-    }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(onBack = onBack)
@@ -253,7 +239,6 @@ fun RecipientSetupScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .imePadding()
                         .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 14.dp)
                         .testTag(WishTraceTestTags.SetupPrimaryAction),
                     trailingContent = if (state.saving) {
@@ -289,12 +274,6 @@ fun RecipientSetupScreen(
                     state = state,
                     onNameChange = onNameChange,
                     onRelationshipChange = onRelationshipChange,
-                    onPickPhoto = {
-                        photoPicker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
-                    onRemovePhoto = { onPhotoChange(null) },
                 )
 
                 RecipientSetupStep.OCCASION -> OccasionStep(
@@ -348,8 +327,6 @@ private fun PersonStep(
     state: RecipientSetupUiState,
     onNameChange: (String) -> Unit,
     onRelationshipChange: (String) -> Unit,
-    onPickPhoto: () -> Unit,
-    onRemovePhoto: () -> Unit,
 ) {
     val nameFocus = remember { FocusRequester() }
 
@@ -372,53 +349,6 @@ private fun PersonStep(
                 modifier = Modifier.semantics { heading() },
                 style = MaterialTheme.typography.headlineLarge,
             )
-        }
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box {
-                    RecipientAvatar(
-                        initials = state.displayName.initialsOrFallback(),
-                        photoUri = state.photoUri,
-                        size = 88.dp,
-                    )
-                    Surface(
-                        onClick = onPickPhoto,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(38.dp)
-                            .semantics { contentDescription = "Choose a photo" },
-                        color = BrandIndigo,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = CircleShape,
-                        border = BorderStroke(3.dp, MaterialTheme.colorScheme.background),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Rounded.PhotoCamera,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = if (state.photoUri == null) "Add a photo" else "Photo added",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    TextButton(
-                        onClick = if (state.photoUri == null) onPickPhoto else onRemovePhoto,
-                        contentPadding = PaddingValues(0.dp),
-                    ) {
-                        Text(if (state.photoUri == null) "Choose from device" else "Remove")
-                    }
-                }
-            }
         }
         item {
             OutlinedTextField(
@@ -763,13 +693,4 @@ private fun setupTransition(
         fadeOut(tween(120)) +
             slideOutHorizontally(tween(180)) { fullWidth -> -fullWidth * direction / 10 }
         )
-}
-
-private fun String.initialsOrFallback(): String {
-    val initials = trim()
-        .split(Regex("\\s+"))
-        .take(2)
-        .mapNotNull { it.firstOrNull()?.uppercase() }
-        .joinToString("")
-    return initials.ifEmpty { "?" }
 }

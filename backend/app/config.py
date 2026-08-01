@@ -55,6 +55,13 @@ class Settings(BaseSettings):
             raise ValueError("PUBLIC_BASE_URL must use HTTPS outside local/test environments")
         return self
 
+    @field_validator("session_token_pepper")
+    @classmethod
+    def require_strong_session_pepper(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and len(value.get_secret_value().encode()) < 32:
+            raise ValueError("SESSION_TOKEN_PEPPER must contain at least 32 bytes")
+        return value
+
     @property
     def sqlalchemy_database_url(self) -> str:
         raw = self.database_url.get_secret_value()

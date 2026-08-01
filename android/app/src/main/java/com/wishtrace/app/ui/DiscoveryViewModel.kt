@@ -3,7 +3,6 @@ package com.wishtrace.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wishtrace.app.data.GiftDiscoveryGateway
-import com.wishtrace.app.data.SeededGiftDiscoveryGateway
 import com.wishtrace.app.domain.DiscoveryStage
 import com.wishtrace.app.domain.GiftDiscoveryRequest
 import com.wishtrace.app.domain.SourceMode
@@ -33,7 +32,7 @@ sealed interface DiscoveryUiState {
 }
 
 class DiscoveryViewModel(
-    private val gateway: GiftDiscoveryGateway = SeededGiftDiscoveryGateway(),
+    private val gateway: GiftDiscoveryGateway,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<DiscoveryUiState>(DiscoveryUiState.Idle)
     val state: StateFlow<DiscoveryUiState> = mutableState.asStateFlow()
@@ -64,7 +63,7 @@ class DiscoveryViewModel(
                 mutableState.value = DiscoveryUiState.Cancelled
             } catch (_: Exception) {
                 mutableState.value = DiscoveryUiState.Error(
-                    message = "The controlled catalog could not be checked. No ranking or purchase was started.",
+                    message = "Live products could not be checked. No ranking or purchase was started.",
                 )
             }
         }

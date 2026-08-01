@@ -109,21 +109,22 @@ publishes `/health` plus the public UCP platform profile.
 
 ```powershell
 cd backend
-uv sync --dev
+uv sync --all-groups
 uv run python -m pytest
 uv run python -m ruff check .
 uv run python -m mypy app scripts
 uv run python -m alembic upgrade head
-uv run uvicorn app.main:create_app --factory
+uv run python -m scripts.run_server
 ```
 
 Copy variable names from `templates/.env.example`; never commit the populated `.env`.
 
-## Android prototype
+## Android client
 
-The native client lives in `android/`. Its pre-kickoff routes still contain disclosed local fixture
-implementations that are being replaced by authenticated backend repositories. They are not an
-acceptable judged runtime or fallback and do not claim merchant, OpenAI or Prava connectivity.
+The native client lives in `android/`. Runtime authentication, recipient, occasion and Home state
+come from the WishTrace backend; seeded repositories and the local authentication escape hatch
+have been removed. Compose previews and tests may use isolated fixtures, but runtime commerce
+remains honestly unavailable until a live merchant adapter is connected.
 
 Requirements:
 
@@ -148,6 +149,8 @@ Debug APK:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Rendered prototype evidence is in `android/evidence/`. The connected test requires a running emulator or device and currently covers onboarding → home → recipient profile → controlled discovery.
+Rendered prototype evidence is in `android/evidence/`. Connected guardrail tests cover onboarding
+to required Google authentication. Real OAuth has also been exercised on the Play-enabled physical
+phone against the local backend through ADB reverse; no Google token or bearer token is captured.
 
 This implementation began before the official build window at the user's explicit direction and is recorded in `docs/PREEXISTING_WORK.md`. It must not be represented as judged-window work.

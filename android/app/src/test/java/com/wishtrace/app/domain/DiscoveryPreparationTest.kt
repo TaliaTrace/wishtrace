@@ -9,7 +9,7 @@ class DiscoveryPreparationTest {
         assertThrows(IllegalArgumentException::class.java) {
             DiscoveryPreparation(
                 eligibleCandidateIds = listOf("candidate_a", "candidate_a"),
-                sourceMode = SourceMode.CONTROLLED,
+                sourceMode = SourceMode.LIVE,
             )
         }
     }

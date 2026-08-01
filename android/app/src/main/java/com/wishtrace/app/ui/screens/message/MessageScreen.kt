@@ -43,7 +43,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wishtrace.app.R
-import com.wishtrace.app.data.ControlledFixtures
+import com.wishtrace.app.data.PreviewFixtures
 import com.wishtrace.app.domain.HomeSnapshot
 import com.wishtrace.app.domain.MessageOrigin
 import com.wishtrace.app.domain.PersonalMessage
@@ -369,7 +369,7 @@ private fun MessageActionBar(
 private fun MessagePreview() {
     WishTraceTheme {
         MessageScreen(
-            snapshot = ControlledFixtures.homeSnapshot(),
+            snapshot = PreviewFixtures.homeSnapshot(),
             state = MessageUiState(),
             onBack = {},
             onTextChange = {},

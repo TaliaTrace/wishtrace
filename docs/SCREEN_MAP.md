@@ -35,14 +35,14 @@ Fields:
 
 - name;
 - relationship;
-- optional photo or initials;
+- generated initials;
 - next.
 
 State:
 
 - validation inline;
 - keyboard-safe layout;
-- optional Android Photo Picker only after an explicit tap;
+- photo capture is deferred until WishTrace has a server-backed media contract;
 - visible `1 of 2` progress;
 - safe back recovery.
 
@@ -56,9 +56,9 @@ Fields:
 - dislikes/exclusions;
 - budget and currency;
 - optional note/hint;
-- delivery deadline/address only when needed.
+- delivery deadline/address is collected later, only when a live quote needs it.
 
-Primary action: `Save Sophie` or `Create occasion`.
+Primary action: `Save`.
 
 Implemented as the second step of the setup/editor flow. The initial viewport prioritizes occasion, date and interests; exclusions, budget and optional clue follow by scroll while the Save action remains sticky.
 

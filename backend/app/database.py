@@ -3,7 +3,12 @@ from typing import Any, cast
 
 from psycopg import AsyncConnection
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import NullPool
 
 from app.config import Settings
@@ -22,6 +27,12 @@ def create_database_engine(settings: Settings) -> AsyncEngine:
         poolclass=NullPool,
         hide_parameters=True,
     )
+
+
+def create_database_session_factory(
+    engine: AsyncEngine,
+) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def probe_database(engine: AsyncEngine) -> DatabaseProbe:

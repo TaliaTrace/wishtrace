@@ -38,8 +38,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wishtrace.app.R
@@ -49,11 +51,15 @@ import com.wishtrace.app.domain.AppSession
 import com.wishtrace.app.ui.components.DimensionalAsset
 import com.wishtrace.app.ui.components.ErrorBanner
 import com.wishtrace.app.ui.components.ScreenTopBar
-import com.wishtrace.app.ui.components.SecondaryAction
 import com.wishtrace.app.ui.theme.BlueSurface
 import com.wishtrace.app.ui.theme.Ink
 import com.wishtrace.app.ui.theme.OutlineCool
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+
+private const val AUTOMATIC_SIGN_IN_TIMEOUT_MILLIS = 15_000L
 
 private sealed interface SignInState {
     data object Idle : SignInState
@@ -67,7 +73,6 @@ fun SignInRoute(
     authRepository: AuthRepository,
     webClientId: String,
     onSignedIn: (AppSession) -> Unit,
-    onContinueLocal: () -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -89,24 +94,39 @@ fun SignInRoute(
         scope.launch {
             state = SignInState.Working
             try {
+                val challenge = authRepository.createGoogleChallenge().getOrThrow()
                 val token = if (isAutomatic) {
-                    credentialClient.requestAuthorizedAccount(activity, webClientId)
+                    withTimeout(AUTOMATIC_SIGN_IN_TIMEOUT_MILLIS) {
+                        credentialClient.requestAuthorizedAccount(
+                            activity,
+                            webClientId,
+                            challenge.nonce,
+                        )
+                    }
                 } else {
-                    credentialClient.requestWithGoogleButton(activity, webClientId)
+                    credentialClient.requestWithGoogleButton(
+                        activity,
+                        webClientId,
+                        challenge.nonce,
+                    )
                 }
-                authRepository.exchangeGoogleIdToken(token)
+                authRepository.exchangeGoogleIdToken(challenge.id, token)
                     .onSuccess(onSignedIn)
                     .onFailure {
                         state = SignInState.Error(
                             it.message ?: "WishTrace could not verify this account.",
                         )
                     }
+            } catch (_: TimeoutCancellationException) {
+                state = SignInState.Idle
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (_: Exception) {
                 state = if (isAutomatic) {
                     SignInState.Idle
                 } else {
                     SignInState.Error(
-                        "Google sign-in was cancelled or unavailable. Try again or continue for now.",
+                        "Google sign-in was cancelled or unavailable. Try again.",
                     )
                 }
             }
@@ -123,7 +143,6 @@ fun SignInRoute(
     SignInScreen(
         state = state,
         onGoogle = { requestGoogle(isAutomatic = false) },
-        onContinueLocal = onContinueLocal,
         onBack = onBack,
     )
 }
@@ -132,7 +151,6 @@ fun SignInRoute(
 private fun SignInScreen(
     state: SignInState,
     onGoogle: () -> Unit,
-    onContinueLocal: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -155,12 +173,6 @@ private fun SignInScreen(
                     GoogleButton(
                         loading = state == SignInState.Working,
                         onClick = onGoogle,
-                    )
-                    SecondaryAction(
-                        text = "Not now",
-                        onClick = onContinueLocal,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = state != SignInState.Working,
                     )
                 }
             }
@@ -223,7 +235,11 @@ private fun GoogleButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .size(height = 56.dp, width = 1.dp),
+            .size(height = 56.dp, width = 1.dp)
+            .semantics {
+                contentDescription = "Sign in with Google"
+                if (loading) stateDescription = "Signing in"
+            },
         enabled = !loading,
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(

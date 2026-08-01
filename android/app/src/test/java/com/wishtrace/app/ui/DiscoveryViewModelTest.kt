@@ -93,7 +93,7 @@ class DiscoveryViewModelTest {
             }
             return DiscoveryPreparation(
                 eligibleCandidateIds = listOf("candidate_alpha"),
-                sourceMode = SourceMode.CONTROLLED,
+                sourceMode = SourceMode.LIVE,
             )
         }
     }

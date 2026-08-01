@@ -1,9 +1,12 @@
+import logging
 from collections.abc import Mapping
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger("wishtrace")
 
 
 class ApiError(Exception):
@@ -15,6 +18,7 @@ class ApiError(Exception):
         message: str,
         recoverable: bool,
         field_errors: Mapping[str, str] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
@@ -22,6 +26,7 @@ class ApiError(Exception):
         self.message = message
         self.recoverable = recoverable
         self.field_errors = dict(field_errors or {})
+        self.headers = dict(headers or {})
 
 
 def _correlation_id(request: Request) -> str:
@@ -50,6 +55,7 @@ def register_error_handlers(app: FastAPI) -> None:
     async def handle_api_error(request: Request, error: ApiError) -> JSONResponse:
         return JSONResponse(
             status_code=error.status_code,
+            headers=error.headers,
             content=_body(
                 request,
                 code=error.code,
@@ -80,7 +86,14 @@ def register_error_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def handle_unexpected_error(request: Request, _error: Exception) -> JSONResponse:
+    async def handle_unexpected_error(request: Request, error: Exception) -> JSONResponse:
+        logger.error(
+            "request_failed_unexpectedly",
+            extra={
+                "correlation_id": _correlation_id(request),
+                "error_category": type(error).__name__,
+            },
+        )
         return JSONResponse(
             status_code=500,
             content=_body(

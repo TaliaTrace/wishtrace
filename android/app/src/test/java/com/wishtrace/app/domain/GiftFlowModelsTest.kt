@@ -71,7 +71,7 @@ class GiftFlowModelsTest {
                 supportedDeliveryFact = null,
                 arrivesBy = LocalDate.of(2026, 8, 10),
                 sourceTimestamp = Instant.parse("2026-07-30T12:00:00Z"),
-                sourceMode = SourceMode.CONTROLLED,
+                sourceMode = SourceMode.LIVE,
             )
         }
     }

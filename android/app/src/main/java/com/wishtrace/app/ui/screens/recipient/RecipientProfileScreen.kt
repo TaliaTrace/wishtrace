@@ -42,7 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.wishtrace.app.data.ControlledFixtures
+import com.wishtrace.app.data.PreviewFixtures
 import com.wishtrace.app.domain.HomeSnapshot
 import com.wishtrace.app.ui.HomeUiState
 import com.wishtrace.app.ui.WishTraceTestTags
@@ -406,7 +406,7 @@ private fun ProfileUnavailable(
 private fun RecipientProfilePreview() {
     WishTraceTheme {
         RecipientProfileScreen(
-            state = HomeUiState.Content(ControlledFixtures.homeSnapshot()),
+            state = HomeUiState.Content(PreviewFixtures.homeSnapshot()),
             onBack = {},
             onRetry = {},
             onFindGift = {},

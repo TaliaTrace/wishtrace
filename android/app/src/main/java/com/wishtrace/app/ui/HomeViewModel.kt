@@ -2,7 +2,6 @@ package com.wishtrace.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wishtrace.app.data.SeededWishTraceRepository
 import com.wishtrace.app.data.WishTraceRepository
 import com.wishtrace.app.domain.HomeSnapshot
 import kotlinx.coroutines.Job
@@ -22,7 +21,7 @@ sealed interface HomeUiState {
 }
 
 class HomeViewModel(
-    private val repository: WishTraceRepository = SeededWishTraceRepository(),
+    private val repository: WishTraceRepository,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val state: StateFlow<HomeUiState> = mutableState.asStateFlow()
@@ -35,23 +34,6 @@ class HomeViewModel(
 
     fun retry() {
         load()
-    }
-
-    fun resetLocalData() {
-        loadJob?.cancel()
-        loadJob = viewModelScope.launch {
-            mutableState.value = HomeUiState.Loading
-            mutableState.value = try {
-                repository.reset()
-                repository.getHome()
-                    ?.let(HomeUiState::Content)
-                    ?: HomeUiState.Empty
-            } catch (_: Exception) {
-                HomeUiState.Error(
-                    message = "We couldn't reset these details. Try again.",
-                )
-            }
-        }
     }
 
     private fun load() {

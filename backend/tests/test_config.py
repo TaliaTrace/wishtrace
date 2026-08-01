@@ -35,3 +35,14 @@ def test_deployed_public_url_requires_https() -> None:
             ),
             public_base_url="http://wishtrace.invalid",
         )
+
+
+def test_configured_session_pepper_must_be_strong() -> None:
+    with pytest.raises(ValidationError, match="at least 32 bytes"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/wishtrace?sslmode=require"
+            ),
+            session_token_pepper=SecretStr("too-short"),
+        )

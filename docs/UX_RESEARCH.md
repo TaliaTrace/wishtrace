@@ -120,7 +120,10 @@ Use five short, skippable value/trust moments followed by account choice and a r
 4. Let the clues come together.
 5. You make the final call.
 
-Each page has one focal composition, one headline, one sentence and a stable action/progress area. Account choice follows on its own route; `Not now` creates a local session without presenting a separate demo product mode. Recipient and occasion questions live in setup because those answers actually change the experience.
+Each page has one focal composition, one headline, one sentence and a stable action/progress area.
+Account choice follows on its own route and is required; there is no local-session or demo escape
+hatch. Recipient and occasion questions live in setup because those answers actually change the
+experience.
 
 ### Avoid
 

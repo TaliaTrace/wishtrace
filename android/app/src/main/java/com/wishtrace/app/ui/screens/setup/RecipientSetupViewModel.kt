@@ -30,7 +30,6 @@ data class RecipientSetupUiState(
     val step: RecipientSetupStep = RecipientSetupStep.PERSON,
     val displayName: String = "",
     val relationship: String = "",
-    val photoUri: String? = null,
     val occasionDate: LocalDate? = null,
     val selectedInterests: Set<String> = emptySet(),
     val dislikesText: String = "",
@@ -122,6 +121,7 @@ class RecipientSetupViewModel(
     private val initialSnapshot: HomeSnapshot?,
     initialStep: RecipientSetupStep = RecipientSetupStep.PERSON,
 ) : ViewModel() {
+    private var savedRecipientId: String? = initialSnapshot?.recipient?.id
     private val initialState = initialSnapshot.toSetupState(initialStep)
     private val mutableState = MutableStateFlow(initialState)
     val state: StateFlow<RecipientSetupUiState> = mutableState.asStateFlow()
@@ -132,10 +132,6 @@ class RecipientSetupViewModel(
 
     fun updateRelationship(value: String) = update {
         copy(relationship = value, relationshipError = null, saveError = null)
-    }
-
-    fun updatePhoto(uri: String?) = update {
-        copy(photoUri = uri, saveError = null)
     }
 
     fun updateDate(value: LocalDate) = update {
@@ -212,15 +208,15 @@ class RecipientSetupViewModel(
             runCatching {
                 val recipient = peopleRepository.saveRecipient(
                     RecipientInput(
-                        id = initialSnapshot?.recipient?.id,
+                        id = savedRecipientId,
                         displayName = current.displayName,
                         relationship = current.relationship,
-                        photoUri = current.photoUri,
                         interests = current.selectedInterests.sorted(),
                         dislikes = splitTags(current.dislikesText),
                         hint = current.hintText.takeIf(String::isNotBlank),
                     ),
                 )
+                savedRecipientId = recipient.id
                 occasionRepository.saveOccasion(
                     OccasionInput(
                         id = initialSnapshot?.occasion?.id,
@@ -232,7 +228,7 @@ class RecipientSetupViewModel(
                             minorUnits = requireNotNull(occasionValidation.budgetMinorUnits),
                             currencyCode = "USD",
                         ),
-                        requiredArrivalDate = current.occasionDate.minusDays(1),
+                        requiredArrivalDate = initialSnapshot?.occasion?.requiredArrivalDate,
                     ),
                 )
             }.onSuccess {
@@ -274,7 +270,6 @@ class RecipientSetupViewModel(
                 step = initialStep,
                 displayName = snapshot.recipient.displayName,
                 relationship = snapshot.recipient.relationship,
-                photoUri = snapshot.recipient.photoUri,
                 occasionDate = snapshot.occasion.localDate,
                 selectedInterests = snapshot.recipient.interests.toSet(),
                 dislikesText = snapshot.recipient.dislikes.joinToString(", "),

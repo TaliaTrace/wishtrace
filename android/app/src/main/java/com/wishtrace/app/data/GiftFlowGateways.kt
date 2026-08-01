@@ -21,6 +21,21 @@ interface GiftDiscoveryGateway {
     ): DiscoveryPreparation
 }
 
+class UnavailableGiftDiscoveryGateway : GiftDiscoveryGateway {
+    override suspend fun prepareCandidates(
+        request: GiftDiscoveryRequest,
+        onStage: suspend (DiscoveryStage) -> Unit,
+    ): DiscoveryPreparation {
+        require(request.recipientId.isNotBlank())
+        onStage(DiscoveryStage.CHECKING_CATALOG)
+        throw WishTraceApiException(
+            message = "Live product retrieval is temporarily unavailable.",
+            code = "COMMERCE_UNAVAILABLE",
+            recoverable = true,
+        )
+    }
+}
+
 interface GroundedRankingGateway {
     suspend fun rankAllowedCandidates(
         request: GroundedRankingRequest,

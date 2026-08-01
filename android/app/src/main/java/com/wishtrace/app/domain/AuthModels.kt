@@ -1,9 +1,6 @@
 package com.wishtrace.app.domain
 
-enum class SessionMode {
-    LIVE,
-    LOCAL,
-}
+import java.time.Instant
 
 data class AppUser(
     val id: String,
@@ -12,6 +9,13 @@ data class AppUser(
 )
 
 data class AppSession(
-    val mode: SessionMode,
+    val accessToken: String,
+    val expiresAt: Instant,
     val user: AppUser,
+)
+
+data class GoogleAuthChallenge(
+    val id: String,
+    val nonce: String,
+    val expiresAt: Instant,
 )

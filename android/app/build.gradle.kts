@@ -21,6 +21,13 @@ android {
             .get()
             .replace("\"", "\\\"")
         resValue("string", "google_web_client_id", "\"$googleWebClientId\"")
+        val backendBaseUrl = providers
+            .gradleProperty("WISHTRACE_API_BASE_URL")
+            .orElse("http://127.0.0.1:8000")
+            .get()
+            .trimEnd('/')
+            .replace("\"", "\\\"")
+        resValue("string", "wishtrace_api_base_url", "\"$backendBaseUrl\"")
     }
 
     buildTypes {

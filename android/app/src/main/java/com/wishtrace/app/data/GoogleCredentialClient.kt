@@ -2,7 +2,6 @@ package com.wishtrace.app.data
 
 import android.app.Activity
 import android.content.Context
-import android.util.Base64
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -10,7 +9,6 @@ import androidx.credentials.GetCredentialRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import java.security.SecureRandom
 
 class GoogleCredentialClient(context: Context) {
     private val manager = CredentialManager.create(context.applicationContext)
@@ -18,13 +16,15 @@ class GoogleCredentialClient(context: Context) {
     suspend fun requestAuthorizedAccount(
         activity: Activity,
         webClientId: String,
+        nonce: String,
     ): String {
         require(webClientId.isNotBlank()) { "Google sign-in is not configured for this build." }
+        require(nonce.isNotBlank()) { "WishTrace sign-in challenge is missing." }
         val option = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(true)
             .setAutoSelectEnabled(true)
             .setServerClientId(webClientId)
-            .setNonce(generateNonce())
+            .setNonce(nonce)
             .build()
         return requestToken(
             activity = activity,
@@ -37,10 +37,12 @@ class GoogleCredentialClient(context: Context) {
     suspend fun requestWithGoogleButton(
         activity: Activity,
         webClientId: String,
+        nonce: String,
     ): String {
         require(webClientId.isNotBlank()) { "Google sign-in is not configured for this build." }
+        require(nonce.isNotBlank()) { "WishTrace sign-in challenge is missing." }
         val option = GetSignInWithGoogleOption.Builder(webClientId)
-            .setNonce(generateNonce())
+            .setNonce(nonce)
             .build()
         return requestToken(
             activity = activity,
@@ -73,12 +75,4 @@ class GoogleCredentialClient(context: Context) {
             .idToken
     }
 
-    private fun generateNonce(byteLength: Int = 32): String {
-        val bytes = ByteArray(byteLength)
-        SecureRandom().nextBytes(bytes)
-        return Base64.encodeToString(
-            bytes,
-            Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING,
-        )
-    }
 }

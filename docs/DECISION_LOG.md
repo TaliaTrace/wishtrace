@@ -130,7 +130,9 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Context: Earlier plans allowed a controlled Bronze fallback and the prototype still wires seeded repositories plus `Not now` local auth.
 - Evidence: The user explicitly requires no placeholders/demo behavior and is available to provide integration access. Runtime truth is also stronger finalist evidence than a polished simulation.
 - Decision: Supersede every controlled-runtime fallback. Seeded/controlled data may remain only in tests, Compose previews and the preexisting-work disclosure; unavailable integrations produce honest empty/error/recovery states.
-- Consequence: The current Android runtime is temporarily noncompliant until network repositories replace the pre-kickoff implementations. It must not be used as judged end-to-end evidence.
+- Consequence: Network auth and context repositories now replace the pre-kickoff implementations.
+  Runtime commerce stops at an honest unavailable state until a live source exists; preview/test
+  fixtures remain isolated from application wiring.
 - Owner: WishTrace team / Codex
 
 ### 2026-08-01 — Prava proof uses documented polling and a real-merchant attempt
@@ -152,7 +154,41 @@ Record only decisions that change product, architecture, truth boundary, schedul
 ### 2026-08-01 — Supabase TLS proof uses the client connection
 
 - Context: `pg_stat_ssl` observed through Supabase's pooler can describe the pooler's server-side hop rather than the application-to-pooler connection.
-- Evidence: psycopg/libpq exposes `PGconn.ssl_in_use` for the actual client connection. A secure process-only DSN override returned TLS `true` and PostgreSQL `17.6`; Alembic reached `20260801_0001 (head)`.
+- Evidence: psycopg/libpq exposes `PGconn.ssl_in_use` for the actual client connection. A secure
+  process-only DSN override returned TLS `true` and PostgreSQL `17.6`; Alembic reached
+  `20260801_0004 (head)`. Supabase documents session-mode Supavisor as the supported IPv4
+  intermediary and documents that `sslmode=require` always uses SSL:
+  https://supabase.com/docs/guides/database/connecting-to-postgres and
+  https://supabase.com/docs/guides/platform/ssl-enforcement.
 - Decision: Require `sslmode=require` in configuration and health-check client TLS through libpq. Use SQLAlchemy `NullPool` with the session pooler.
-- Consequence: Migrations and runtime startup reject an insecure database URL; secrets remain outside tracked files.
+- Consequence: Migrations and runtime startup reject an insecure database URL; secrets remain outside
+  tracked files. `pg_stat_ssl` behind Supavisor is recorded as the pooler's database-side hop, not
+  substituted for the application's libpq TLS observation.
+- Owner: WishTrace team / Codex
+
+### 2026-08-01 — Setup collects only facts WishTrace can preserve
+
+- Context: The pre-kickoff editor offered a Photo Picker without server-backed media persistence and
+  derived a delivery deadline by subtracting one day from the birthday.
+- Evidence: The network recipient contract has no photo field, and the user never supplied that
+  delivery rule. Both values would disappear or become an unsupported commerce claim.
+- Decision: Remove photo capture until a persisted media contract exists. Store required arrival as
+  unknown unless it already came from a real backend record; collect address/deadline just in time
+  when a live merchant quote actually requires them.
+- Consequence: Recipient initials remain truthful and stable. Deterministic delivery rejection cannot
+  run until the user and merchant provide evidence, which is safer than inventing a deadline.
+- Owner: WishTrace team / Codex
+
+### 2026-08-01 — Google identity exchanges for an opaque WishTrace session
+
+- Context: Android must authenticate a real user without making Google tokens the long-lived app
+  session or placing backend secrets on the phone.
+- Evidence: A physical Play-enabled Android 11 phone completed Google account selection and consent,
+  the backend consumed one nonce-bound challenge, and the app reached authenticated empty Home.
+  Supabase showed one user, one active session and one consumed challenge.
+- Decision: Fetch a short-lived backend challenge before Credential Manager, validate the returned ID
+  token server-side, consume the nonce once, then return a 24-hour opaque WishTrace bearer token.
+  Store only a peppered HMAC server-side and protect the phone copy with Android Keystore AES/GCM.
+- Consequence: Replay, wrong audience, expiry, logout and unauthorized recovery have explicit
+  boundaries. Stable local/deployed pepper configuration is mandatory before server restart or deploy.
 - Owner: WishTrace team / Codex

@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,21 +76,22 @@ fun WishTraceApp() {
     }
     val homeViewModel: HomeViewModel = viewModel(factory = homeFactory)
     val discoveryViewModel: DiscoveryViewModel = viewModel(factory = discoveryFactory)
-    val sessionViewModel: AppSessionViewModel = viewModel()
 
     val navController = rememberNavController()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
     val discoveryState by discoveryViewModel.state.collectAsStateWithLifecycle()
-    val session by sessionViewModel.session.collectAsState()
+    val session by container.authRepository.session.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val shellRoutes = remember { ShellDestination.entries.map { it.route }.toSet() }
+    val publicRoutes = remember { setOf(Destination.Welcome, Destination.SignIn) }
     val showShell = currentRoute in shellRoutes
     val scope = rememberCoroutineScope()
     val googleWebClientId = stringResource(R.string.google_web_client_id)
     var savedMessage by remember { mutableStateOf<PersonalMessage?>(null) }
 
     fun enterApp() {
+        homeViewModel.retry()
         navController.navigate(ShellDestination.Home.route) {
             popUpTo(Destination.Welcome) { inclusive = true }
             launchSingleTop = true
@@ -105,6 +105,17 @@ fun WishTraceApp() {
             }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    LaunchedEffect(session, currentRoute) {
+        when {
+            session != null && currentRoute == Destination.Welcome -> enterApp()
+            session == null && currentRoute != null && currentRoute !in publicRoutes -> {
+                navController.navigate(Destination.Welcome) {
+                    popUpTo(navController.graph.id) { inclusive = true }
+                }
+            }
         }
     }
 
@@ -157,11 +168,6 @@ fun WishTraceApp() {
                     authRepository = container.authRepository,
                     webClientId = googleWebClientId,
                     onSignedIn = {
-                        sessionViewModel.acceptVerifiedSession(it)
-                        enterApp()
-                    },
-                    onContinueLocal = {
-                        sessionViewModel.enterLocal()
                         enterApp()
                     },
                     onBack = navController::popBackStack,
@@ -170,6 +176,7 @@ fun WishTraceApp() {
             composable(ShellDestination.Home.route) {
                 HomeScreen(
                     state = homeState,
+                    giverDisplayName = session?.user?.displayName,
                     onRetry = homeViewModel::retry,
                     onFindGift = { navController.navigate(Destination.Discovery) },
                     onReviewRecipient = { navController.navigate(Destination.Recipient) },
@@ -197,17 +204,13 @@ fun WishTraceApp() {
             composable(ShellDestination.Profile.route) {
                 ProfileScreen(
                     session = session,
-                    onResetLocal = {
-                        sessionViewModel.enterLocal()
-                        homeViewModel.resetLocalData()
-                    },
                     onSignOut = {
                         scope.launch {
+                            container.authRepository.logout()
                             runCatching {
                                 container.googleCredentialClient.clearCredentialState()
                             }
                         }
-                        sessionViewModel.signOut()
                         navController.navigate(Destination.Welcome) {
                             popUpTo(navController.graph.id) { inclusive = true }
                         }

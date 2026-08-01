@@ -7,14 +7,16 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0001` | Codex | 2026-08-01 |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0004` | Codex | 2026-08-01 |
 | Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — public deploy pending | Codex | 2026-08-01 |
+| Google authentication | nonce-bound exchange + real physical-phone account | PASS LOCALLY — one real user/session, public deploy pending | Codex/user | 2026-08-01 |
+| Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
 | Prava auth works | smallest official sandbox request | PRE-KICKOFF ONLY — REVERIFY | Codex/user | 2026-08-01 |
 | Prava transaction path understood | session + authoritative status | NOT STARTED | | |
 | Primary merchant validated | search/product/quote/checkout facts | NOT STARTED | | |
 | Backup merchant validated | documented fallback | NOT STARTED | | |
 | OpenAI structured output works | valid live candidate IDs returned | PRE-KICKOFF SMOKE ONLY | Codex/user | 2026-08-01 |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS BASELINE — runtime fixtures remain | Codex | 2026-08-01 |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — UI MILESTONE 4 | Codex | 2026-07-30 19:34 PKT |
@@ -27,11 +29,10 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Finish and deploy the secure FastAPI foundation.
-2. Implement real Google challenge/exchange and Supabase-owned recipient/occasion persistence.
-3. Replace every Android runtime seed/local-session path with authenticated network state.
-4. Prove one live merchant path before ranking or payment UI claims.
-5. Preserve the pre-kickoff prototype disclosure and never use fixtures as judged runtime fallback.
+1. Enter one actual recipient/occasion on the physical phone and prove close/reopen persistence.
+2. Add the stable local session pepper and permanent `sslmode=require`, then deploy the API over HTTPS.
+3. Prove one live merchant path before ranking or payment UI claims.
+4. Preserve the pre-kickoff prototype disclosure and never use fixtures as judged runtime fallback.
 
 ## Next
 
@@ -43,16 +44,51 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Milestone evidence
 
+### 2026-08-01 — Real Google authentication and owned context runtime
+
+- Backend auth: one-time five-minute challenges store only a nonce hash; Google ID tokens are
+  validated for signature, issuer, audience, expiry and nonce; challenges are consumed atomically.
+- Session boundary: Android receives an opaque 24-hour WishTrace token, stores it with Android
+  Keystore-backed AES/GCM, and the database stores only its peppered HMAC. Logout, expiry and
+  unauthorized recovery are explicit.
+- Persistence: migrations `20260801_0002` through `20260801_0004` created owned users, challenges,
+  sessions, recipients, preferences, hints and occasions, then enforced one recipient per Gold user.
+  Birthdays remain local dates with IANA timezones and money remains integer minor units in USD.
+- Android runtime: removed the `Not now` escape hatch, local session ViewModel and seeded runtime
+  repositories. Home/People/Occasions use the authenticated backend; discovery now reports commerce
+  unavailable rather than manufacturing a candidate.
+- Runtime audit: giver/recipient copy now comes from authenticated state, and the production
+  `SourceMode` permits only `LIVE`; controlled values remain confined to historical evidence.
+- Truth corrections: setup no longer offers an unpersisted photo, and it no longer invents a
+  birthday-minus-one delivery deadline. Media stays deferred and delivery remains unknown until a
+  real quote requires user-provided shipping context.
+- Physical evidence: the RMX3201 opened the real Google account chooser and consent surface,
+  returned to WishTrace, reached the genuine empty Home state, and created exactly one backend user,
+  one active session and one consumed challenge. No raw Google or bearer token was captured.
+- Physical UX correction: removed duplicate IME inset handling that collapsed the person form on API
+  30. A connected test now verifies the name and relationship fields remain visible above the
+  keyboard; it passed 1/1 on the RMX3201.
+- Quality: backend pytest 19 passed; Ruff passed; strict mypy passed. Android assemble, unit tests,
+  lint and Android-test compilation passed; the debug APK installed successfully on the physical
+  phone. Every authenticated route now returns to sign-in after backend session invalidation.
+- Evidence: `android/evidence/wishtrace-signin.png`, `wishtrace-after-auth-wait.png`,
+  `wishtrace-person-form.png` (failure) and `wishtrace-person-form-current.png` (fixed). Account-chooser
+  XML was intentionally destroyed after the proof because it contained account identifiers.
+- Truth boundary: OAuth, local API transport and Supabase auth persistence are live. Recipient APIs
+  are live but await real user entry on the phone. Public Azure deployment, live merchant facts,
+  grounded ranking and Prava transaction behavior remain unverified.
+
 ### 2026-08-01 — Judged-window security and backend foundation
 
 - Kickoff: local clock verified after the official opening.
 - Baseline: initialized Git after a tracked-file secret scan and committed all disclosed pre-kickoff work as `283f5be`.
 - Backend: FastAPI/Pydantic v2, async SQLAlchemy + psycopg 3, Alembic, correlation/error middleware, audit-safe request logging, `/health`, and catalog-only `/.well-known/ucp`.
-- Database: application-to-pooler TLS verified through libpq `ssl_in_use`; observed PostgreSQL 17.6; Alembic upgraded to `20260801_0001 (head)` using `NullPool`.
-- Backend quality: pytest 7 passed; Ruff passed; strict mypy passed. These commands must be rerun after the final foundation diff.
+- Database: application-to-pooler TLS verified through libpq `ssl_in_use`; observed PostgreSQL 17.6; Alembic initially upgraded to `20260801_0001 (head)` using `NullPool`.
+- Backend quality at this milestone: pytest 7 passed; Ruff passed; strict mypy passed.
 - Android baseline: debug assembly, unit tests and lint passed during the official window. Physical RMX3201/API 30 with Google Play Services is ADB-authorized for real OAuth testing.
 - Track evidence: live Devfolio page verified the Open Finalists, Visa and Best UX prizes; the proof strategy now uses one shared real transaction path.
-- Truth boundary: the backend foundation and database migration are live. Public Azure deployment, real auth, runtime persistence, merchant calls, grounded ranking and judged-window Prava calls are not yet complete. Current Android runtime fixtures remain pre-kickoff technical debt and are not acceptable demo evidence.
+- Truth boundary at this milestone: the backend foundation and first migration were live. Later
+  evidence above supersedes the then-pending auth/runtime-fixture status.
 
 ### 2026-07-30 — UI milestone 4: grounded decision and personal note
 

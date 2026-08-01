@@ -64,8 +64,6 @@ import com.wishtrace.app.ui.theme.InkMuted
 import com.wishtrace.app.ui.theme.LavenderSurface
 import com.wishtrace.app.ui.theme.OutlineCool
 import com.wishtrace.app.ui.theme.SurfaceWhite
-import com.wishtrace.app.ui.theme.Warning
-import com.wishtrace.app.ui.theme.WarningSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -285,29 +283,6 @@ fun InterestChip(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             style = MaterialTheme.typography.labelMedium,
         )
-    }
-}
-
-@Composable
-fun PreviewBanner(
-    modifier: Modifier = Modifier,
-    text: String = "UI preview — no transaction occurred",
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = WarningSurface,
-        contentColor = Warning,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Warning.copy(alpha = 0.22f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(text = "ⓘ", fontWeight = FontWeight.Bold)
-            Text(text = text, style = MaterialTheme.typography.labelMedium)
-        }
     }
 }
 

@@ -10,15 +10,12 @@ import java.time.ZoneId
 
 interface WishTraceRepository {
     suspend fun getHome(): HomeSnapshot?
-
-    suspend fun reset()
 }
 
 data class RecipientInput(
     val id: String?,
     val displayName: String,
     val relationship: String,
-    val photoUri: String?,
     val interests: List<String>,
     val dislikes: List<String>,
     val hint: String?,

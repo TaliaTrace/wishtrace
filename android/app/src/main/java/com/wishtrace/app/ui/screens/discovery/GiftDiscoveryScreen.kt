@@ -62,7 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.wishtrace.app.R
-import com.wishtrace.app.data.ControlledFixtures
+import com.wishtrace.app.data.PreviewFixtures
 import com.wishtrace.app.domain.DiscoveryStage
 import com.wishtrace.app.domain.GiftDiscoveryRequest
 import com.wishtrace.app.domain.HomeSnapshot
@@ -196,12 +196,13 @@ private fun DiscoveryContent(
         else -> "Finding a gift that fits."
     }
     val supporting = when (state) {
-        DiscoveryUiState.Idle -> "Bringing Sophie’s clues into focus."
+        DiscoveryUiState.Idle ->
+            "Bringing ${snapshot.recipient.displayName}’s clues into focus."
         is DiscoveryUiState.Running -> state.activeStage.detail(snapshot)
         is DiscoveryUiState.ReadyForRanking ->
             "Product facts stay hidden until their source can be verified."
 
-        DiscoveryUiState.Cancelled -> "Her date, budget and clues are still here."
+        DiscoveryUiState.Cancelled -> "The date, budget and clues are still here."
         is DiscoveryUiState.Error -> "Nothing was selected or purchased. Try again safely."
     }
 
@@ -800,7 +801,7 @@ private fun DiscoveryStage.detail(snapshot: HomeSnapshot): String = when (this) 
 private fun DiscoveryProgressPreview() {
     WishTraceTheme {
         GiftDiscoveryScreen(
-            homeState = HomeUiState.Content(ControlledFixtures.homeSnapshot()),
+            homeState = HomeUiState.Content(PreviewFixtures.homeSnapshot()),
             state = DiscoveryUiState.Running(
                 activeStage = DiscoveryStage.CHECKING_FULFILLMENT,
                 completedStages = listOf(
@@ -821,10 +822,10 @@ private fun DiscoveryProgressPreview() {
 private fun DiscoveryReadyPreview() {
     WishTraceTheme {
         GiftDiscoveryScreen(
-            homeState = HomeUiState.Content(ControlledFixtures.homeSnapshot()),
+            homeState = HomeUiState.Content(PreviewFixtures.homeSnapshot()),
             state = DiscoveryUiState.ReadyForRanking(
                 eligibleCandidateIds = listOf("alpha", "bravo"),
-                sourceMode = com.wishtrace.app.domain.SourceMode.CONTROLLED,
+                sourceMode = com.wishtrace.app.domain.SourceMode.LIVE,
             ),
             onBack = {},
             onStart = {},

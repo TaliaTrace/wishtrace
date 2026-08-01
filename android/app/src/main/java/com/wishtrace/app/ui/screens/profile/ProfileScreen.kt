@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +25,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wishtrace.app.domain.AppSession
-import com.wishtrace.app.domain.SessionMode
 import com.wishtrace.app.ui.components.SecondaryAction
 import com.wishtrace.app.ui.theme.BlueSurface
 import com.wishtrace.app.ui.theme.BrandBlue
@@ -35,12 +33,10 @@ import com.wishtrace.app.ui.theme.BrandIndigo
 @Composable
 fun ProfileScreen(
     session: AppSession?,
-    onResetLocal: () -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val displayName = session?.user?.displayName ?: "Talia"
-    val isLocal = session?.mode != SessionMode.LIVE
+    val displayName = session?.user?.displayName ?: "Signed out"
 
     LazyColumn(
         modifier = modifier
@@ -94,7 +90,7 @@ fun ProfileScreen(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = session?.user?.email ?: "Seeded local profile",
+                            text = session?.user?.email ?: "Google account",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -120,12 +116,12 @@ fun ProfileScreen(
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = if (isLocal) "On this device" else "Account connected",
+                            text = if (session == null) "Session ended" else "Account connected",
                             style = MaterialTheme.typography.labelLarge,
                         )
                         Text(
-                            text = if (isLocal) {
-                                "Sign in whenever you want sync."
+                            text = if (session == null) {
+                                "Sign in again to continue."
                             } else {
                                 "Your plans can sync across devices."
                             },
@@ -134,15 +130,6 @@ fun ProfileScreen(
                         )
                     }
                 }
-            }
-        }
-        if (isLocal) {
-            item {
-                SecondaryAction(
-                    text = "Reset local data",
-                    onClick = onResetLocal,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
         item {

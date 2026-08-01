@@ -10,19 +10,22 @@ Use Python 3.12 through `uv`:
 
 ```powershell
 cd backend
-uv sync --dev
+uv sync --all-groups
 uv run python -m scripts.probe_database
 uv run alembic upgrade head
-uv run uvicorn app.main:create_app --factory --reload
+uv run python -m scripts.run_server
 ```
 
 The repository-root `.env` is loaded automatically. `DATABASE_URL` must use PostgreSQL
 and contain `sslmode=require`; startup and the database probe reject an insecure DSN.
+`GOOGLE_WEB_CLIENT_ID` and a stable, random `SESSION_TOKEN_PEPPER` of at least 32 bytes
+are required for authentication. The local launcher selects a psycopg-compatible event
+loop on Windows.
 
 ## Quality gates
 
 ```powershell
-uv run pytest
+uv run python -m pytest
 uv run ruff check .
 uv run mypy app scripts
 ```

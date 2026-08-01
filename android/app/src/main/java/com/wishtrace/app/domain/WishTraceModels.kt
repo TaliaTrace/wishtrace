@@ -6,9 +6,6 @@ import java.time.temporal.ChronoUnit
 
 enum class SourceMode {
     LIVE,
-    CONTROLLED,
-    HYBRID,
-    SIMULATED,
 }
 
 data class HintEvidence(

@@ -55,7 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.wishtrace.app.R
-import com.wishtrace.app.data.ControlledFixtures
+import com.wishtrace.app.data.PreviewFixtures
 import com.wishtrace.app.domain.CandidateRejection
 import com.wishtrace.app.domain.HomeSnapshot
 import com.wishtrace.app.domain.ProductCandidate
@@ -877,9 +877,6 @@ private fun RecommendationActionBar(
 
 private fun SourceMode.displayName(): String = when (this) {
     SourceMode.LIVE -> "Live"
-    SourceMode.CONTROLLED -> "Controlled"
-    SourceMode.HYBRID -> "Hybrid"
-    SourceMode.SIMULATED -> "Simulated"
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
@@ -887,7 +884,7 @@ private fun SourceMode.displayName(): String = when (this) {
 private fun SourceNeededPreview() {
     WishTraceTheme {
         RecommendationScreen(
-            snapshot = ControlledFixtures.homeSnapshot(),
+            snapshot = PreviewFixtures.homeSnapshot(),
             state = RecommendationUiState.SourceNeeded,
             onBack = {},
             onRetry = {},

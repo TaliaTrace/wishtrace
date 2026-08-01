@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,7 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.wishtrace.app.data.ControlledFixtures
+import com.wishtrace.app.data.PreviewFixtures
 import com.wishtrace.app.domain.HomeSnapshot
 import com.wishtrace.app.ui.HomeUiState
 import com.wishtrace.app.ui.WishTraceTestTags
@@ -56,6 +56,7 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     state: HomeUiState,
+    giverDisplayName: String? = null,
     onRetry: () -> Unit,
     onFindGift: () -> Unit,
     onReviewRecipient: () -> Unit,
@@ -77,6 +78,7 @@ fun HomeScreen(
 
             is HomeUiState.Content -> HomeContent(
                 snapshot = state.snapshot,
+                giverDisplayName = giverDisplayName,
                 onFindGift = onFindGift,
                 onReviewRecipient = onReviewRecipient,
             )
@@ -87,6 +89,7 @@ fun HomeScreen(
 @Composable
 private fun HomeContent(
     snapshot: HomeSnapshot,
+    giverDisplayName: String?,
     onFindGift: () -> Unit,
     onReviewRecipient: () -> Unit,
 ) {
@@ -114,7 +117,7 @@ private fun HomeContent(
         item {
             StaggeredEntrance(index = 1) {
                 Text(
-                    text = "Hi, Talia",
+                    text = greetingFor(giverDisplayName),
                     modifier = Modifier.semantics { heading() },
                     style = MaterialTheme.typography.headlineLarge,
                 )
@@ -218,7 +221,7 @@ private fun HomeContent(
                                 .testTag(WishTraceTestTags.FindGift),
                             trailingContent = {
                                 Icon(
-                                    imageVector = Icons.Rounded.ArrowForward,
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
@@ -279,7 +282,7 @@ private fun HomeContent(
                             )
                         }
                         Icon(
-                            imageVector = Icons.Rounded.ArrowForward,
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                             contentDescription = "Review ${recipient.displayName}'s profile",
                             modifier = Modifier.size(20.dp),
                             tint = BrandIndigo,
@@ -373,10 +376,19 @@ private fun HomeError(message: String, onRetry: () -> Unit) {
 private fun HomeContentPreview() {
     WishTraceTheme {
         HomeScreen(
-            state = HomeUiState.Content(ControlledFixtures.homeSnapshot()),
+            state = HomeUiState.Content(PreviewFixtures.homeSnapshot()),
+            giverDisplayName = "Talia",
             onRetry = {},
             onFindGift = {},
             onReviewRecipient = {},
         )
     }
+}
+
+private fun greetingFor(displayName: String?): String {
+    val firstName = displayName
+        ?.trim()
+        ?.substringBefore(' ')
+        ?.takeIf { it.isNotEmpty() && '@' !in it }
+    return firstName?.let { "Hi, $it" } ?: "Welcome back"
 }

@@ -61,6 +61,10 @@ class UserModel(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    ranking_runs: Mapped[list["RankingRunModel"]] = orm_relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     purchase_intents: Mapped[list["PurchaseIntentModel"]] = orm_relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -252,6 +256,11 @@ class DiscoveryRunModel(Base):
         back_populates="discovery_run",
         cascade="all, delete-orphan",
     )
+    ranking_run: Mapped["RankingRunModel | None"] = orm_relationship(
+        back_populates="discovery_run",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class CandidateSnapshotModel(Base):
@@ -321,6 +330,10 @@ class CandidateSnapshotModel(Base):
         back_populates="candidate_snapshot",
         cascade="all, delete-orphan",
     )
+    ranking_items: Mapped[list["RankingItemModel"]] = orm_relationship(
+        back_populates="candidate_snapshot",
+        cascade="all, delete-orphan",
+    )
 
 
 class CandidateRejectionModel(Base):
@@ -348,6 +361,155 @@ class CandidateRejectionModel(Base):
     )
 
     candidate: Mapped[CandidateSnapshotModel] = orm_relationship(back_populates="rejection")
+
+
+class RankingRunModel(Base):
+    __tablename__ = "ranking_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('IN_PROGRESS', 'COMPLETED', 'USER_CHOICE_REQUIRED')",
+            name="ck_ranking_status",
+        ),
+        CheckConstraint(
+            "mode IS NULL OR mode IN ('MODEL', 'DETERMINISTIC')",
+            name="ck_ranking_mode",
+        ),
+        CheckConstraint(
+            "uncertainty IS NULL OR uncertainty IN ('LOW', 'MEDIUM', 'HIGH')",
+            name="ck_ranking_uncertainty",
+        ),
+        CheckConstraint(
+            "(status = 'IN_PROGRESS' AND mode IS NULL AND uncertainty IS NULL "
+            "AND completed_at IS NULL) OR "
+            "(status = 'COMPLETED' AND mode IS NOT NULL AND uncertainty IS NOT NULL "
+            "AND completed_at IS NOT NULL) OR "
+            "(status = 'USER_CHOICE_REQUIRED' AND mode IS NULL AND uncertainty IS NULL "
+            "AND completed_at IS NOT NULL)",
+            name="ck_ranking_state_shape",
+        ),
+        CheckConstraint(
+            "duration_ms IS NULL OR duration_ms >= 0",
+            name="ck_ranking_duration_non_negative",
+        ),
+        CheckConstraint("attempt_count >= 1", name="ck_ranking_attempt_positive"),
+        UniqueConstraint("discovery_run_id", name="uq_ranking_discovery_run"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    discovery_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("discovery_runs.id", ondelete="CASCADE")
+    )
+    status: Mapped[str] = mapped_column(String(32))
+    mode: Mapped[str | None] = mapped_column(String(16))
+    uncertainty: Mapped[str | None] = mapped_column(String(16))
+    provider_request_id: Mapped[str | None] = mapped_column(String(255))
+    provider_deployment: Mapped[str | None] = mapped_column(String(200))
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    schema_version: Mapped[str] = mapped_column(String(32))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1)
+    failure_category: Mapped[str | None] = mapped_column(String(100))
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[UserModel] = orm_relationship(back_populates="ranking_runs")
+    discovery_run: Mapped[DiscoveryRunModel] = orm_relationship(
+        back_populates="ranking_run"
+    )
+    items: Mapped[list["RankingItemModel"]] = orm_relationship(
+        back_populates="ranking_run",
+        cascade="all, delete-orphan",
+    )
+    evidence: Mapped[list["RankingEvidenceModel"]] = orm_relationship(
+        back_populates="ranking_run",
+        cascade="all, delete-orphan",
+    )
+
+
+class RankingEvidenceModel(Base):
+    __tablename__ = "ranking_evidence"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('INTEREST', 'HINT', 'RELATIONSHIP', 'OCCASION')",
+            name="ck_ranking_evidence_kind",
+        ),
+        CheckConstraint("position >= 0", name="ck_ranking_evidence_position"),
+        UniqueConstraint(
+            "ranking_run_id",
+            "evidence_id",
+            name="uq_ranking_evidence_id",
+        ),
+        UniqueConstraint(
+            "ranking_run_id",
+            "source_ref",
+            name="uq_ranking_evidence_source",
+        ),
+        UniqueConstraint(
+            "ranking_run_id",
+            "position",
+            name="uq_ranking_evidence_position",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    ranking_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ranking_runs.id", ondelete="CASCADE"), index=True
+    )
+    evidence_id: Mapped[str] = mapped_column(String(48))
+    source_ref: Mapped[str] = mapped_column(String(100))
+    position: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(16))
+    value: Mapped[str] = mapped_column(String(500))
+
+    ranking_run: Mapped[RankingRunModel] = orm_relationship(back_populates="evidence")
+
+
+class RankingItemModel(Base):
+    __tablename__ = "ranking_items"
+    __table_args__ = (
+        CheckConstraint("role IN ('SELECTED', 'ALTERNATIVE')", name="ck_ranking_item_role"),
+        CheckConstraint("position >= 0 AND position <= 2", name="ck_ranking_item_position"),
+        CheckConstraint(
+            "(position = 0 AND role = 'SELECTED') OR "
+            "(position > 0 AND role = 'ALTERNATIVE')",
+            name="ck_ranking_item_role_position",
+        ),
+        UniqueConstraint(
+            "ranking_run_id",
+            "candidate_snapshot_id",
+            name="uq_ranking_item_candidate",
+        ),
+        UniqueConstraint(
+            "ranking_run_id",
+            "position",
+            name="uq_ranking_item_position",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    ranking_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ranking_runs.id", ondelete="CASCADE"), index=True
+    )
+    candidate_snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("candidate_snapshots.id", ondelete="RESTRICT"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    role: Mapped[str] = mapped_column(String(16))
+    reason: Mapped[str] = mapped_column(String(240))
+    evidence_ids: Mapped[list[str]] = mapped_column(JSON)
+
+    ranking_run: Mapped[RankingRunModel] = orm_relationship(back_populates="items")
+    candidate_snapshot: Mapped[CandidateSnapshotModel] = orm_relationship(
+        back_populates="ranking_items"
+    )
 
 
 class PurchaseIntentModel(Base):

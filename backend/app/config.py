@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -7,6 +8,7 @@ from pydantic import AnyHttpUrl, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPOSITORY_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+AZURE_DEPLOYMENT_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,200}$")
 
 
 class Settings(BaseSettings):
@@ -67,6 +69,47 @@ class Settings(BaseSettings):
         if value is not None and len(value.get_secret_value().encode()) < 32:
             raise ValueError("SESSION_TOKEN_PEPPER must contain at least 32 bytes")
         return value
+
+    @field_validator("azure_openai_deployment")
+    @classmethod
+    def validate_azure_deployment(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if AZURE_DEPLOYMENT_PATTERN.fullmatch(normalized) is None:
+            raise ValueError("AZURE_OPENAI_DEPLOYMENT is invalid")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_azure_openai_configuration(self) -> "Settings":
+        values = (
+            self.azure_openai_base_url,
+            self.azure_openai_api_key,
+            self.azure_openai_deployment,
+        )
+        if any(value is not None for value in values) and not all(
+            value is not None for value in values
+        ):
+            raise ValueError("Azure OpenAI configuration must be complete")
+        if self.azure_openai_base_url is None:
+            return self
+        parsed = urlsplit(str(self.azure_openai_base_url))
+        hostname = (parsed.hostname or "").casefold()
+        if (
+            parsed.scheme != "https"
+            or not hostname.endswith((".openai.azure.com", ".services.ai.azure.com"))
+            or parsed.path.rstrip("/") != "/openai/v1"
+            or parsed.query
+            or parsed.fragment
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.port not in (None, 443)
+        ):
+            raise ValueError("AZURE_OPENAI_BASE_URL must use an approved Azure /openai/v1 endpoint")
+        assert self.azure_openai_api_key is not None
+        if len(self.azure_openai_api_key.get_secret_value()) < 16:
+            raise ValueError("AZURE_OPENAI_API_KEY is invalid")
+        return self
 
     @field_validator("android_return_uri")
     @classmethod

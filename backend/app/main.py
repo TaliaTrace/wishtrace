@@ -22,6 +22,7 @@ from app.discovery import (
 from app.discovery_api import build_discovery_router
 from app.errors import register_error_handlers
 from app.observability import configure_logging, register_request_context
+from app.openai_ranking import build_azure_ranking_gateway
 from app.prava import PravaHttpGateway
 from app.purchase import (
     PurchaseOperations,
@@ -29,6 +30,13 @@ from app.purchase import (
     build_purchase_service,
 )
 from app.purchase_api import build_purchase_router
+from app.ranking import (
+    RankingGateway,
+    RankingOperations,
+    UnavailableRankingGateway,
+    build_ranking_service,
+)
+from app.ranking_api import build_ranking_router
 from app.recipient_context import ContextOperations, SqlContextStore
 from app.system import DatabaseProbeCallable, build_system_router
 
@@ -40,6 +48,7 @@ def create_app(
     context_operations: ContextOperations | None = None,
     discovery_operations: DiscoveryOperations | None = None,
     purchase_operations: PurchaseOperations | None = None,
+    ranking_operations: RankingOperations | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     engine = None
@@ -110,6 +119,26 @@ def create_app(
                 resolved_purchase_operations = UnavailablePurchaseService()
         else:
             resolved_purchase_operations = UnavailablePurchaseService()
+    resolved_ranking_operations = ranking_operations
+    if resolved_ranking_operations is None and session_factory is not None:
+        ranking_gateway: RankingGateway = UnavailableRankingGateway()
+        if (
+            resolved_settings.azure_openai_base_url is not None
+            and resolved_settings.azure_openai_api_key is not None
+            and resolved_settings.azure_openai_deployment is not None
+        ):
+            try:
+                ranking_gateway = build_azure_ranking_gateway(
+                    base_url=str(resolved_settings.azure_openai_base_url),
+                    api_key=resolved_settings.azure_openai_api_key,
+                    deployment=resolved_settings.azure_openai_deployment,
+                )
+            except ValueError:
+                ranking_gateway = UnavailableRankingGateway()
+        resolved_ranking_operations = build_ranking_service(
+            session_factory=session_factory,
+            gateway=ranking_gateway,
+        )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -139,5 +168,8 @@ def create_app(
         app.include_router(
             build_purchase_router(resolved_settings.android_return_uri)
         )
+    if resolved_ranking_operations is not None:
+        app.state.ranking_operations = resolved_ranking_operations
+        app.include_router(build_ranking_router())
     app.include_router(build_system_router(resolved_settings, resolved_database_probe))
     return app

@@ -7,7 +7,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0006` | Codex | 2026-08-01 21:04 PKT |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0007` | Codex | 2026-08-01 21:33 PKT |
 | Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — public deploy pending | Codex | 2026-08-01 |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS LOCALLY — one real user/session, public deploy pending | Codex/user | 2026-08-01 |
 | Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
@@ -15,7 +15,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Prava transaction path understood | session + authoritative status | FOUNDATION PASS — exact API adapter + ledger; live hosted flow pending | Codex | 2026-08-01 21:04 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL — HyperX catalog live; MCP `create_checkout` absent, browser path pending | Codex | 2026-08-01 |
 | Backup merchant validated | documented fallback | PARTIAL PASS — Turtle live catalog; stored-value card blocked | Codex | 2026-08-01 |
-| OpenAI structured output works | valid live candidate IDs returned | PRE-KICKOFF SMOKE ONLY | Codex/user | 2026-08-01 |
+| OpenAI structured output works | valid live candidate IDs returned | BOUNDARY PASS — strict SDK/schema tests; live provider DNS + zero eligible candidates block runtime proof | Codex/user | 2026-08-01 21:33 PKT |
 | Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
@@ -29,10 +29,10 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Add the stable local session pepper and permanent `sslmode=require`, then deploy the API over HTTPS once the Azure subscription is visible to the signed-in CLI account.
-2. Get Prava's exact Browser Harness/API answer and prove one real HyperX checkout attempt; do not enable candidate checkout before that evidence.
-3. Enter Zaid's real birthday and maximum USD budget on the physical phone, then prove close/reopen persistence.
-4. Rank only persisted eligible live candidate IDs with Azure OpenAI structured output; current zero-eligible state must remain honest.
+1. Correct `AZURE_OPENAI_BASE_URL` from the Foundry deployment's exact target URI; the current hostname fails DNS. Make the Azure subscription visible to the signed-in CLI account, then deploy the API over HTTPS.
+2. Add the stable local session pepper and permanent `sslmode=require` without sharing either value.
+3. Get Prava's exact Browser Harness/API answer and prove one real HyperX checkout attempt; do not enable candidate checkout before that evidence.
+4. Enter Zaid's real birthday and maximum USD budget on the physical phone, then prove close/reopen persistence.
 
 ## Next
 
@@ -42,6 +42,33 @@ Update this file during the hackathon. Do not manage the project from memory.
 4. Repeat the physical-phone flow twice, then apply for production access.
 
 ## Milestone evidence
+
+### 2026-08-01 — Grounded Azure ranking boundary and immutable decision audit
+
+- Ranking boundary: added authenticated create/read routes that accept only persisted candidates which
+  still pass source-mode, checkout, availability, variant, USD and budget checks. With the current
+  merchants, every candidate remains rejected for unsupported checkout, so the runtime makes zero
+  Azure calls and returns `NO_ELIGIBLE_CANDIDATES`.
+- Structured output: the official OpenAI Python client targets the configured Azure `/openai/v1/`
+  endpoint with `store=false`, a strict JSON Schema whose enums contain only eligible candidate and
+  evidence IDs, no tools, one malformed-output repair, and application validation after parsing.
+- Privacy and claims: the provider input omits recipient name, merchant URL, money, availability,
+  delivery and payment data. Reasons may describe recipient fit only; commerce claims, unknown IDs,
+  rejected candidates, duplicate IDs and unknown evidence are rejected.
+- Recovery: provider failure or two invalid outputs use a high-uncertainty deterministic result only
+  when saved interest/hint text directly matches a candidate. Otherwise the durable run becomes
+  `USER_CHOICE_REQUIRED`; no local product or model-like answer is fabricated.
+- Persistence: migration `20260801_0007` added one owned ranking run per discovery, immutable evidence
+  snapshots and ordered evidence-linked decision items. Supabase advanced over verified TLS;
+  PostgreSQL 17.6 remained healthy and Alembic reports no model/schema drift.
+- Provider proof: the SDK wire contract passes an isolated mocked HTTP transport test. A judged-window
+  live structured-output probe correctly failed as `MODEL_TIMEOUT` because the configured Foundry
+  hostname did not resolve in DNS. This is an external configuration blocker, not a successful model
+  call; the earlier pre-kickoff provider smoke is not promoted as current evidence.
+- Quality: backend pytest 67 passed; Ruff passed; strict mypy passed. Android debug assembly, unit
+  tests and lint also passed. Connected tests were not run to preserve the user's pending phone form.
+- Evidence: `backend/app/ranking.py`, `backend/app/openai_ranking.py`,
+  `backend/tests/test_ranking.py`, and `backend/tests/test_openai_ranking.py`.
 
 ### 2026-08-01 — Idempotent Prava boundary and authoritative purchase ledger
 

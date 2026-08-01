@@ -229,3 +229,22 @@ Record only decisions that change product, architecture, truth boundary, schedul
   `Gift secured` without an independently verified merchant order. Live purchase routes remain
   unreachable while merchant checkout support is unproven.
 - Owner: WishTrace team / Codex
+
+### 2026-08-01 21:33 PKT — Ranking is evidence-linked and cannot bypass checkout truth
+
+- Context: Azure ranking must strengthen the same real transaction path without turning provider
+  availability or polished model prose into a substitute for a purchasable product.
+- Evidence: The implementation accepts only persisted `LIVE` snapshots that still pass checkout,
+  availability, variant, USD and budget checks. Strict-schema and SDK-wire tests pass, Supabase is at
+  `20260801_0007`, and Alembic reports no drift. The current merchant snapshots have no verified
+  checkout path. A judged-window Azure probe failed DNS before a response because the configured
+  Foundry hostname does not resolve.
+- Decision: Return `NO_ELIGIBLE_CANDIDATES` before any provider call when hard rules leave no option.
+  Send Azure only opaque eligible/evidence IDs and minimal fit text; validate every dynamic ID and
+  disallow commerce claims. Repair malformed output once, then use only a high-uncertainty direct-
+  evidence fallback or require explicit user choice. Persist evidence and ordered rationales for
+  owner-scoped audit, but never persist provider secrets or payment data.
+- Consequence: The OpenAI boundary is production-shaped and test-proven, yet no runtime OpenAI success
+  is claimed until both the exact Azure endpoint resolves and a real merchant candidate becomes
+  checkout-eligible. A model timeout or invalid response cannot create a product or success state.
+- Owner: WishTrace team / Codex

@@ -77,28 +77,39 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Account/project used: Azure AI Foundry, configured in ignored environment
 - Model selected: configured Azure deployment; name intentionally not duplicated in docs
 - Structured extraction verified:
-- Structured ranking verified:
+- Structured ranking verified: CONTRACT + SDK WIRE TEST — strict dynamic JSON Schema, official
+  Responses client, `store=false`, known candidate/evidence enums and post-response validation pass
+  automated tests. No runtime recommendation has been generated.
 - Multimodal verified:
 - Message generation verified:
-- Invalid-output fallback tested:
-- Latency:
-- Known blockers: structured ranking against live candidate IDs is not implemented
-- Last verified: pre-kickoff Responses API smoke response only; judged-window orchestration pending
+- Invalid-output fallback tested: YES — malformed schema, unknown/rejected candidate ID, unsupported
+  commerce claim, model no-selection, provider failure, one repair, direct-evidence fallback and
+  explicit user-choice recovery are covered
+- Latency: no judged-window provider latency available
+- Backend boundary: authenticated rank/read routes persist one immutable evidence-linked decision per
+  discovery. Only still-eligible `LIVE` snapshots can reach the model; recipient name, merchant URL,
+  money, delivery and payment data are omitted from provider input.
+- Known blockers: all observed live products currently fail checkout support, so runtime ranking
+  correctly stops before Azure. The configured Azure hostname also failed DNS resolution during a
+  2026-08-01 21:31 PKT test-only structured-output probe; the SDK returned `MODEL_TIMEOUT`. Replace
+  `AZURE_OPENAI_BASE_URL` with the exact deployment target URI from Foundry before retesting.
+- Last verified: 2026-08-01 21:33 PKT; implementation/tests current, live provider proof blocked
 
 ## Supabase PostgreSQL
 
 - Path: session pooler on port 5432 with SQLAlchemy async psycopg 3 and `NullPool`
 - Client TLS verified: YES via libpq `ssl_in_use`
 - Server version observed: PostgreSQL 17.6
-- Migration status: `20260801_0006 (head)`; Alembic model/schema drift check passes
+- Migration status: `20260801_0007 (head)`; Alembic model/schema drift check passes
 - Migration content: foundation; Google users/challenges/sessions; owned recipients, preferences,
   hints and occasions; one-recipient Gold uniqueness; owned immutable discovery runs, live candidate
   snapshots and deterministic rejection records; exact purchase snapshots, public Prava session
-  identifiers, hashed idempotency operations and immutable transaction transitions
+  identifiers, hashed idempotency operations and immutable transaction transitions; owned ranking
+  runs, immutable evidence snapshots and ordered evidence-linked decisions
 - Permanent local `.env` contains `sslmode=require`: USER CONFIRMATION PENDING; verification used a process-only secure override
 - Stable local `SESSION_TOKEN_PEPPER`: USER CONFIRMATION PENDING; the current local server uses a
   process-only value and must not be restarted before the permanent value is added
-- Last verified: 2026-08-01 21:04 PKT during official window
+- Last verified: 2026-08-01 21:33 PKT during official window
 
 ## Android
 

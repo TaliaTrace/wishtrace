@@ -105,9 +105,10 @@ unavailable or recovery state instead.
 
 The FastAPI service lives in `backend/`. It requires Python 3.12 and `uv`, loads secrets from the
 ignored repository-root `.env`, rejects PostgreSQL connections without `sslmode=require`, and
-publishes `/health` plus the public UCP platform profile. Authenticated recipient, discovery and
-purchase-ledger routes are implemented; current live catalog candidates remain deterministically
-blocked from purchase until a callable real-merchant checkout path is proven.
+publishes `/health` plus the public UCP platform profile. Authenticated recipient, discovery,
+grounded-ranking and purchase-ledger routes are implemented; current live catalog candidates remain
+deterministically blocked from ranking or purchase until a callable real-merchant checkout path is
+proven.
 
 ```powershell
 cd backend

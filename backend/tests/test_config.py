@@ -58,3 +58,67 @@ def test_android_return_uri_cannot_be_redirected() -> None:
             ),
             android_return_uri="https://attacker.example/return",
         )
+
+
+def test_azure_openai_configuration_must_be_complete() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="Azure OpenAI configuration must be complete",
+    ):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            azure_openai_base_url=None,
+            azure_openai_api_key=None,
+            azure_openai_deployment="wishtrace-ranking",
+        )
+
+
+def test_azure_openai_endpoint_rejects_non_azure_host() -> None:
+    with pytest.raises(ValidationError, match="approved Azure /openai/v1 endpoint"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            azure_openai_base_url="https://attacker.example/openai/v1/",
+            azure_openai_api_key=SecretStr("not-a-real-key-but-long-enough"),
+            azure_openai_deployment="wishtrace-ranking",
+        )
+
+
+def test_azure_openai_endpoint_rejects_nested_project_path() -> None:
+    with pytest.raises(ValidationError, match="approved Azure /openai/v1 endpoint"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            azure_openai_base_url=(
+                "https://wishtrace.services.ai.azure.com/api/projects/example/openai/v1/"
+            ),
+            azure_openai_api_key=SecretStr("not-a-real-key-but-long-enough"),
+            azure_openai_deployment="wishtrace-ranking",
+        )
+
+
+def test_azure_openai_foundry_endpoint_is_accepted() -> None:
+    settings = Settings(
+        app_env="test",
+        database_url=SecretStr(
+            "postgresql://wishtrace:password@database.invalid:5432/"
+            "wishtrace?sslmode=require"
+        ),
+        azure_openai_base_url=(
+            "https://wishtrace.services.ai.azure.com/openai/v1/"
+        ),
+        azure_openai_api_key=SecretStr("not-a-real-key-but-long-enough"),
+        azure_openai_deployment="wishtrace-ranking",
+    )
+
+    assert settings.azure_openai_deployment == "wishtrace-ranking"

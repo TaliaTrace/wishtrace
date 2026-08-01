@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     azure_openai_deployment: str | None = None
     prava_base_url: AnyHttpUrl | None = None
     prava_secret_key: SecretStr | None = None
+    android_return_uri: str = "wishtrace://prava/return"
     primary_merchant_profile_url: AnyHttpUrl = AnyHttpUrl(
         "https://hyperx.com/.well-known/ucp"
     )
@@ -65,6 +66,22 @@ class Settings(BaseSettings):
     def require_strong_session_pepper(cls, value: SecretStr | None) -> SecretStr | None:
         if value is not None and len(value.get_secret_value().encode()) < 32:
             raise ValueError("SESSION_TOKEN_PEPPER must contain at least 32 bytes")
+        return value
+
+    @field_validator("android_return_uri")
+    @classmethod
+    def require_wishtrace_return_uri(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "wishtrace"
+            or parsed.hostname != "prava"
+            or parsed.path != "/return"
+            or parsed.query
+            or parsed.fragment
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise ValueError("ANDROID_RETURN_URI must equal wishtrace://prava/return")
         return value
 
     @property

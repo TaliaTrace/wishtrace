@@ -46,3 +46,15 @@ def test_configured_session_pepper_must_be_strong() -> None:
             ),
             session_token_pepper=SecretStr("too-short"),
         )
+
+
+def test_android_return_uri_cannot_be_redirected() -> None:
+    with pytest.raises(ValidationError, match="wishtrace://prava/return"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            android_return_uri="https://attacker.example/return",
+        )

@@ -46,17 +46,20 @@ Prava is not a button after recommendation. It enables WishTrace to move from a 
 ```text
 DRAFT
   → VALIDATING
+  → QUOTED
   → READY_FOR_APPROVAL
   → SESSION_CREATING
   → AWAITING_USER
-  → PROCESSING
+  → CREDENTIALS_READY
+  → CHECKOUT_IN_PROGRESS
+  → ORDER_VERIFIED
   → SUCCEEDED
 
 Terminal alternatives:
 DECLINED | CANCELLED | EXPIRED | FAILED
 
 Nonterminal uncertainty:
-UNKNOWN → RECONCILING → terminal state or manual support
+UNKNOWN → RECONCILING → authoritative state or manual support
 ```
 
 ## Required purchase snapshot
@@ -78,6 +81,9 @@ UNKNOWN → RECONCILING → terminal state or manual support
 
 - Keys only on backend.
 - No card data stored.
+- Store only SHA-256 hashes of idempotency keys and canonical requests.
+- Require the returned merchant origin and total to match the explicit review before a one-time
+  credential can enter checkout memory.
 - Validate redirect targets.
 - Poll only the documented payment-result endpoint; do not invent a webhook contract.
 - Report the merchant attempt as `APPROVED` or `DECLINED` through the documented report-status endpoint.

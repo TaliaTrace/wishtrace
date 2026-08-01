@@ -7,12 +7,12 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0005` | Codex | 2026-08-01 |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0006` | Codex | 2026-08-01 21:04 PKT |
 | Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — public deploy pending | Codex | 2026-08-01 |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS LOCALLY — one real user/session, public deploy pending | Codex/user | 2026-08-01 |
 | Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | NOT STARTED | | |
+| Prava transaction path understood | session + authoritative status | FOUNDATION PASS — exact API adapter + ledger; live hosted flow pending | Codex | 2026-08-01 21:04 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL — HyperX catalog live; MCP `create_checkout` absent, browser path pending | Codex | 2026-08-01 |
 | Backup merchant validated | documented fallback | PARTIAL PASS — Turtle live catalog; stored-value card blocked | Codex | 2026-08-01 |
 | OpenAI structured output works | valid live candidate IDs returned | PRE-KICKOFF SMOKE ONLY | Codex/user | 2026-08-01 |
@@ -29,10 +29,10 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Enter one actual recipient/occasion on the physical phone and prove close/reopen persistence.
-2. Add the stable local session pepper and permanent `sslmode=require`, then deploy the API over HTTPS.
-3. Rank only persisted eligible live candidate IDs with Azure OpenAI structured output.
-4. Refresh one exact HyperX variant into a real quote before any payment UI claim.
+1. Add the stable local session pepper and permanent `sslmode=require`, then deploy the API over HTTPS once the Azure subscription is visible to the signed-in CLI account.
+2. Get Prava's exact Browser Harness/API answer and prove one real HyperX checkout attempt; do not enable candidate checkout before that evidence.
+3. Enter Zaid's real birthday and maximum USD budget on the physical phone, then prove close/reopen persistence.
+4. Rank only persisted eligible live candidate IDs with Azure OpenAI structured output; current zero-eligible state must remain honest.
 
 ## Next
 
@@ -42,6 +42,35 @@ Update this file during the hackathon. Do not manage the project from memory.
 4. Repeat the physical-phone flow twice, then apply for production access.
 
 ## Milestone evidence
+
+### 2026-08-01 — Idempotent Prava boundary and authoritative purchase ledger
+
+- Prava adapter: implemented the documented hosted `full_checkout` session request, payment-result
+  polling and `APPROVED`/`DECLINED` report-status contracts behind typed HTTP boundaries. Hosted URLs
+  are HTTPS host-allowlisted, redirects and oversized/non-JSON responses are rejected, and provider
+  errors expose only safe codes and response IDs.
+- Credential isolation: session tokens are discarded. One-time card token, dynamic CVV and expiry use
+  masked in-memory types and are absent from API response models, logs and all four new database
+  tables. `awaiting_result` advances only for exactly one credential whose merchant origin and total
+  match the reviewed purchase facts.
+- Duplicate protection: Prava session creation requires a stable idempotency key; only SHA-256 hashes
+  of the key and canonical request are stored. A repeated tap returns the existing hosted session.
+  A network timeout, server-side error, redirect or malformed success after the POST becomes
+  `UNKNOWN` and refuses a blind retry.
+- Truth boundary: a Prava `completed` response cannot produce success without a separately verified
+  merchant order. The current live merchants remain checkout-ineligible, so no runtime purchase
+  intent or hosted session can be created yet.
+- Persistence: migration `20260801_0006` added exact purchase snapshots, Prava public identifiers,
+  idempotency operations and immutable state transitions. Supabase advanced from `0005` to `0006`
+  over verified TLS; PostgreSQL 17.6 remained healthy and Alembic reports no model/schema drift.
+- API: added authenticated purchase-intent create/read, idempotent Prava-session create, reconcile,
+  public status and fixed Android return routes. The return route conveys only the purchase-intent ID
+  and never trusts a provider status from the browser.
+- Quality: backend pytest 52 passed; Ruff passed; strict mypy passed; Android `assembleDebug`, unit
+  tests and lint passed. Connected tests were intentionally skipped to preserve the user's current
+  unsaved recipient form.
+- Evidence: `backend/app/prava.py`, `backend/app/purchase.py`,
+  `backend/tests/test_prava.py`, `backend/tests/test_purchase.py`.
 
 ### 2026-08-01 — Live UCP discovery and immutable candidate evidence
 

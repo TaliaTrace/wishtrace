@@ -9,20 +9,30 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Dashboard/API key created: YES (user-provided environment; value never recorded here)
 - Authentication request verified: YES during official window — authenticated missing-session probe
   returned expected `404 NOT_FOUND`, response `9fecc0ee-838b-40c4-9ece-048f5f16bb5c`
-- Session creation verified:
+- Session creation verified: CONTRACT + MOCK TRANSPORT — exact decimal money, hosted URL allowlist,
+  response-ID capture and session-token discard tested; no live sandbox session created yet
 - Hosted approval verified:
 - App return verified:
-- Payment-result polling verified:
-- Report-status verified:
+- Payment-result polling verified: CONTRACT + MOCK TRANSPORT — credentials remain masked and
+  memory-only; no live approval result polled yet
+- Report-status verified: CONTRACT + MOCK TRANSPORT — only the documented purchase outcome fields
+  are sent; no live merchant attempt has been reported yet
 - Real-merchant browser attempt verified:
 - Authoritative success verified:
-- Decline/cancel/unknown tested:
+- Decline/cancel/unknown tested: create timeout, server error, unsafe redirect and malformed success
+  freeze as `UNKNOWN`; replay refusal and invalid provider facts pass automated tests; live decline
+  and cancel remain pending
 - Production access requested: NO — intentionally gated behind organizer-required sandbox evidence
+- Backend boundary: purchase ledger, hashed idempotency mapping, exact state transitions, fixed app
+  return and authoritative polling are implemented. A repeated session tap cannot issue a second
+  provider call; an uncertain create cannot be blindly retried. Prava facts must match the approved
+  merchant origin and total before credentials become usable.
 - Known blockers: official docs describe Browser Harness but expose no SDK/API invocation contract;
-  no judged-window session, tokenized-card attempt or authoritative result yet. Birdie support answer
-  requested before implementing or inventing this boundary.
-- Last verified: 2026-08-01 20:45 PKT
-- Evidence location: safe response ID above; no credential or provider payload retained
+  no judged-window hosted session, tokenized-card attempt or authoritative result yet. Birdie support
+  answer is required before implementing or inventing this boundary.
+- Last verified: 2026-08-01 21:04 PKT
+- Evidence location: safe response ID above; `backend/app/prava.py`, `backend/app/purchase.py` and
+  isolated transport/state tests; no credential or provider payload retained
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -80,14 +90,15 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Path: session pooler on port 5432 with SQLAlchemy async psycopg 3 and `NullPool`
 - Client TLS verified: YES via libpq `ssl_in_use`
 - Server version observed: PostgreSQL 17.6
-- Migration status: `20260801_0005 (head)`
+- Migration status: `20260801_0006 (head)`; Alembic model/schema drift check passes
 - Migration content: foundation; Google users/challenges/sessions; owned recipients, preferences,
   hints and occasions; one-recipient Gold uniqueness; owned immutable discovery runs, live candidate
-  snapshots and deterministic rejection records
+  snapshots and deterministic rejection records; exact purchase snapshots, public Prava session
+  identifiers, hashed idempotency operations and immutable transaction transitions
 - Permanent local `.env` contains `sslmode=require`: USER CONFIRMATION PENDING; verification used a process-only secure override
 - Stable local `SESSION_TOKEN_PEPPER`: USER CONFIRMATION PENDING; the current local server uses a
   process-only value and must not be restarted before the permanent value is added
-- Last verified: 2026-08-01 during official window
+- Last verified: 2026-08-01 21:04 PKT during official window
 
 ## Android
 

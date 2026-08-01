@@ -22,6 +22,13 @@ from app.discovery import (
 from app.discovery_api import build_discovery_router
 from app.errors import register_error_handlers
 from app.observability import configure_logging, register_request_context
+from app.prava import PravaHttpGateway
+from app.purchase import (
+    PurchaseOperations,
+    UnavailablePurchaseService,
+    build_purchase_service,
+)
+from app.purchase_api import build_purchase_router
 from app.recipient_context import ContextOperations, SqlContextStore
 from app.system import DatabaseProbeCallable, build_system_router
 
@@ -32,6 +39,7 @@ def create_app(
     auth_operations: AuthOperations | None = None,
     context_operations: ContextOperations | None = None,
     discovery_operations: DiscoveryOperations | None = None,
+    purchase_operations: PurchaseOperations | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     engine = None
@@ -82,6 +90,26 @@ def create_app(
             )
         except ValueError:
             resolved_discovery_operations = UnavailableDiscoveryService()
+    resolved_purchase_operations = purchase_operations
+    if resolved_purchase_operations is None and session_factory is not None:
+        if (
+            resolved_settings.prava_base_url is not None
+            and resolved_settings.prava_secret_key is not None
+        ):
+            try:
+                prava = PravaHttpGateway(
+                    base_url=str(resolved_settings.prava_base_url),
+                    secret_key=resolved_settings.prava_secret_key,
+                )
+                resolved_purchase_operations = build_purchase_service(
+                    session_factory=session_factory,
+                    prava=prava,
+                    public_base_url=str(resolved_settings.public_base_url),
+                )
+            except ValueError:
+                resolved_purchase_operations = UnavailablePurchaseService()
+        else:
+            resolved_purchase_operations = UnavailablePurchaseService()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -106,5 +134,10 @@ def create_app(
     if resolved_discovery_operations is not None:
         app.state.discovery_operations = resolved_discovery_operations
         app.include_router(build_discovery_router())
+    if resolved_purchase_operations is not None:
+        app.state.purchase_operations = resolved_purchase_operations
+        app.include_router(
+            build_purchase_router(resolved_settings.android_return_uri)
+        )
     app.include_router(build_system_router(resolved_settings, resolved_database_probe))
     return app

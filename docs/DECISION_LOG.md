@@ -212,3 +212,20 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: Turtle Beach physical products are the backup. Gift cards can be enabled only by
   changing the server-side policy after end-to-end stored-value checkout evidence exists.
 - Owner: WishTrace team / Codex
+
+### 2026-08-01 21:04 PKT — Prava credentials cross only an exact, idempotent purchase boundary
+
+- Context: Finalist and Visa evidence require explicit consent, duplicate protection and a truthful
+  distinction between hosted approval, one-time credentials and a verified merchant order.
+- Evidence: Current Prava documentation exposes hosted session creation, polling and report-status.
+  Transport tests prove exact minor-unit conversion, safe response handling and masked credential
+  models. Supabase migration `20260801_0006` is live over TLS and matches SQLAlchemy metadata.
+- Decision: Snapshot the reviewed merchant, variant and amount before Prava; store only hashes of the
+  idempotency key/request; replay a completed create; freeze uncertain creates as `UNKNOWN`; and
+  accept `awaiting_result` credentials only when a single line item matches the reviewed merchant
+  origin and total. Treat network, 5xx, redirect and malformed-success responses after a create POST
+  as uncertain. Discard the session token and never persist card token, CVV or expiry.
+- Consequence: Provider approval cannot silently change the basket and `completed` cannot become
+  `Gift secured` without an independently verified merchant order. Live purchase routes remain
+  unreachable while merchant checkout support is unproven.
+- Owner: WishTrace team / Codex

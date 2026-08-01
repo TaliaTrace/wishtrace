@@ -105,15 +105,18 @@ unavailable or recovery state instead.
 
 The FastAPI service lives in `backend/`. It requires Python 3.12 and `uv`, loads secrets from the
 ignored repository-root `.env`, rejects PostgreSQL connections without `sslmode=require`, and
-publishes `/health` plus the public UCP platform profile.
+publishes `/health` plus the public UCP platform profile. Authenticated recipient, discovery and
+purchase-ledger routes are implemented; current live catalog candidates remain deterministically
+blocked from purchase until a callable real-merchant checkout path is proven.
 
 ```powershell
 cd backend
 uv sync --all-groups
-uv run python -m pytest
-uv run python -m ruff check .
-uv run python -m mypy app scripts
-uv run python -m alembic upgrade head
+uv run pytest
+uv run ruff check app tests migrations scripts
+uv run mypy app scripts
+uv run alembic upgrade head
+uv run alembic check
 uv run python -m scripts.run_server
 ```
 

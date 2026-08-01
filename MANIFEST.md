@@ -1,0 +1,54 @@
+# Manifest
+
+- `.agents/skills/README.md` — 412 bytes
+- `.agents/skills/wishtrace-android/SKILL.md` — 729 bytes
+- `.agents/skills/wishtrace-demo/SKILL.md` — 616 bytes
+- `.agents/skills/wishtrace-merchant/SKILL.md` — 593 bytes
+- `.agents/skills/wishtrace-openai/SKILL.md` — 668 bytes
+- `.agents/skills/wishtrace-prava/SKILL.md` — 754 bytes
+- `.agents/skills/wishtrace-product/SKILL.md` — 745 bytes
+- `.agents/skills/wishtrace-qa/SKILL.md` — 597 bytes
+- `.agents/skills/wishtrace-startup/SKILL.md` — 596 bytes
+- `.agents/skills/wishtrace-ux/SKILL.md` — 872 bytes
+- `AGENTS.md` — 13,484 bytes
+- `CODEX_BOOTSTRAP.md` — 2,812 bytes
+- `EXECUTION_BOARD.md` — 2,275 bytes
+- `PLAN.md` — 14,595 bytes
+- `README.md` — 4,650 bytes
+- `TOOLKIT.md` — 3,816 bytes
+- `assets/concepts/README.md` — 298 bytes
+- `assets/concepts/wishtrace_onboarding_ai_concept.png` — 1,165,633 bytes
+- `assets/concepts/wishtrace_onboarding_wireframe.png` — 284,478 bytes
+- `assets/concepts/wishtrace_showcase_concept.png` — 1,698,315 bytes
+- `docs/ARCHITECTURE.md` — 2,276 bytes
+- `docs/DECISION_LOG.md` — 1,228 bytes
+- `docs/DEMO_AND_SUBMISSION.md` — 2,809 bytes
+- `docs/DESIGN_SYSTEM.md` — 3,161 bytes
+- `docs/INTEGRATION_STATUS.md` — 1,479 bytes
+- `docs/MERCHANT_VALIDATION.md` — 2,210 bytes
+- `docs/MOTION_SPEC.md` — 1,468 bytes
+- `docs/OPENAI_ORCHESTRATION.md` — 2,549 bytes
+- `docs/PRAVA_INTEGRATION.md` — 3,223 bytes
+- `docs/PREEXISTING_WORK.md` — 1,050 bytes
+- `docs/PRODUCT_SPEC.md` — 4,158 bytes
+- `docs/QA_AND_TESTING.md` — 2,080 bytes
+- `docs/RISK_REGISTER.md` — 2,083 bytes
+- `docs/SCREEN_MAP.md` — 3,062 bytes
+- `docs/STARTUP_STORY.md` — 2,548 bytes
+- `docs/UX_RESEARCH.md` — 5,405 bytes
+- `prompts/CODEX_TASKS.md` — 2,534 bytes
+- `prompts/IMAGE_GENERATION.md` — 3,276 bytes
+- `prompts/JUDGE_QA.md` — 2,157 bytes
+- `prompts/MOBBIN_QUERIES.md` — 1,629 bytes
+- `references/DISCORD_NOTES.md` — 1,608 bytes
+- `references/HANDBOOK_NOTES.md` — 2,094 bytes
+- `references/RFH_NOTES.md` — 702 bytes
+- `references/source/Agentic Commerce Hackathon Builder Handbook.html` — 202,431 bytes
+- `references/source/Agentic Commerce Hackathon Builder Handbook.txt` — 16,441 bytes
+- `references/source/Discord dump excerpt.txt` — 24,041 bytes
+- `references/source/RFH — Requests for Hacks.pdf` — 616,357 bytes
+- `templates/.env.example` — 207 bytes
+- `templates/SUBMISSION_TEMPLATE.md` — 792 bytes
+- `templates/SUPPORT_REQUEST.md` — 341 bytes
+
+- `docs/TRACK_STRATEGY.md` — explicit prize targets, proof matrix and Linq gate.

@@ -1,0 +1,187 @@
+Not necessarily- if you can come up with something better, a new insight or idea. Build that.   Idea you submit is just one of the many filter for us to evaluate your application.
+Hey <@719794709618229248> <@756907952195109014> , just wanted to understand that the idea we submitted during filling up the form, we have to stick to it , right?
+Don't worry on the openai credits folks!   Y'all get it before Hackathon. Will ping here as and when the process starts
+I am not selected yet, any way to get selected 🙁
+Ye even i got selected on 26th so applied on that day , will i still recieve it ?
+<@&1526171311372767292> would you all be open to taking on a new sponsor for prizes? I'd be happy to sponsor a track for **$1,000** towards GLM 5.2 / Kimi K2.7 Code (and K3 if my upstream provider gets it soon) on my AI gateway service Triad
+i applied for OpenAI hackathon Credits now. The mail says to apply before before 26th. is it fine? <@719794709618229248>
+You can checkout documentation and familiarize yourself with Prava in advance.   However, only the work done during the official hackathon period, after the start has been formally announced as per the timeline, will be considered for judging.   Any work completed before the hackathon begins will not count toward your project evaluation.
+hey! can we begin building or do we have to wait till official day begins
+hi can the team help me get into this hackathon ?
+<@&1526171311372767292> can you help me, get into the hackathon   My name is Sahil Rakhaiya, GSoC 25 contributor, lead of gdgoc, Google cloud facilitator and working on my on AI security research
+From what I read earlier from one of the organizers, we get it before the hackathon begins
+Hey I just filled the form for ai credit. I know I'm late so should I mail anyone for this ? <@255650474735173634>
+Are invites sent to everyone?
+<@255650474735173634> can i use another email for the codex account, if no how could i change it.
+Got it. Thanks
+You can work on plan but build it during hackathon
+Thanks buddy
+Guys, I just discovered the hackathon. Should I start building for the hackathon product?
+I spotted this question answered earlier. Credits will be applied before the Hackathon starts  https://discord.com/channels/1505768637313716285/1525459999781027910/1530870930274783315
+<@719794709618229248>  Sushant I applied for OPEN AI credit but it is yet to be credit to account . My account showing 0 credit even after submitting the form . Can you please help me ?
+got it about 2 hours ago
+did anyone get the acceptance email?
+Copy that 🫡
+Yeap, many builders missed the deadline and reached out to extend it. So had to.
+<@719794709618229248>
+Hey, quick question was the registration deadline extended...? I noticed something on Devfolio.
+ohh didn't know this  <@1529139877306695830> can you get me the docs on how the customize the iframe for the embedded integration of prava
+you can embed the iframe and customize the colour etc as per your app's branding.   Would that help?
+yeah I'm planning on hosted checkout,   did you try the embedded one ? it was an iframe, so would look little odd with my app UI, so going wit hosted
+Hi guyys, how do you intend on handling the final merchant checkout step in your demo? Are you using Prava's hosted checkout, or something else?
+Most approvals have been sent.   We've few applications waitlisted
+aight thanks
+<@719794709618229248>  I had filled the application 2-3 days back but on devfolio it still shows under review? Is the review process still  ongoing or is it completed? Teamname : KSV007
+<@1529139877306695830> how i will get access of linq ?
+Ok
+This is devfolio MCP and not Prava's
+Not mandatory
+Hey everyone..just small question , I got approved for hack..do I need to setup MCP necessarily?
+All good. You'll get the credits before hackathon starts.
+Before hackathon starts
+Hi there, do I have to refill the credits form because I rsvped after filling the credits form
+you might have recieved mail with google form link, you need to fill that
+could someone tell me how can i claim openAi credits?
+Any idea when OpenAI credits will show up in Codex?
+<@166262385701683200> you can RSVP- extended the deadline
+Yeah, we've got few these now so need to take a look lol
+Thank you! The website says to check with organizers of hackathon on the RSVP page to RSVP late so idk who else to contact but y’all haha
+Hey! I don't think so, I'll check with the devfolio team. Can't see any option to override that
+Sent an email to y’all too 🙂
+
+<@719794709618229248> hey man I got busy with work and missed the deadline to RSVP, any chance you could override it for me?
+Thank you Sushant!
+Done!
+Hey <@&1526171311372767292>, could you please help me, get into the hackathon, and speedup my application process, as my team mate actually applied solo, and then i also applied solo but his proposal is accepted and mine is still pending. I request you help me with this.   My name is Amrendra Vikram Singh/ Amrendra Singh.  You can cross check the idea and submittion if you want, and if this is not the right place to raise a support ticket, then please guide me as well.  The teammate name is Piyush Agarwal. Thank you.
+Hey I haven't received any mail
+Hey I haven't received any mail regarding selection ? Have applied 3-4 days before Am I not selected or can I still hope for email for selection?
+<@1070595046279229512> please avoid tagging everyone. You can tag <@&1526171311372767292>
+<@1529139877306695830> can I get a test card, can you DM
+@everyone  we're in <#1505768641101168813>
+hey hey, let's take these up during the office hours?   check here: https://discord.com/channels/1505768637313716285/1525459674885787730/1530598676253114548
+<@719794709618229248> how to claim the openai credits??
+hi <@719794709618229248> gotta ask smth, can I DM you?
+this
+Cause 30k credits 100 pp
+I think it's 300 people
+hey guys , 300 people are selected or is it 300 teams?
+Hey @everyone !  I really appreciate y'all joining our community. I'm going through each and every application but we've got over 2000 registrations now. (I did this last week and we were at 1200 apps)  If you can drop your devfolio username/team name with which you applied in the thread below, I'll prioritize to review your applications first.   `*Note: This is only to fast-track the review, final approval will be based on your idea/application.  *`
+cools
+interesting, that email shouldn't have gone to you.   We're going through applications, give us some time and you'll hear back.
+Hey, got the email saying the application is incomplete, but i had submitted cleanly. Any idea, who can help or resolve?
+itching to start, sitting on my hands
+thank you for the opportunity and hosting an amazing hackathon
+I have RSVPd but I have not got any email yet .almost 12-13 hours now .will the instructions be in the email ?
+I want to know how long it takes for the application to be approved. I applied since on Thursday
+Hello team, I applied early Friday, but still under review..
+hello everyone
+its been quite a long time
+how long is review time
+THANKSSS !
+Its completely online
+Mail them at hello@devfolio.co with ss
+helloo i have a doubt where is the venue for this hackathon ? is it online or offline ?
+not a issue from my side right?
+i submitted my application on friday(24/7) but every 7 hours i get a email from devfolio saying application not submitted
+hey can someone help me out here
+hello 🙂
+wait Yash isnt in prava team?
+getting an error while adding test card
+you'll get it by 31st
+you can use our MCP/CLI (pravapay.com) to test out the prod directly but it'll be limited to your individual use.
+Also, you can't use real cards (Visa crypto card in this case) in sandbox
+hey <@685374953805316203> - have you tried other cards?  You can ask <@1529139877306695830> to share more test cards in the <#1505768791743795230>
+Hey <@910171427192328273> sending the acceptance in batches. Already sent approvals to folks. Can you DM your username/email to <@719794709618229248>
+<@719794709618229248> <@756907952195109014>  when I will get approved for participating in the hackathon?
+<@719794709618229248> hi bro , i did google from fill up for openai credits when i am getting the credits 😶‍🌫️ .
+getting an error while adding test card and also I've added crypto card but payment is failing.
+wait Yash isnt in prava team?
+<:BUYYYYY:1527740711401820210>
+haha we're the one organizing bro
+dude wait ; Prava team is also participating here?
+just submitted the form ; looking forward to work around this environment actually haha
+hello guys!
+Thanks <@719794709618229248>  — we'd love to take you up on this. Our plan is to get the sandbox flow (intent → session → checkout) fully working and tested first, so we'd want to schedule the live-testing call for later in the 48 hours (or just after, if timing's tighter) rather than now — we want to make sure we're bringing a working flow to the call, not debugging it live with you. We'll flag here once we're at that point and ready to find a time. Really appreciate you removing the card-sourcing problem for us either way.
+Hi <@&1525463586955202831> <@&1525463541564309584> !  If you plan to move to prod after running sandbox, <@&1526171311372767292> will co-ordinate with you to get you a special fast-tracked access to prod for this Hacakthon.   If you can't arrange a US, SGP, HK, Canada card, we can get on a quick call to do the live testing. Just let us know here. Prod isn't required but if you go live that would be a great add on to your submission.
+Nope. Only US, Canada, Singapore and Hong Kong. Crypto Visa cards work too
+Hey <@719794709618229248>   For payment, can I use an Indian Visa card?
+<@1417901140602781817> try again
+It should work for you
+is it the design?
+I cannot use it on personal dm
+Birdie is on telegram as well: https://t.me/pravapay_bot
+<@1493694055216058569> <@1482968291072020612><@781726353849319464> <@1417901140602781817> <@925694937259970590> - tagging the most active ones here to test it out
+We've created Prava's own support agent, that will help you answer any questions related to Prava implementations, docs, testing, test cards, hackathon or any links you need.   It's <@1529139877306695830>!  You can head to <#1505768791743795230> and just tag <@1529139877306695830> and ask any questions you have, it'll start a thread and you'll be good. Excited for what y'all are going to build.   Birdie can't answer everything at times, so feel free to email us at support@prava.space (our response time is under 10 mins).
+My bad, apologies 😭
+actually  it was a part of. the idea i am working with
+Ohh, no worries.   It's understandable- both are familiar name.
+This
+Actually I read it on the chat itself,  the conversation between Lucifer and Shubham, so misinterpreted sorry !
+Hey <@1493694055216058569> , swiggy and zepto swiggy skills are only to support those MCPs, not mandatory implementations.  Prava can be used for any use-cases where AI makes payment.   **We've not mentioned anywhere that swiggy and zepto are the main use-cases (can you please DM me the details of docs where it's mentioned? I'll get that updated).  ** For hackathon: You're free to work on any idea that's relevant with the themes and tracks you're going for. More importantly- your idea which has agentic commerce as a primary use-case.
+<@719794709618229248> Hi, I noticed the docs mention Zepto/Swiggy style checkout flows as the main use case for Prava. In my submission I mentioned using it for a data/subscription upgrade instead of a product checkout. Does that still count as valid usage for judging, or does it specifically need to be a checkout flow like Zepto/Swiggy? Just want to confirm before we lock our build.
+Sandbox Doubts
+Hi <@1105821555918909491> - if you've RSVP'ed, you're good to go. No check-ins required as it's a virtual hacakthon. That part should have been edited out from the email you got.
+yes will look into it
+Hey <@719794709618229248>  — We've done our architecture/spec work ahead of time and want to spend the actual 48 hours building, not discovering unknowns. A few things we'd love confirmed before then, roughly in order of how much they'd block us: 1.⁠ ⁠Is Zepto/Swiggy sandbox actually live for hackathon participants? Your docs say "US & SEA" but the skill repo ships India-specific integrations — want to confirm before we build around it. 2.⁠ ⁠Any support for standing/recurring mandates, or is it strictly one-time per mandate? Shapes whether our subscription-renewal track can be fully real. 3.⁠ ⁠Real method signatures for intent creation + the mandate webhook shape, ahead of the conceptual docs. 4.⁠ ⁠Where the sandbox test-card docs live. 5.⁠ ⁠Whether mandate TTL/expiry is configurable on our side.  #1 and #2 are the ones that actually change what we build — the rest we're happy to sort out live. Thanks for the time!
+Thanks for the appreciation <@719794709618229248> !  And @everyone , just to mention this is totally a self made sdk by me and maintained by me ( NOT affiliated with Prava till now )  If there are any issues with the sdk you can contact me or raise a issue on github
+Awesome work <@781726353849319464> !  It's always good to have builders from the community contribute to the product. <@&1525463586955202831> check it out.
+OpenAI credits will be added to your account before hackathon starts, if you fill the form by 26th July.  If you submit the form at a later date, credits might not end up in your account on time.
+Hi guys
+hi team, <@719794709618229248> <@781726353849319464> <@756907952195109014>  I filled the form, but didnt get any credits in my account. So will they only become available after the hackathon starts?
+@everyone Hi Builders! 👋 If you're building a hackathon project in Python for AI agents or backend services, you can use Prava's Python SDK. Just run: pip install prava-sdk 📖 Getting started: https://prava-sdk.prajwalsuryawanshi.in/getting-started/ GitHub - https://github.com/prajwalsuryawanshi/prava-payments
+it's online. can you quickly email the screenshot of this on support@prava.space  I'll loop in Devfolio folks.
+members.
+<@719794709618229248> application submitted with Devfolio username "smallel4", would appreciate a review. Thanks!
+I received the acceptance email, but after RSVP it says “Check‑in QR.” Is the event online, or is the demo day offline?
+Damn 1400 teams or members ?
+<@1493694055216058569>  Around 50 teams so far. We'll get in more. Today applications crossed 1400 mark
+<@719794709618229248> how many teams have qualified for the building around out of the number of participating individuals ?
+Haha yes, will announce soon
+you brought in vidhit thats cool
+😭😭
+someone added this as their bio, hilarious
+thanks ⚡
+Hey <@925694937259970590>!  We had to add it to prevent spam on our sandbox, can you share your email.   I've extended it, let me know if it works
+didn't even know sandbox had limits 🥲  <@719794709618229248>
+people have started getting it
+Have the first approvals been sent yet?
+Hi , My name on Devfolio is DIYA  and I am participating Solo.
+please put it in the thread
+anyone
+Devfolio Username: w3fpriyanshu Team Name: VAPOR
+is this for team or individual application review
+Hey @everyone !  I really appreciate y'all joining our community. I'm going through each and every application but we've got over 1200 registrations now.   If you can drop your `devfolio username/team name` with which you applied in the thread below, I'll prioritize to review your applications first.   *`Note: This is only to fast-track the review, final approval will be based on your idea/application.  `*
+Hey <@925694937259970590>!  **If you're integrating Prava in your project (which is an eligibility criteria for the Hackathon), you'll be by default eligible for Visa track. **  VIC can only be used through Prava, no one can directly access it with Visa.    Thanks for highlighting, I've updated the tracks page to reflect this note.
+<@299100661000306689>  for the visa track, it says "implementing VIC using Prava" but Prava itself already uses VIC right ?   are teams expected to implement any additional VIC capabilities beyond the standard Prava payment flow?
+now its fixed thanks sir
+Nice, also possible to let me know the card that didnt work over dm, we can update our docs accordingly.
+yup it's working now, with a different card👍
+Sure, can you try out with different cards ? As this is a sandbox enviornment, there are times when the network is not able to respond correctly.
+hey it worked,  i gave the otp, but this time it failed at passkey verfication  FETCH_AGENTIC_CREDS_ERROR: Request failed with status code 400
+Hi <@925694937259970590> , can you try again , now?
+<@299100661000306689>  even i am facing this issue, used the test cards  Order ID: ord_01KXTP5TX34ZH01FVFXR5P2GK2 Session ID: ses_01KXTTHCSTNV9QRENPEFZDFYZA Transaction ID: txn_01KXTTHRF5XCPYR93N9KB7M6CT  **Error code: PROVISION_ERROR Error message: Request failed with status code 400**  Flow: Visa · addCard · Checkout UI Time: 18 Jul 2026, 18:51
+<@925694937259970590> , currently the support is not there adding by the EOD.
+<@1482968291072020612> can you check again and let us know if you face the same issue ?
+Hi checking this <@1482968291072020612> .
+Hi Prava team,  We are testing the documented sandbox payment flow using an `sk_test_*` key against `sandbox.api.prava.space` and the official Visa sandbox cards.  Two separate documented test cards failed before reaching OTP/passkey approval:  1. Session: ses_01KXT7TW487VF7V9QMT5NQQNBZ      Transaction: txn_01KXT84B98P9QVD1KXY5RSHFJN      Result: failed      Error: PROVISION_ERROR — “Request failed with status code 400”      X-Response-ID: acdffb7a-3cef-46d4-a396-078823142df2  2. Session: ses_01KXT8NNZ1QQ3S48RBCQMYKT8F      Hosted UI result: “Card Processing Failed”      API result afterward: status remained pending, with no transactions      X-Response-ID: 0ec56d19-099b-4e85-8c8b-71b3106b2189  The cards were taken directly from your published sandbox test-card documentation. No real card was used.  Could you please check whether sandbox card provisioning is working for this merchant account and whether any additional account configuration is required? The second attempt also appears to show a hosted-UI/API status propagation mismatch.  Thanks.
+also can't i delete the sandbox api key, once created ? and create a new one ??
+<@719794709618229248>
+heyyy, did anyone manage to add "allowed domains" to their dashboard ???  if yes, help a brother out, I can't find where to add that 🫠
+Okay thank youuu
+Thanks <@756907952195109014> , that's really helpful — good to know merchants aren't restricted, and we can build the full Zepto/Swiggy flow in sandbox with the docs' test cards.  One quick clarification: just to confirm, the test cards in the docs complete a full simulated payment in sandbox with no geography restriction, right? And the US/Canada/HK/Singapore Visa requirement only bites if we attach a real card ourselves — sandbox or production — not when using your own test fixtures?  And the other one from before that I don't think I saw an answer to: do mandates support anything like a standing/recurring charge — scoped to one merchant, capped, valid for repeat charges — or is every mandate strictly one-time? We're building a subscription-renewal track (auto-renew a SaaS tool at the best price) and this decides whether we can make that fully real on Prava or need to keep it as a disclosed simulation for the hackathon.
+https://directory.prava.space/  I've bunch of AI apps listed here. A lot of them are discovery only.   It'd be very interesting to see payments enabled in shopping, travel and personal assistants.
+I am building an agent that will first
+hi <@756907952195109014> do you provide code mode interface in your mcp ?
+I am building an agent that will first help me find cool oversized shirts from indian streetwear brands and then I will pick and choose which one I want and pay directly using prava. I will make the agent watch the my wishlist and if some of the price drops/sale. We can also have our family and friends ask us to pay for them/we can have a shared wishlist. Basically I would love to add features where my agent will use prava to pay for my opencode subscription automatically every month because I dont like e mandates. Most of the indian street wear brands use shopify as their ecommerce so using prava to pay for what I like is pretty cool for me. I would also add some beauty brands for my loved ones so they don't have issues finding them in hurry.
+<@&1525463586955202831> what all are you working on?  Share about the idea you're building  or want to build.   Also, mention if you're looking for a team member: post on <#1525460532046594189> .
+If you're able to run a transaction in Prod, that's a plus. Not mandatory.   However, if you can successfully run a sandbox, prod shouldn't be much of a problem.
+Thanks <@756907952195109014>   Would be building in production be a criteria for scoring the hackathon?
+Hey <@1116643253597515857> only sandbox will be available for your region. In production we are yet to go live with Nigerian Cards.
+Hey <@1482968291072020612> , for now you can build everything on the sandbox and use the test cards in the docs to validate your flow.  once you’re ready, ping us on Discord and we’ll help you with a compatible Visa card for testing.  Any Visa card issued in the US, Canada, Hong Kong or Singapore works. Merchants aren’t restricted, so you can build flows for things like Zepto or Swiggy. You can set up the entire flow in sandbox – only the final payment step will fail.  When you’re ready to move to production, reach out to us and we’ll sort you out with a compatible card.
+Hi guys, before I commit real time, I wanted to check: does Prava Pay (CLI/MCP) or the sandbox work for a developer based in Nigeria, and is a non-US-issued card (Visa) usable for testing/checkout? Want to confirm before I build. Thanks 🙏🏾
+Hey <@756907952195109014>  — We've done our architecture/spec work ahead of time and want to spend the actual 48 hours building, not discovering unknowns. A few things we'd love confirmed before then, roughly in order of how much they'd block us: 1.⁠ ⁠Is Zepto/Swiggy sandbox actually live for hackathon participants? Your docs say "US & SEA" but the skill repo ships India-specific integrations — want to confirm before we build around it. 2.⁠ ⁠Any support for standing/recurring mandates, or is it strictly one-time per mandate? Shapes whether our subscription-renewal track can be fully real. 3.⁠ ⁠Real method signatures for intent creation + the mandate webhook shape, ahead of the conceptual docs. 4.⁠ ⁠Where the sandbox test-card docs live. 5.⁠ ⁠Whether mandate TTL/expiry is configurable on our side.  #1 and #2 are the ones that actually change what we build — the rest we're happy to sort out live. Thanks for the time!
+awesome <@1482968291072020612> & <@434777617510694912> both are good idea. excited to seem them getting build during hackathon
+Hi all, Pawan here. Applied solo: I'm thinking of building a purchasing agent that spends under an explicit policy.
+Hi <@756907952195109014>  "We at team Axiom are building the housemate who replaces the milk before you notice you're out — except ours works on any merchant Prava can reach, not just one fridge.""Amazon's AutoBuy already proved people will let an agent buy for them without being asked — we're building that for the whole internet instead of one company's app, powered end-to-end by Prava."
+hey <@825671947731075083> any idea you have in mind?
+Hi I am looking forward to connecting to new people and building some cool stuff for the hackathon.

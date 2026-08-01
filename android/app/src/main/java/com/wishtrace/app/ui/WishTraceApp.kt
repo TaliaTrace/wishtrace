@@ -1,5 +1,7 @@
 package com.wishtrace.app.ui
 
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -15,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -31,10 +34,9 @@ import com.wishtrace.app.R
 import com.wishtrace.app.ui.components.ShellDestination
 import com.wishtrace.app.ui.components.WishTraceBottomBar
 import com.wishtrace.app.ui.screens.auth.SignInRoute
+import com.wishtrace.app.ui.screens.checkout.CheckoutScreen
 import com.wishtrace.app.ui.screens.discovery.GiftDiscoveryScreen
 import com.wishtrace.app.ui.screens.home.HomeScreen
-import com.wishtrace.app.ui.screens.message.MessageRoute
-import com.wishtrace.app.ui.screens.message.MessageViewModel
 import com.wishtrace.app.ui.screens.occasions.OccasionsScreen
 import com.wishtrace.app.ui.screens.onboarding.WelcomeScreen
 import com.wishtrace.app.ui.screens.people.PeopleScreen
@@ -45,8 +47,6 @@ import com.wishtrace.app.ui.screens.recommendation.RecommendationUiState
 import com.wishtrace.app.ui.screens.setup.RecipientSetupRoute
 import com.wishtrace.app.ui.screens.setup.RecipientSetupStep
 import com.wishtrace.app.ui.screens.setup.RecipientSetupViewModel
-import com.wishtrace.app.domain.MessageOrigin
-import com.wishtrace.app.domain.PersonalMessage
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -56,14 +56,17 @@ private object Destination {
     const val Recipient = "recipient"
     const val Discovery = "discovery"
     const val Recommendation = "recommendation"
-    const val Message = "message"
+    const val Checkout = "checkout"
     const val AddPerson = "add_person"
     const val EditPerson = "edit_person"
     const val EditOccasion = "edit_occasion"
 }
 
 @Composable
-fun WishTraceApp() {
+fun WishTraceApp(
+    pravaReturnUri: String? = null,
+    onPravaReturnConsumed: () -> Unit = {},
+) {
     val context = LocalContext.current
     val container = remember(context.applicationContext) {
         AppContainer(context.applicationContext)
@@ -76,10 +79,15 @@ fun WishTraceApp() {
     }
     val homeViewModel: HomeViewModel = viewModel(factory = homeFactory)
     val discoveryViewModel: DiscoveryViewModel = viewModel(factory = discoveryFactory)
+    val checkoutFactory = remember(container) {
+        viewModelFactory { CheckoutViewModel(container.purchaseFlowGateway) }
+    }
+    val checkoutViewModel: CheckoutViewModel = viewModel(factory = checkoutFactory)
 
     val navController = rememberNavController()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
     val discoveryState by discoveryViewModel.state.collectAsStateWithLifecycle()
+    val checkoutState by checkoutViewModel.state.collectAsStateWithLifecycle()
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -88,7 +96,7 @@ fun WishTraceApp() {
     val showShell = currentRoute in shellRoutes
     val scope = rememberCoroutineScope()
     val googleWebClientId = stringResource(R.string.google_web_client_id)
-    var savedMessage by remember { mutableStateOf<PersonalMessage?>(null) }
+    var selectedCandidateId by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun enterApp() {
         homeViewModel.retry()
@@ -116,6 +124,48 @@ fun WishTraceApp() {
                     popUpTo(navController.graph.id) { inclusive = true }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(pravaReturnUri, session) {
+        val uri = pravaReturnUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        if (uri == null) return@LaunchedEffect
+        val purchaseIntentId = uri.getQueryParameter("purchase_intent_id")
+        val valid = uri.scheme == "wishtrace" &&
+            uri.host == "prava" &&
+            uri.path == "/return" &&
+            purchaseIntentId?.matches(
+                Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"),
+            ) == true
+        if (!valid) {
+            onPravaReturnConsumed()
+            return@LaunchedEffect
+        }
+        if (session != null) {
+            navController.navigate(Destination.Checkout) { launchSingleTop = true }
+            checkoutViewModel.resumeFromReturn(requireNotNull(purchaseIntentId))
+            onPravaReturnConsumed()
+        }
+    }
+
+    LaunchedEffect(checkoutState.approvalUrl) {
+        val hostedUrl = checkoutState.approvalUrl ?: return@LaunchedEffect
+        val uri = runCatching { Uri.parse(hostedUrl) }.getOrNull()
+        val safe = uri?.scheme == "https" &&
+            uri.host in setOf("sandbox.collect.prava.space", "collect.prava.space") &&
+            uri.userInfo == null
+        if (!safe) {
+            checkoutViewModel.approvalLaunchFailed()
+            return@LaunchedEffect
+        }
+        checkoutViewModel.consumeApprovalUrl()
+        runCatching {
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+                .launchUrl(context, requireNotNull(uri))
+        }.onFailure {
+            checkoutViewModel.approvalLaunchFailed()
         }
     }
 
@@ -248,50 +298,47 @@ fun WishTraceApp() {
                 if (snapshot == null) {
                     LaunchedEffect(Unit) { navController.popBackStack() }
                 } else {
+                    val preparation = (discoveryState as? DiscoveryUiState.ReadyForRanking)
+                        ?.preparation
                     RecommendationScreen(
                         snapshot = snapshot,
-                        state = RecommendationUiState.SourceNeeded,
+                        state = preparation?.let {
+                            RecommendationUiState.Content(
+                                candidates = it.candidates,
+                                decision = it.decision,
+                            )
+                        } ?: RecommendationUiState.Error(
+                            "Run live discovery before choosing a gift.",
+                        ),
                         onBack = navController::popBackStack,
                         onRetry = navController::popBackStack,
-                        onSelect = {
-                            navController.navigate(Destination.Message)
+                        onSelect = { candidateId ->
+                            selectedCandidateId = candidateId
+                            navController.navigate(Destination.Checkout)
                         },
-                        onWriteMessage = {
-                            navController.navigate(Destination.Message)
-                        },
+                        onWriteMessage = navController::popBackStack,
                     )
                 }
             }
-            composable(Destination.Message) {
-                val snapshot = remember {
-                    (homeState as? HomeUiState.Content)?.snapshot
+            composable(Destination.Checkout) {
+                selectedCandidateId?.let { candidateId ->
+                    LaunchedEffect(candidateId) { checkoutViewModel.start(candidateId) }
                 }
-                if (snapshot == null) {
-                    LaunchedEffect(Unit) { navController.popBackStack() }
-                } else {
-                    val messageFactory = remember(snapshot.recipient.id, savedMessage) {
-                        viewModelFactory {
-                            MessageViewModel(
-                                initialText = savedMessage?.text.orEmpty(),
-                                initialOrigin = savedMessage?.origin ?: MessageOrigin.USER,
-                            )
-                        }
-                    }
-                    val messageViewModel: MessageViewModel = viewModel(
-                        key = "message-${snapshot.recipient.id}",
-                        factory = messageFactory,
-                    )
-                    MessageRoute(
-                        viewModel = messageViewModel,
-                        snapshot = snapshot,
-                        onBack = navController::popBackStack,
-                        onSaved = {
-                            savedMessage = it
-                            navController.popBackStack()
-                        },
-                        onSkip = navController::popBackStack,
-                    )
-                }
+                CheckoutScreen(
+                    state = checkoutState,
+                    verifiedEmail = session?.user?.email,
+                    onBack = navController::popBackStack,
+                    onBillingChange = { form ->
+                        checkoutViewModel.updateBilling { form }
+                    },
+                    onQuote = {
+                        checkoutViewModel.requestQuote(session?.user?.email)
+                    },
+                    onApprove = checkoutViewModel::createApprovalSession,
+                    onRefresh = checkoutViewModel::refresh,
+                    onMessageChange = checkoutViewModel::updateMessage,
+                    onSaveMessage = checkoutViewModel::saveMessage,
+                )
             }
             composable(Destination.AddPerson) {
                 val today = (homeState as? HomeUiState.Content)

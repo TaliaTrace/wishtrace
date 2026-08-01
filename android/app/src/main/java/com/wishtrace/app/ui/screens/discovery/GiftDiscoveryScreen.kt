@@ -824,8 +824,7 @@ private fun DiscoveryReadyPreview() {
         GiftDiscoveryScreen(
             homeState = HomeUiState.Content(PreviewFixtures.homeSnapshot()),
             state = DiscoveryUiState.ReadyForRanking(
-                eligibleCandidateIds = listOf("alpha", "bravo"),
-                sourceMode = com.wishtrace.app.domain.SourceMode.LIVE,
+                preparation = PreviewFixtures.discoveryPreparation(),
             ),
             onBack = {},
             onStart = {},

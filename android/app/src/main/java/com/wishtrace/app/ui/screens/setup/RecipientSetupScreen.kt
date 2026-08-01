@@ -89,7 +89,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val interestOptions = listOf(
-    "Cozy gaming",
+    "Gaming",
     "Live music",
     "Books",
     "Food",

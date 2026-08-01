@@ -3,9 +3,10 @@ package com.wishtrace.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wishtrace.app.data.GiftDiscoveryGateway
+import com.wishtrace.app.data.WishTraceApiException
 import com.wishtrace.app.domain.DiscoveryStage
+import com.wishtrace.app.domain.DiscoveryPreparation
 import com.wishtrace.app.domain.GiftDiscoveryRequest
-import com.wishtrace.app.domain.SourceMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,8 +23,7 @@ sealed interface DiscoveryUiState {
     ) : DiscoveryUiState
 
     data class ReadyForRanking(
-        val eligibleCandidateIds: List<String>,
-        val sourceMode: SourceMode,
+        val preparation: DiscoveryPreparation,
     ) : DiscoveryUiState
 
     data object Cancelled : DiscoveryUiState
@@ -56,14 +56,15 @@ class DiscoveryViewModel(
                     previousStage = stage
                 }
                 mutableState.value = DiscoveryUiState.ReadyForRanking(
-                    eligibleCandidateIds = preparation.eligibleCandidateIds,
-                    sourceMode = preparation.sourceMode,
+                    preparation = preparation,
                 )
             } catch (_: CancellationException) {
                 mutableState.value = DiscoveryUiState.Cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 mutableState.value = DiscoveryUiState.Error(
-                    message = "Live products could not be checked. No ranking or purchase was started.",
+                    message = (error as? WishTraceApiException)?.message
+                        ?.takeIf(String::isNotBlank)
+                        ?: "Live products could not be checked. No purchase was started.",
                 )
             }
         }

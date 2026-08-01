@@ -17,12 +17,16 @@ class WishTraceApiClient(baseUrl: String) {
         path: String,
         json: JSONObject? = null,
         accessToken: String? = null,
+        headers: Map<String, String> = emptyMap(),
+        readTimeoutMillis: Int = DEFAULT_READ_TIMEOUT_MILLIS,
     ): JSONObject = withContext(Dispatchers.IO) {
         execute(
             method = "POST",
             path = path,
             json = json,
             accessToken = accessToken,
+            headers = headers,
+            readTimeoutMillis = readTimeoutMillis,
         )
     }
 
@@ -36,6 +40,8 @@ class WishTraceApiClient(baseUrl: String) {
             path = path,
             json = json,
             accessToken = accessToken,
+            headers = emptyMap(),
+            readTimeoutMillis = DEFAULT_READ_TIMEOUT_MILLIS,
         )
     }
 
@@ -48,6 +54,8 @@ class WishTraceApiClient(baseUrl: String) {
             path = path,
             json = null,
             accessToken = accessToken,
+            headers = emptyMap(),
+            readTimeoutMillis = DEFAULT_READ_TIMEOUT_MILLIS,
         )
     }
 
@@ -56,17 +64,29 @@ class WishTraceApiClient(baseUrl: String) {
         path: String,
         json: JSONObject?,
         accessToken: String?,
+        headers: Map<String, String>,
+        readTimeoutMillis: Int,
     ): JSONObject {
         require(path.startsWith('/'))
+        require(readTimeoutMillis in 1_000..180_000)
         val connection = URL(root + path).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = method
             connection.connectTimeout = 10_000
-            connection.readTimeout = 15_000
+            connection.readTimeout = readTimeoutMillis
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("X-Correlation-ID", java.util.UUID.randomUUID().toString())
             if (accessToken != null) {
                 connection.setRequestProperty("Authorization", "Bearer $accessToken")
+            }
+            headers.forEach { (name, value) ->
+                require(name.equals("Idempotency-Key", ignoreCase = true)) {
+                    "Only the idempotency header is supported."
+                }
+                require(value.matches(Regex("[A-Za-z0-9._:-]{8,255}"))) {
+                    "Idempotency key is invalid."
+                }
+                connection.setRequestProperty("Idempotency-Key", value)
             }
             if (json != null) {
                 connection.doOutput = true
@@ -97,6 +117,8 @@ class WishTraceApiClient(baseUrl: String) {
         }
     }
 }
+
+private const val DEFAULT_READ_TIMEOUT_MILLIS = 15_000
 
 class WishTraceApiException(
     override val message: String,

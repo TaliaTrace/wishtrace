@@ -8,8 +8,8 @@ enum class DiscoveryStage(
     val explanation: String,
 ) {
     CHECKING_CATALOG(
-        title = "Checking controlled catalog records",
-        explanation = "Start with known records, never invented products.",
+        title = "Checking the live gift catalog",
+        explanation = "Read current products directly from the merchant.",
     ),
     APPLYING_BUDGET(
         title = "Applying the approved budget",
@@ -32,10 +32,18 @@ data class GiftDiscoveryRequest(
 )
 
 data class DiscoveryPreparation(
+    val discoveryId: String,
+    val candidates: List<ProductCandidate>,
+    val decision: RankedDecision,
     val eligibleCandidateIds: List<String>,
     val sourceMode: SourceMode,
 ) {
     init {
+        require(discoveryId.isNotBlank()) { "Discovery ID cannot be blank." }
+        require(candidates.isNotEmpty()) { "Discovery requires observed candidates." }
+        require(candidates.map { it.id }.distinct().size == candidates.size) {
+            "Candidate IDs must be unique."
+        }
         require(eligibleCandidateIds.isNotEmpty()) {
             "Discovery preparation requires at least one eligible candidate ID."
         }
@@ -44,6 +52,9 @@ data class DiscoveryPreparation(
         }
         require(eligibleCandidateIds.distinct().size == eligibleCandidateIds.size) {
             "Candidate IDs must be unique."
+        }
+        require(eligibleCandidateIds.all { id -> candidates.any { it.id == id } }) {
+            "Every eligible ID must identify an observed candidate."
         }
     }
 }
@@ -254,16 +265,20 @@ data class PravaApprovalRequest(
 enum class TransactionState {
     DRAFT,
     VALIDATING,
+    QUOTED,
     READY_FOR_APPROVAL,
     SESSION_CREATING,
     AWAITING_USER,
-    PROCESSING,
+    CREDENTIALS_READY,
+    CHECKOUT_IN_PROGRESS,
+    ORDER_VERIFIED,
     SUCCEEDED,
     DECLINED,
     CANCELLED,
     EXPIRED,
     FAILED,
     UNKNOWN,
+    RECONCILING,
 }
 
 data class PravaApprovalHandoff(
@@ -271,3 +286,77 @@ data class PravaApprovalHandoff(
     val hostedApprovalUrl: String,
     val state: TransactionState,
 )
+
+data class BillingContact(
+    val email: String,
+    val firstName: String,
+    val lastName: String,
+    val addressLine1: String,
+    val addressLine2: String? = null,
+    val city: String,
+    val region: String? = null,
+    val postalCode: String,
+    val countryCode: String = "US",
+    val phone: String? = null,
+) {
+    init {
+        require(email.isNotBlank()) { "Billing email cannot be blank." }
+        require(firstName.isNotBlank()) { "First name cannot be blank." }
+        require(lastName.isNotBlank()) { "Last name cannot be blank." }
+        require(addressLine1.isNotBlank()) { "Billing address cannot be blank." }
+        require(city.isNotBlank()) { "City cannot be blank." }
+        require(postalCode.isNotBlank()) { "Postal code cannot be blank." }
+        require(countryCode.matches(Regex("[A-Z]{2}"))) {
+            "Country code must be a two-letter ISO code."
+        }
+    }
+}
+
+data class ApprovalSession(
+    val id: String,
+    val hostedUrl: String,
+    val expiresAt: Instant,
+)
+
+data class PurchaseIntentDetails(
+    val id: String,
+    val recipientId: String,
+    val occasionId: String,
+    val candidateId: String,
+    val state: TransactionState,
+    val merchantName: String,
+    val merchantUrl: String,
+    val title: String,
+    val variantTitle: String?,
+    val itemPrice: Money,
+    val approvedTotal: Money?,
+    val deliverySummary: String?,
+    val quoteExpiresAt: Instant?,
+    val approvalSession: ApprovalSession?,
+    val providerStatus: String?,
+    val merchantOrderId: String?,
+    val updatedAt: Instant,
+)
+
+sealed interface VerifiedResult {
+    val purchaseIntentId: String
+    val merchantName: String
+    val title: String
+    val amount: Money
+
+    data class AuthorizationDeclined(
+        override val purchaseIntentId: String,
+        override val merchantName: String,
+        override val title: String,
+        override val amount: Money,
+        val message: String,
+    ) : VerifiedResult
+
+    data class OrderReceipt(
+        override val purchaseIntentId: String,
+        override val merchantName: String,
+        override val title: String,
+        override val amount: Money,
+        val merchantOrderId: String,
+    ) : VerifiedResult
+}

@@ -106,13 +106,14 @@ unavailable or recovery state instead.
 The FastAPI service lives in `backend/`. It requires Python 3.12 and `uv`, loads secrets from the
 ignored repository-root `.env`, rejects PostgreSQL connections without `sslmode=require`, and
 publishes `/health` plus the public UCP platform profile. Authenticated recipient, discovery,
-grounded-ranking and purchase-ledger routes are implemented; current live catalog candidates remain
-deterministically blocked from ranking or purchase until a callable real-merchant checkout path is
-proven.
+grounded-ranking and purchase-ledger routes are implemented. The locked Playwright image is deployed
+to Azure Container Apps, and the staging runtime exposes the exact allowlisted Jackbox $5 path for
+the organizer-required Prava sandbox attempt. This does not assert production stored-value support.
 
 ```powershell
 cd backend
 uv sync --all-groups
+$env:PYTHONPATH = (Get-Location).Path
 uv run pytest
 uv run ruff check app tests migrations scripts
 uv run mypy app scripts
@@ -127,8 +128,9 @@ Copy variable names from `templates/.env.example`; never commit the populated `.
 
 The native client lives in `android/`. Runtime authentication, recipient, occasion and Home state
 come from the WishTrace backend; seeded repositories and the local authentication escape hatch
-have been removed. Compose previews and tests may use isolated fixtures, but runtime commerce
-remains honestly unavailable until a live merchant adapter is connected.
+have been removed. Compose previews and tests may use isolated fixtures. Runtime discovery, ranking,
+exact quote, Prava Custom Tab handoff, backend reconciliation and personal-message persistence call
+the public HTTPS backend; no Android route substitutes preview data when a provider is unavailable.
 
 Requirements:
 
@@ -155,6 +157,6 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 Rendered prototype evidence is in `android/evidence/`. Connected guardrail tests cover onboarding
 to required Google authentication. Real OAuth has also been exercised on the Play-enabled physical
-phone against the local backend through ADB reverse; no Google token or bearer token is captured.
+phone against the public Azure backend; no Google token or bearer token is captured.
 
 This implementation began before the official build window at the user's explicit direction and is recorded in `docs/PREEXISTING_WORK.md`. It must not be represented as judged-window work.

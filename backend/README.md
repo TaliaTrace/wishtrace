@@ -11,6 +11,7 @@ Use Python 3.12 through `uv`:
 ```powershell
 cd backend
 uv sync --all-groups
+$env:PYTHONPATH = (Get-Location).Path
 uv run python -m scripts.probe_database
 uv run alembic upgrade head
 uv run python -m scripts.run_server

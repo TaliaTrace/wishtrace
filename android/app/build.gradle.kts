@@ -23,7 +23,7 @@ android {
         resValue("string", "google_web_client_id", "\"$googleWebClientId\"")
         val backendBaseUrl = providers
             .gradleProperty("WISHTRACE_API_BASE_URL")
-            .orElse("http://127.0.0.1:8000")
+            .orElse("https://wishtrace-api.braveriver-5c04d9b5.eastus2.azurecontainerapps.io")
             .get()
             .trimEnd('/')
             .replace("\"", "\\\"")
@@ -80,6 +80,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("androidx.browser:browser:1.10.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

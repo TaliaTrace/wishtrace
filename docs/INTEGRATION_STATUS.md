@@ -10,7 +10,8 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Authentication request verified: YES during official window — authenticated missing-session probe
   returned expected `404 NOT_FOUND`, response `9fecc0ee-838b-40c4-9ece-048f5f16bb5c`
 - Session creation verified: CONTRACT + MOCK TRANSPORT — exact decimal money, hosted URL allowlist,
-  response-ID capture and session-token discard tested; no live sandbox session created yet
+  response-ID capture and session-token discard tested; the live judged-window session is the next
+  physical-phone step
 - Hosted approval verified:
 - App return verified:
 - Payment-result polling verified: CONTRACT + MOCK TRANSPORT — credentials remain masked and
@@ -31,8 +32,9 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   report-status was interrupted, reconciliation re-reports that result and never checks out again.
   Prava facts must match the approved merchant origin and total.
 - Known blockers: no judged-window hosted session, tokenized-card attempt or authoritative provider
-  result yet. Stored-value permission for the $5 Jackbox card requires Birdie/Prava confirmation.
-- Last verified: 2026-08-01 22:40 PKT
+  result yet. Staging permits the exact $5 stored-value path solely for the organizer-required
+  sandbox expected-failure proof; production compatibility still requires Prava approval/evidence.
+- Last verified: 2026-08-02 00:37 PKT
 - Evidence location: safe response ID above; `backend/app/prava.py`, `backend/app/purchase.py` and
   isolated transport/state tests; no credential or provider payload retained
 
@@ -68,8 +70,9 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Prava compatibility: CONTRACT/TESTED BOUNDARY ONLY — code accepts one matching in-memory
   credential, makes one merchant attempt, reports `APPROVED`/`DECLINED`, and re-polls. Stored-value
   permission and the live sandbox attempt remain pending.
-- Runtime gate: checkout and stored value are disabled by default. The candidate cannot become
-  eligible until both explicit server flags are enabled after Prava confirmation.
+- Runtime gate: checkout and stored value remain disabled by code default. Both explicit flags are
+  enabled only on the Azure staging revision for the organizer-required sandbox attempt. This does
+  not claim production stored-value support.
 - Amazon decision: rejected for this sprint. Its current catalog and Incentives gift-card APIs need
   separate program onboarding/credentials and cannot provide a truthful hackathon integration now.
 - Geography risk: Jackbox limits purchase/use to supported regions. A future real $5 gift remains
@@ -100,13 +103,14 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Backend boundary: authenticated rank/read routes persist one immutable evidence-linked decision per
   discovery. Only still-eligible `LIVE` snapshots can reach the model; recipient name, merchant URL,
   money, delivery and payment data are omitted from provider input.
-- Known blockers: the exact live Jackbox candidate remains deterministically ineligible while the
-  checkout and stored-value policy flags are off pending Prava approval, so the authenticated runtime
-  discovery route correctly stops before ranking. The provider itself is no longer a blocker.
-- Azure access: interactive tenant-scoped CLI login succeeded. The subscription is enabled and the
-  account can read the existing Foundry resources. No App Service plan, Web App, Container App or
-  registry currently exists, and no hosting resource or spend has been created by WishTrace.
-- Last verified: 2026-08-01 23:23 PKT; live provider proof passed
+- Known blockers: the Azure staging revision now permits the exact live Jackbox candidate to cross
+  deterministic eligibility into ranking. The remaining proof is one authenticated phone run with
+  real user-created context; the provider itself is no longer a blocker.
+- Azure runtime: DEPLOYED — Azure Container Apps serves the locked browser image over managed HTTPS
+  from a single active revision. A Basic ACR uses a managed pull identity; secrets are Container Apps
+  secret references, not image or Android values. Public health reports PostgreSQL TLS true and the
+  public UCP profile returns `2026-04-08` with cache headers.
+- Last verified: 2026-08-02 00:37 PKT; live provider and public runtime proofs passed
 
 ## Supabase PostgreSQL
 
@@ -137,20 +141,25 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Google auth client: Credential Manager `1.6.0` and Google ID `1.2.0` compiled; `WISHTRACE_GOOGLE_WEB_CLIENT_ID` resource injection compiled
 - Google account validation: VERIFIED on the physical phone through a real nonce-bound Google
   exchange; one backend user, active session and consumed challenge observed without capturing tokens
-- API connection verified: YES locally through ADB reverse to `127.0.0.1:8000`; public HTTPS deploy pending
-- Azure runtime packaging: CODE COMPLETE / NOT DEPLOYED — `backend/Dockerfile` installs
-  frozen Python dependencies and matching Playwright Chromium so the exact checkout actor can run
-  without a developer-machine Chrome path. No Azure resource or spend has been created.
-- Custom tab/hosted approval verified:
-- App link verified:
+- API connection verified: YES over public Azure HTTPS on the physical phone; the existing real
+  Google session reopened an authenticated, genuinely empty Home after the public-URL APK update
+- Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
+  Apps behind managed HTTPS; one healthy revision receives 100% traffic
+- Custom tab/hosted approval verified: CODE + BUILD — AndroidX Browser `1.10.0` opens only the exact
+  HTTPS sandbox/production Prava collection hosts; an actual hosted session remains pending
+- App link verified: DEVICE RECOVERY PASS — a synthetic return carrying only a random, nonexistent
+  UUID reached the singleTop activity, called the authenticated public backend and rendered its safe
+  `PURCHASE_INTENT_NOT_FOUND` recovery instead of trusting browser state. An actual Prava return
+  remains pending.
 - Process recreation tested:
 - Accessibility checked: primary/back targets asserted at 48dp; semantic headings/labels and onboarding page semantics present; core contrast pairs are 5.95:1–14.91:1; onboarding captured at 130% text scale; motion snaps when animator duration is disabled. TalkBack/manual switch-access testing remains pending.
 - Keyboard/IME checked: API 30 physical-device form collapse was fixed by removing duplicate IME
   inset consumption; connected Compose regression passed 1/1 with name and relationship visible
 - Evidence location: `artifacts/screenshots/milestone-4/`, `artifacts/screenshots/milestone-3/`, `artifacts/screenshots/milestone-2/`, `android/evidence/`, `android/app/build/reports/androidTests/connected/debug/`
-- Known blockers: one actual recipient/occasion still needs to be entered and recovered after app
-  relaunch; the API is not publicly deployed; the running Android build is not yet wired to the new
-  live discovery endpoints
+- Known blockers: the recipient's actual occasion date still needs user input before the first
+  truthful run. Live discovery/ranking, exact quote, idempotent approval, return reconciliation,
+  authoritative result and persisted personal-message routes are now wired; the physical transaction
+  remains unproven until that context and the Prava hosted interaction are completed.
 
 ## Demo
 

@@ -8,20 +8,20 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0009` | Codex | 2026-08-01 22:34 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — Azure browser container ready; public deploy pending | Codex | 2026-08-01 22:58 PKT |
-| Google authentication | nonce-bound exchange + real physical-phone account | PASS LOCALLY — one real user/session, public deploy pending | Codex/user | 2026-08-01 |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — Azure HTTPS health/UCP; database TLS true | Codex | 2026-08-02 00:37 PKT |
+| Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
 | Prava transaction path understood | session + authoritative status | CODE PASS — session → credential → one merchant attempt → report → re-poll tested; live hosted flow pending | Codex | 2026-08-01 22:34 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
-| OpenAI structured output works | valid live candidate IDs returned | PROVIDER PASS — `gpt-5.6-terra` returned strict schema output; runtime candidate remains gated by stored-value policy | Codex/user | 2026-08-01 23:23 PKT |
+| OpenAI structured output works | valid live candidate IDs returned | PROVIDER PASS — strict schema response; exact-candidate phone run pending | Codex/user | 2026-08-02 00:37 PKT |
 | Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
-| Android grounded decision build | discovery + recommendation + message + recovery | PASS — UI MILESTONE 4 | Codex | 2026-07-30 19:34 PKT |
+| Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
 | Android device UX evidence | API 31 route tests + screenshots + text scale + contrast | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
-| Android return flow works | approval → app → reconciled state | NOT STARTED | | |
+| Android return flow works | approval → app → reconciled state | CODE + BUILD PASS — physical hosted return pending | Codex/user | 2026-08-02 00:36 PKT |
 | Bronze flow repeats twice | full device demo | NOT STARTED | | |
 | Five-second UX understood | fresh viewer explanation | NOT STARTED | | |
 | Clean build works | fresh checkout command log | NOT STARTED | | |
@@ -29,19 +29,41 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Get Prava's explicit stored-value answer, then run one hosted sandbox approval and expected-fail tokenized attempt against the exact Jackbox $5 checkout.
-2. Deploy the locked browser container over public Azure HTTPS. CLI access, the existing subscription
-   and the live Foundry deployment are proven; no hosting resource exists yet.
-3. Enable the Jackbox checkout/stored-value flags only after Prava confirmation, then connect the Android review/return flow.
+1. Enter the user-provided recipient context and $5 USD budget on the physical phone.
+2. Run live discovery → Azure ranking → exact Jackbox quote → hosted Prava approval.
+3. Capture the expected sandbox merchant decline, reconciled authorization result and persisted note.
 
 ## Next
 
 1. Run hosted Prava approval and the organizer-required real-merchant browser attempt.
-2. Prove a live eligible Jackbox candidate can reach grounded Azure ranking.
-3. Wire Android quote/review/Custom Tab/reconcile/message to the real backend.
-4. Repeat the physical-phone flow twice, then apply for production access.
+2. Repeat the physical-phone path once after the first evidence run without a duplicate action.
+3. Apply for production access only with the captured sandbox evidence.
 
 ## Milestone evidence
+
+### 2026-08-02 — Public Azure runtime and real Android commerce wiring
+
+- Deployment: built the frozen Python 3.12/Playwright image in Azure Container Registry and deployed
+  it to Azure Container Apps in East US 2. A user-assigned managed identity has pull-only access;
+  registry admin credentials remain disabled. One healthy revision receives 100% HTTPS traffic.
+- Public boundary: `/health` returns `ok` with PostgreSQL 17.6 and client TLS true;
+  `/.well-known/ucp` returns `2026-04-08` without redirect and with public cache policy; auth challenge
+  and safe unauthorized envelopes pass over the external URL.
+- Sandbox activation: code defaults remain fail-closed, while the staging revision enables only the
+  exact allowlisted Jackbox checkout and stored-value path for the organizer-required expected-fail
+  tokenized-card proof. No hosted session, credential or merchant payment has been initiated yet.
+- Android: replaced runtime commerce-unavailable wiring with live discovery, deterministic rejection,
+  validated Azure ranking, immutable purchase intent, just-in-time non-persisted billing, idempotent
+  quote/session actions, Prava Custom Tab allowlisting, validated app return, backend reconciliation,
+  truthful authorization/order result types and owned personal-message persistence.
+- Physical proof so far: the public-URL APK installed on the RMX3201 and the existing real Google
+  session reopened a genuinely empty authenticated Home without crash. The recipient's real occasion
+  date remains required before live discovery can run.
+- Recovery proof: a device app-link test with a random nonexistent purchase UUID reached the public
+  authenticated endpoint and rendered a safe not-found state; no browser-supplied result was trusted.
+- Quality at this checkpoint: backend pytest 97, Ruff, strict mypy and Alembic drift checks pass.
+  Android debug assembly, unit tests and lint pass; the latest APK is installed and authenticated.
+  The actual hosted sandbox flow remains in the current task.
 
 ### 2026-08-01 — Live Azure provider and deployment-readiness hardening
 

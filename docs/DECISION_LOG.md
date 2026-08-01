@@ -307,3 +307,24 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: A provider outage yields the existing explicit recovery/user-choice state; it
   never creates a candidate or bypasses deterministic rules.
 - Owner: WishTrace team / Codex
+
+### 2026-08-02 00:37 PKT — Public Azure staging carries the one exact sandbox path
+
+- Context: The organizer requires an end-to-end in-app Prava sandbox integration and a tokenized
+  test-card attempt against a real merchant, explicitly accepting the expected merchant failure.
+  The backend and exact $5 Jackbox actor were locally proven, but a private localhost flow could not
+  receive Prava's HTTPS return or serve as submission evidence.
+- Evidence: Azure Container Apps now serves the locked browser image over managed HTTPS; public
+  health observes Supabase TLS, the public UCP profile is cache-compliant, and a real phone session
+  reaches authenticated empty Home. Current public Prava docs do not state a stored-value ban, but
+  no live sandbox attempt or production permission has yet been observed.
+- Decision: Use a single Azure Container Apps revision, managed ACR pull identity and encrypted
+  secret references. Keep checkout/stored-value disabled by code default, but enable the exact
+  allowlisted Jackbox $5 path on staging solely to collect the organizer-required expected-failure
+  sandbox evidence. Do not generalize this into production stored-value support.
+- Consequence: Android can now traverse live discovery, grounded Azure ranking, exact quote, hosted
+  approval and backend reconciliation without a runtime fixture. Success language remains impossible
+  without a verified merchant order; the expected sandbox decline becomes an authorization result.
+- Rollback: Set both staging flags false to make the candidate deterministically ineligible without
+  changing or redeploying code.
+- Owner: WishTrace team / Codex

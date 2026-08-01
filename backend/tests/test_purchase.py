@@ -15,12 +15,22 @@ from app.config import Settings
 from app.database import DatabaseProbe
 from app.errors import ApiError
 from app.main import create_app
+from app.merchant_browser import (
+    JACKBOX_VARIANT_GID,
+    BillingContact,
+    MerchantCheckoutOutcome,
+    MerchantCheckoutResult,
+    MerchantQuote,
+    MerchantQuoteRequest,
+)
 from app.prava import (
     HostedPravaSession,
     PravaGatewayError,
     PravaLineItemResult,
     PravaPaymentResult,
     PravaPaymentStatus,
+    PravaReportOutcome,
+    PravaReportResult,
     PravaSessionRequest,
     PravaTransactionResult,
     SensitivePaymentCredential,
@@ -28,18 +38,26 @@ from app.prava import (
 from app.purchase import (
     ApprovalSessionResponse,
     PurchaseIntentResponse,
+    PurchaseQuoteFacts,
+    PurchaseQuoteRequest,
     PurchaseService,
     PurchaseStore,
+    QuoteClaim,
+    QuoteClaimAction,
     SessionClaim,
     SessionClaimAction,
     TransactionState,
     _require_transition,
+    receipt,
 )
 
 
 class MemoryPurchaseStore(PurchaseStore):
     def __init__(self, intent: PurchaseIntentResponse) -> None:
         self.intent = intent
+        self.quote_key_hash: bytes | None = None
+        self.quote_request_hash: bytes | None = None
+        self.quote_status: str | None = None
         self.key_hash: bytes | None = None
         self.request_hash: bytes | None = None
         self.operation_status: str | None = None
@@ -61,6 +79,86 @@ class MemoryPurchaseStore(PurchaseStore):
     ) -> PurchaseIntentResponse:
         del user_id
         assert purchase_intent_id == self.intent.id
+        return self.intent
+
+    async def claim_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        request_hash: bytes,
+        now: datetime,
+    ) -> QuoteClaim:
+        del user_id, now
+        assert purchase_intent_id == self.intent.id
+        if self.quote_key_hash is not None:
+            if (
+                self.quote_key_hash == key_hash
+                and self.quote_request_hash == request_hash
+                and self.quote_status == "COMPLETED"
+            ):
+                return QuoteClaim(
+                    action=QuoteClaimAction.REPLAY,
+                    existing=self.intent,
+                )
+            raise AssertionError("unexpected quote retry")
+        self.quote_key_hash = key_hash
+        self.quote_request_hash = request_hash
+        self.quote_status = "IN_PROGRESS"
+        self.intent = self.intent.model_copy(
+            update={"state": TransactionState.VALIDATING}
+        )
+        return QuoteClaim(
+            action=QuoteClaimAction.CREATE,
+            facts=PurchaseQuoteFacts(
+                intent=self.intent,
+                product_url=(
+                    "https://checkout.jackboxgames.com/products/"
+                    "jackbox-games-gift-card-5"
+                ),
+                budget_minor=500,
+            ),
+        )
+
+    async def complete_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        quote: MerchantQuote,
+    ) -> PurchaseIntentResponse:
+        del user_id
+        assert purchase_intent_id == self.intent.id
+        assert key_hash == self.quote_key_hash
+        self.quote_status = "COMPLETED"
+        self.intent = self.intent.model_copy(
+            update={
+                "state": TransactionState.READY_FOR_APPROVAL,
+                "item_price_minor": quote.item_minor,
+                "approved_total_minor": quote.total_minor,
+                "quote_source": quote.source,
+                "quote_timestamp": quote.quoted_at,
+                "quote_expires_at": quote.expires_at,
+                "delivery_summary": quote.delivery_summary,
+            }
+        )
+        return self.intent
+
+    async def fail_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        reason_code: str,
+    ) -> PurchaseIntentResponse:
+        del user_id, reason_code
+        assert purchase_intent_id == self.intent.id
+        assert key_hash == self.quote_key_hash
+        self.quote_status = "FAILED"
+        self.intent = self.intent.model_copy(update={"state": TransactionState.FAILED})
         return self.intent
 
     async def claim_session_creation(
@@ -177,6 +275,96 @@ class MemoryPurchaseStore(PurchaseStore):
         )
         return self.intent
 
+    async def begin_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+    ) -> PurchaseIntentResponse:
+        del user_id
+        assert purchase_intent_id == self.intent.id
+        assert self.intent.state == TransactionState.CREDENTIALS_READY
+        self.intent = self.intent.model_copy(
+            update={"state": TransactionState.CHECKOUT_IN_PROGRESS}
+        )
+        return self.intent
+
+    async def record_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        result: MerchantCheckoutResult,
+    ) -> PurchaseIntentResponse:
+        del user_id
+        assert purchase_intent_id == self.intent.id
+        assert result.amount_minor == self.intent.approved_total_minor
+        state = {
+            MerchantCheckoutOutcome.ORDER_VERIFIED: TransactionState.ORDER_VERIFIED,
+            MerchantCheckoutOutcome.DECLINED: TransactionState.UNKNOWN,
+            MerchantCheckoutOutcome.UNKNOWN: TransactionState.UNKNOWN,
+        }[result.outcome]
+        self.intent = self.intent.model_copy(
+            update={
+                "state": state,
+                "merchant_order_id": result.order_id,
+                "merchant_outcome": result.outcome,
+                "merchant_attempted_at": datetime.now(UTC),
+            }
+        )
+        return self.intent
+
+    async def fail_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        reason_code: str,
+        outcome_unknown: bool,
+    ) -> PurchaseIntentResponse:
+        del user_id, reason_code
+        assert purchase_intent_id == self.intent.id
+        self.intent = self.intent.model_copy(
+            update={
+                "state": (
+                    TransactionState.UNKNOWN
+                    if outcome_unknown
+                    else TransactionState.FAILED
+                ),
+                "merchant_outcome": (
+                    MerchantCheckoutOutcome.UNKNOWN if outcome_unknown else None
+                ),
+            }
+        )
+        return self.intent
+
+    async def record_prava_report(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        report: PravaReportResult,
+    ) -> PurchaseIntentResponse:
+        del user_id
+        assert purchase_intent_id == self.intent.id
+        self.intent = self.intent.model_copy(
+            update={"visa_confirmation": report.visa_confirmation}
+        )
+        return self.intent
+
+    async def mark_transaction_unknown(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        reason_code: str,
+        response_id: str | None,
+    ) -> PurchaseIntentResponse:
+        del user_id, reason_code, response_id
+        assert purchase_intent_id == self.intent.id
+        self.intent = self.intent.model_copy(update={"state": TransactionState.UNKNOWN})
+        return self.intent
+
     async def begin_reconciliation(
         self,
         user_id: uuid.UUID,
@@ -194,6 +382,8 @@ class FakePrava:
         self.requests: list[PravaSessionRequest] = []
         self.create_error: PravaGatewayError | None = None
         self.payment_result: PravaPaymentResult | None = None
+        self.payment_results: list[PravaPaymentResult] = []
+        self.reports: list[tuple[str, str, PravaReportOutcome]] = []
 
     async def create_session(self, request: PravaSessionRequest) -> HostedPravaSession:
         self.requests.append(request)
@@ -209,9 +399,74 @@ class FakePrava:
 
     async def get_payment_result(self, session_id: str) -> PravaPaymentResult:
         assert session_id == "session-1"
+        if self.payment_results:
+            return self.payment_results.pop(0)
         if self.payment_result is None:
             raise AssertionError("payment result was not configured")
         return self.payment_result
+
+    async def report_status(
+        self,
+        *,
+        session_id: str,
+        txn_ref_id: str,
+        outcome: PravaReportOutcome,
+    ) -> PravaReportResult:
+        self.reports.append((session_id, txn_ref_id, outcome))
+        return PravaReportResult(
+            status="confirmed",
+            txn_ref_id=txn_ref_id,
+            txn_status=outcome,
+            visa_confirmation=(
+                "SUCCESS" if outcome is PravaReportOutcome.APPROVED else "FAILURE"
+            ),
+            response_id="response-report-1",
+        )
+
+
+class FakeMerchantCheckout:
+    def __init__(self, checkout_result: MerchantCheckoutResult) -> None:
+        self.checkout_result = checkout_result
+        self.quote_requests: list[MerchantQuoteRequest] = []
+        self.checkout_calls = 0
+        self.quote_active = False
+
+    async def quote(self, request: MerchantQuoteRequest) -> MerchantQuote:
+        self.quote_requests.append(request)
+        self.quote_active = True
+        now = datetime.now(UTC)
+        return MerchantQuote(
+            item_minor=500,
+            shipping_minor=0,
+            tax_minor=0,
+            total_minor=500,
+            currency="USD",
+            delivery_summary=(
+                "Sent to the checkout contact email for manual forwarding; "
+                "Jackbox shop only, supported regions only, timing not guaranteed"
+            ),
+            quoted_at=now,
+            expires_at=datetime(2099, 8, 1, 16, 0, tzinfo=UTC),
+        )
+
+    async def checkout(
+        self,
+        *,
+        purchase_intent_id: uuid.UUID,
+        credential: SensitivePaymentCredential,
+    ) -> MerchantCheckoutResult:
+        del purchase_intent_id
+        assert credential.token.get_secret_value() == "test-token-redacted"
+        self.checkout_calls += 1
+        self.quote_active = False
+        return self.checkout_result
+
+    async def is_quote_active(self, purchase_intent_id: uuid.UUID) -> bool:
+        del purchase_intent_id
+        return self.quote_active
+
+    async def close(self) -> None:
+        return None
 
 
 class StaticAuth:
@@ -248,6 +503,21 @@ def _user() -> AuthenticatedUser:
     )
 
 
+def _billing() -> BillingContact:
+    return BillingContact(
+        email="talia@example.com",
+        first_name="Test",
+        last_name="Buyer",
+        address_line1="123 Test Street",
+        address_line2=None,
+        city="Seattle",
+        region="Washington",
+        postal_code="98101",
+        country_code="US",
+        phone=None,
+    )
+
+
 def _intent(
     *,
     state: TransactionState = TransactionState.READY_FOR_APPROVAL,
@@ -260,21 +530,24 @@ def _intent(
         occasion_id=uuid.uuid4(),
         candidate_id=uuid.uuid4(),
         state=state,
-        merchant_id="hyperx-us",
-        merchant_name="HyperX US",
-        merchant_url="https://hyperx.com",
-        merchant_product_id="product-1",
-        merchant_variant_id="variant-1",
-        sku="SKU-1",
-        title="Observed headset",
-        variant_title="Black",
-        item_price_minor=6499,
+        merchant_id="jackbox-games-us",
+        merchant_name="Jackbox Games",
+        merchant_url="https://checkout.jackboxgames.com",
+        merchant_product_id="gid://shopify/Product/6734381809798",
+        merchant_variant_id=JACKBOX_VARIANT_GID,
+        sku="GC20221246",
+        title="Jackbox Games Gift Card - $5 USD",
+        variant_title="$5.00",
+        item_price_minor=500,
         currency="USD",
-        approved_total_minor=6999,
-        quote_source="BROWSER_HARNESS",
+        approved_total_minor=500,
+        quote_source="JACKBOX_SHOPIFY_BROWSER",
         quote_timestamp=now,
         quote_expires_at=datetime(2099, 8, 1, 15, 15, tzinfo=UTC),
-        delivery_summary="Merchant checkout delivery option",
+        delivery_summary=(
+            "Sent to the checkout contact email for manual forwarding; "
+            "Jackbox shop only, supported regions only, timing not guaranteed"
+        ),
         approval_session=approval_session,
         provider_status="pending" if approval_session else None,
         created_at=now,
@@ -285,7 +558,7 @@ def _intent(
 def _payment_result(status: PravaPaymentStatus) -> PravaPaymentResult:
     credential = (
         SensitivePaymentCredential(
-            token=SecretStr("4111111111111111"),
+            token=SecretStr("test-token-redacted"),
             dynamic_cvv=SecretStr("123"),
             expiry_month=SecretStr("12"),
             expiry_year=SecretStr("2030"),
@@ -304,9 +577,9 @@ def _payment_result(status: PravaPaymentStatus) -> PravaPaymentResult:
                 line_items=[
                     PravaLineItemResult(
                         txn_ref_id="line-1",
-                        merchant_name="HyperX US",
-                        merchant_url="https://hyperx.com",
-                        total_minor=6999,
+                        merchant_name="Jackbox Games",
+                        merchant_url="https://checkout.jackboxgames.com",
+                        total_minor=500,
                         status=status,
                         credential=credential,
                     )
@@ -316,6 +589,219 @@ def _payment_result(status: PravaPaymentStatus) -> PravaPaymentResult:
         ],
         response_id="response-poll-1",
     )
+
+
+async def test_live_quote_is_idempotent_and_keeps_billing_out_of_response() -> None:
+    user = _user()
+    store = MemoryPurchaseStore(_intent(state=TransactionState.DRAFT))
+    merchant = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=MerchantCheckoutOutcome.DECLINED,
+            amount_minor=500,
+            currency="USD",
+            reason_code="MERCHANT_PAYMENT_DECLINED",
+        )
+    )
+    service = PurchaseService(
+        store=store,
+        prava=FakePrava(),
+        public_base_url="https://api.wishtrace.example",
+        merchant_checkout=merchant,
+        idempotency_pepper="quote-test-pepper-with-at-least-32-bytes",
+    )
+    body = PurchaseQuoteRequest(billing=_billing())
+
+    first = await service.quote(user, store.intent.id, body, "quote-key-123")
+    replay = await service.quote(user, store.intent.id, body, "quote-key-123")
+
+    assert len(merchant.quote_requests) == 1
+    assert first.state is TransactionState.READY_FOR_APPROVAL
+    assert first.approved_total_minor == 500
+    assert replay == first
+    assert "123 Test Street" not in first.model_dump_json()
+    assert "talia@example.com" not in first.model_dump_json()
+
+
+async def test_live_quote_requires_verified_checkout_email() -> None:
+    user = _user()
+    store = MemoryPurchaseStore(_intent(state=TransactionState.DRAFT))
+    merchant = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=MerchantCheckoutOutcome.DECLINED,
+            amount_minor=500,
+            currency="USD",
+            reason_code="MERCHANT_PAYMENT_DECLINED",
+        )
+    )
+    service = PurchaseService(
+        store=store,
+        prava=FakePrava(),
+        public_base_url="https://api.wishtrace.example",
+        merchant_checkout=merchant,
+        idempotency_pepper="quote-test-pepper-with-at-least-32-bytes",
+    )
+    mismatched = _billing().model_copy(update={"email": "friend@example.com"})
+
+    with pytest.raises(ApiError) as error:
+        await service.quote(
+            user,
+            store.intent.id,
+            PurchaseQuoteRequest(billing=mismatched),
+            "quote-key-123",
+        )
+
+    assert error.value.code == "CHECKOUT_EMAIL_MISMATCH"
+    assert merchant.quote_requests == []
+
+
+@pytest.mark.parametrize(
+    ("merchant_outcome", "prava_final", "expected_state", "report_outcome"),
+    [
+        (
+            MerchantCheckoutOutcome.ORDER_VERIFIED,
+            PravaPaymentStatus.COMPLETED,
+            TransactionState.SUCCEEDED,
+            PravaReportOutcome.APPROVED,
+        ),
+        (
+            MerchantCheckoutOutcome.DECLINED,
+            PravaPaymentStatus.FAILED,
+            TransactionState.DECLINED,
+            PravaReportOutcome.DECLINED,
+        ),
+    ],
+)
+async def test_reconcile_runs_one_real_merchant_attempt_and_reports_prava(
+    merchant_outcome: MerchantCheckoutOutcome,
+    prava_final: PravaPaymentStatus,
+    expected_state: TransactionState,
+    report_outcome: PravaReportOutcome,
+) -> None:
+    user = _user()
+    approval = ApprovalSessionResponse(
+        session_id="session-1",
+        hosted_url="https://sandbox.collect.prava.space/checkout?session=1",
+        expires_at=datetime(2099, 8, 1, 16, 0, tzinfo=UTC),
+    )
+    store = MemoryPurchaseStore(
+        _intent(state=TransactionState.AWAITING_USER, approval_session=approval)
+    )
+    prava = FakePrava()
+    prava.payment_results = [
+        _payment_result(PravaPaymentStatus.AWAITING_RESULT),
+        _payment_result(prava_final),
+    ]
+    merchant = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=merchant_outcome,
+            order_id=(
+                "JB-12345"
+                if merchant_outcome is MerchantCheckoutOutcome.ORDER_VERIFIED
+                else None
+            ),
+            amount_minor=500,
+            currency="USD",
+            reason_code=(
+                "MERCHANT_ORDER_VERIFIED"
+                if merchant_outcome is MerchantCheckoutOutcome.ORDER_VERIFIED
+                else "MERCHANT_PAYMENT_DECLINED"
+            ),
+        )
+    )
+    service = PurchaseService(
+        store=store,
+        prava=prava,
+        public_base_url="https://api.wishtrace.example",
+        merchant_checkout=merchant,
+    )
+
+    response = await service.reconcile(user, store.intent.id)
+
+    assert merchant.checkout_calls == 1
+    assert prava.reports == [("session-1", "line-1", report_outcome)]
+    assert response.state is expected_state
+    assert response.merchant_outcome is merchant_outcome
+    assert response.merchant_order_id == (
+        "JB-12345"
+        if merchant_outcome is MerchantCheckoutOutcome.ORDER_VERIFIED
+        else None
+    )
+    assert response.visa_confirmation == (
+        "SUCCESS" if report_outcome is PravaReportOutcome.APPROVED else "FAILURE"
+    )
+    assert store.persisted_sensitive_credential is False
+
+
+@pytest.mark.parametrize(
+    ("merchant_outcome", "prava_final", "expected_state", "report_outcome"),
+    [
+        (
+            MerchantCheckoutOutcome.ORDER_VERIFIED,
+            PravaPaymentStatus.COMPLETED,
+            TransactionState.SUCCEEDED,
+            PravaReportOutcome.APPROVED,
+        ),
+        (
+            MerchantCheckoutOutcome.DECLINED,
+            PravaPaymentStatus.FAILED,
+            TransactionState.DECLINED,
+            PravaReportOutcome.DECLINED,
+        ),
+    ],
+)
+async def test_reconcile_reports_persisted_merchant_result_without_second_checkout(
+    merchant_outcome: MerchantCheckoutOutcome,
+    prava_final: PravaPaymentStatus,
+    expected_state: TransactionState,
+    report_outcome: PravaReportOutcome,
+) -> None:
+    user = _user()
+    approval = ApprovalSessionResponse(
+        session_id="session-1",
+        hosted_url="https://sandbox.collect.prava.space/checkout?session=1",
+        expires_at=datetime(2099, 8, 1, 16, 0, tzinfo=UTC),
+    )
+    persisted = _intent(
+        state=TransactionState.UNKNOWN,
+        approval_session=approval,
+    ).model_copy(
+        update={
+            "merchant_outcome": merchant_outcome,
+            "merchant_order_id": (
+                "JB-RECOVERED"
+                if merchant_outcome is MerchantCheckoutOutcome.ORDER_VERIFIED
+                else None
+            ),
+            "provider_status": PravaPaymentStatus.AWAITING_RESULT.value,
+        }
+    )
+    store = MemoryPurchaseStore(persisted)
+    prava = FakePrava()
+    prava.payment_results = [
+        _payment_result(PravaPaymentStatus.AWAITING_RESULT),
+        _payment_result(prava_final),
+    ]
+    merchant = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=MerchantCheckoutOutcome.UNKNOWN,
+            amount_minor=500,
+            currency="USD",
+            reason_code="SHOULD_NOT_RUN",
+        )
+    )
+    service = PurchaseService(
+        store=store,
+        prava=prava,
+        public_base_url="https://api.wishtrace.example",
+        merchant_checkout=merchant,
+    )
+
+    response = await service.reconcile(user, store.intent.id)
+
+    assert merchant.checkout_calls == 0
+    assert prava.reports == [("session-1", "line-1", report_outcome)]
+    assert response.state is expected_state
+    assert response.merchant_outcome is merchant_outcome
 
 
 async def test_duplicate_session_tap_replays_without_second_provider_call() -> None:
@@ -333,8 +819,8 @@ async def test_duplicate_session_tap_replays_without_second_provider_call() -> N
 
     assert len(prava.requests) == 1
     request = prava.requests[0]
-    assert request.total_minor == 6999
-    assert request.product_unit_minor == 6499
+    assert request.total_minor == 500
+    assert request.product_unit_minor == 500
     assert request.callback_url.endswith(f"purchase_intent_id={store.intent.id}")
     assert first.state == TransactionState.AWAITING_USER
     assert replay.approval_session == first.approval_session
@@ -395,6 +881,30 @@ async def test_session_requires_https_callback_and_fresh_quote() -> None:
     assert quote_error.value.code == "FRESH_QUOTE_REQUIRED"
     assert not prava.requests
 
+    active_store = MemoryPurchaseStore(_intent())
+    inactive_merchant = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=MerchantCheckoutOutcome.DECLINED,
+            amount_minor=500,
+            currency="USD",
+            reason_code="MERCHANT_PAYMENT_DECLINED",
+        )
+    )
+    guarded = PurchaseService(
+        store=active_store,
+        prava=prava,
+        public_base_url="https://api.wishtrace.example",
+        merchant_checkout=inactive_merchant,
+    )
+    with pytest.raises(ApiError) as inactive_quote:
+        await guarded.create_prava_session(
+            user,
+            active_store.intent.id,
+            "stable-key-123",
+        )
+    assert inactive_quote.value.code == "FRESH_QUOTE_REQUIRED"
+    assert not prava.requests
+
 
 async def test_reconcile_exposes_state_but_never_persists_credentials() -> None:
     user = _user()
@@ -418,7 +928,7 @@ async def test_reconcile_exposes_state_but_never_persists_credentials() -> None:
 
     assert response.state == TransactionState.CREDENTIALS_READY
     assert response.provider_status == "awaiting_result"
-    assert "4111111111111111" not in response.model_dump_json()
+    assert "test-token-redacted" not in response.model_dump_json()
     assert store.persisted_sensitive_credential is False
 
 
@@ -435,7 +945,7 @@ async def test_reconcile_rejects_credentials_for_different_approved_total() -> N
     prava = FakePrava()
     result = _payment_result(PravaPaymentStatus.AWAITING_RESULT)
     transaction = result.transactions[0]
-    line_item = transaction.line_items[0].model_copy(update={"total_minor": 7000})
+    line_item = transaction.line_items[0].model_copy(update={"total_minor": 501})
     prava.payment_result = result.model_copy(
         update={
             "transactions": [
@@ -492,14 +1002,54 @@ def test_transaction_state_machine_rejects_unsafe_shortcuts() -> None:
         _require_transition(TransactionState.CREDENTIALS_READY, TransactionState.SUCCEEDED)
 
 
+def test_receipt_requires_both_prava_and_merchant_evidence() -> None:
+    with pytest.raises(ApiError, match="final authoritative"):
+        receipt(_intent())
+
+    order = receipt(
+        _intent(state=TransactionState.SUCCEEDED).model_copy(
+            update={
+                "provider_status": "completed",
+                "visa_confirmation": "SUCCESS",
+                "merchant_outcome": MerchantCheckoutOutcome.ORDER_VERIFIED,
+                "merchant_order_id": "JB-12345",
+            }
+        )
+    )
+    assert order.kind == "ORDER_RECEIPT"
+    assert order.merchant_order_id == "JB-12345"
+
+    decline = receipt(
+        _intent(state=TransactionState.DECLINED).model_copy(
+            update={
+                "provider_status": "failed",
+                "visa_confirmation": "FAILURE",
+                "merchant_outcome": MerchantCheckoutOutcome.DECLINED,
+            }
+        )
+    )
+    assert decline.kind == "AUTHORIZATION_RESULT"
+    assert "decline" in decline.message.casefold()
+
+
 async def test_purchase_routes_require_auth_idempotency_and_safe_return() -> None:
     user = _user()
     store = MemoryPurchaseStore(_intent())
     prava = FakePrava()
+    merchant = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=MerchantCheckoutOutcome.DECLINED,
+            amount_minor=500,
+            currency="USD",
+            reason_code="MERCHANT_PAYMENT_DECLINED",
+        )
+    )
     service = PurchaseService(
         store=store,
         prava=prava,
         public_base_url="https://api.wishtrace.example",
+        merchant_checkout=merchant,
+        idempotency_pepper="route-test-pepper-with-at-least-32-bytes",
     )
     settings = Settings(
         app_env="test",
@@ -523,6 +1073,19 @@ async def test_purchase_routes_require_auth_idempotency_and_safe_return() -> Non
         base_url="http://testserver",
         follow_redirects=False,
     ) as client:
+        quote_path = f"/v1/purchase-intents/{store.intent.id}/quote"
+        quote = await client.post(
+            quote_path,
+            headers={
+                "Authorization": "Bearer valid-session",
+                "Idempotency-Key": "quote-key-123",
+            },
+            json={"billing": _billing().model_dump(mode="json")},
+        )
+        assert quote.status_code == 200
+        assert quote.json()["approved_total_minor"] == 500
+        assert "billing" not in quote.json()
+
         path = f"/v1/purchase-intents/{store.intent.id}/prava-session"
         unauthenticated = await client.post(path)
         assert unauthenticated.status_code == 401

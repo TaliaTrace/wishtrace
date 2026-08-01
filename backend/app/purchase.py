@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import json
 import re
 import uuid
@@ -13,6 +14,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.auth import AuthenticatedUser
 from app.errors import ApiError
+from app.merchant_browser import (
+    BillingContact,
+    MerchantBrowserError,
+    MerchantCheckoutGateway,
+    MerchantCheckoutOutcome,
+    MerchantCheckoutResult,
+    MerchantQuote,
+    MerchantQuoteRequest,
+)
 from app.models import (
     CandidateSnapshotModel,
     DiscoveryRunModel,
@@ -28,6 +38,8 @@ from app.prava import (
     PravaHttpGateway,
     PravaPaymentResult,
     PravaPaymentStatus,
+    PravaReportOutcome,
+    PravaReportResult,
     PravaSessionRequest,
 )
 
@@ -57,6 +69,12 @@ class PurchaseIntentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     candidate_id: uuid.UUID
+
+
+class PurchaseQuoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    billing: BillingContact
 
 
 class ApprovalSessionResponse(BaseModel):
@@ -90,6 +108,10 @@ class PurchaseIntentResponse(BaseModel):
     quote_timestamp: datetime | None
     quote_expires_at: datetime | None
     delivery_summary: str | None
+    merchant_order_id: str | None = None
+    merchant_outcome: MerchantCheckoutOutcome | None = None
+    merchant_attempted_at: datetime | None = None
+    visa_confirmation: Literal["SUCCESS", "FAILURE"] | None = None
     approval_session: ApprovalSessionResponse | None
     provider_status: str | None
     created_at: datetime
@@ -106,9 +128,65 @@ class PublicTransactionStatus(BaseModel):
     message: str
 
 
+class AuthorizationReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["AUTHORIZATION_RESULT"] = "AUTHORIZATION_RESULT"
+    purchase_intent_id: uuid.UUID
+    merchant_name: str
+    title: str
+    amount_minor: int
+    currency: Literal["USD"]
+    state: Literal[TransactionState.DECLINED]
+    provider_status: Literal["failed"]
+    visa_confirmation: Literal["FAILURE"]
+    message: Literal["Merchant decline recorded; Prava result confirmed."] = (
+        "Merchant decline recorded; Prava result confirmed."
+    )
+
+
+class OrderReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["ORDER_RECEIPT"] = "ORDER_RECEIPT"
+    purchase_intent_id: uuid.UUID
+    merchant_name: str
+    title: str
+    amount_minor: int
+    currency: Literal["USD"]
+    merchant_order_id: str
+    state: Literal[TransactionState.SUCCEEDED]
+    provider_status: Literal["completed"]
+    visa_confirmation: Literal["SUCCESS"]
+
+
+type ReceiptResponse = AuthorizationReceipt | OrderReceipt
+
+
 class SessionClaimAction(StrEnum):
     CREATE = "CREATE"
     REPLAY = "REPLAY"
+
+
+class QuoteClaimAction(StrEnum):
+    CREATE = "CREATE"
+    REPLAY = "REPLAY"
+
+
+class PurchaseQuoteFacts(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    intent: PurchaseIntentResponse
+    product_url: str
+    budget_minor: int
+
+
+class QuoteClaim(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: QuoteClaimAction
+    facts: PurchaseQuoteFacts | None = None
+    existing: PurchaseIntentResponse | None = None
 
 
 class SessionClaim(BaseModel):
@@ -129,6 +207,34 @@ class PurchaseStore(Protocol):
         self,
         user_id: uuid.UUID,
         purchase_intent_id: uuid.UUID,
+    ) -> PurchaseIntentResponse: ...
+
+    async def claim_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        request_hash: bytes,
+        now: datetime,
+    ) -> QuoteClaim: ...
+
+    async def complete_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        quote: MerchantQuote,
+    ) -> PurchaseIntentResponse: ...
+
+    async def fail_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        reason_code: str,
     ) -> PurchaseIntentResponse: ...
 
     async def claim_session_creation(
@@ -170,6 +276,47 @@ class PurchaseStore(Protocol):
         reason_code: str,
     ) -> PurchaseIntentResponse: ...
 
+    async def begin_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+    ) -> PurchaseIntentResponse: ...
+
+    async def record_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        result: MerchantCheckoutResult,
+    ) -> PurchaseIntentResponse: ...
+
+    async def fail_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        reason_code: str,
+        outcome_unknown: bool,
+    ) -> PurchaseIntentResponse: ...
+
+    async def record_prava_report(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        report: PravaReportResult,
+    ) -> PurchaseIntentResponse: ...
+
+    async def mark_transaction_unknown(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        reason_code: str,
+        response_id: str | None,
+    ) -> PurchaseIntentResponse: ...
+
     async def begin_reconciliation(
         self,
         user_id: uuid.UUID,
@@ -181,6 +328,14 @@ class PravaOperations(Protocol):
     async def create_session(self, request: PravaSessionRequest) -> HostedPravaSession: ...
 
     async def get_payment_result(self, session_id: str) -> PravaPaymentResult: ...
+
+    async def report_status(
+        self,
+        *,
+        session_id: str,
+        txn_ref_id: str,
+        outcome: PravaReportOutcome,
+    ) -> PravaReportResult: ...
 
 
 class PurchaseOperations(Protocol):
@@ -194,6 +349,14 @@ class PurchaseOperations(Protocol):
         self,
         user: AuthenticatedUser,
         purchase_intent_id: uuid.UUID,
+    ) -> PurchaseIntentResponse: ...
+
+    async def quote(
+        self,
+        user: AuthenticatedUser,
+        purchase_intent_id: uuid.UUID,
+        body: PurchaseQuoteRequest,
+        idempotency_key: str,
     ) -> PurchaseIntentResponse: ...
 
     async def create_prava_session(
@@ -217,10 +380,16 @@ class PurchaseService:
         store: PurchaseStore,
         prava: PravaOperations,
         public_base_url: str,
+        merchant_checkout: MerchantCheckoutGateway | None = None,
+        idempotency_pepper: str | None = None,
     ) -> None:
         self._store = store
         self._prava = prava
         self._public_base_url = public_base_url.rstrip("/")
+        self._merchant_checkout = merchant_checkout
+        self._idempotency_pepper = (
+            idempotency_pepper.encode() if idempotency_pepper is not None else None
+        )
 
     async def create(
         self,
@@ -236,6 +405,115 @@ class PurchaseService:
     ) -> PurchaseIntentResponse:
         return await self._store.get_intent(user.id, purchase_intent_id)
 
+    async def quote(
+        self,
+        user: AuthenticatedUser,
+        purchase_intent_id: uuid.UUID,
+        body: PurchaseQuoteRequest,
+        idempotency_key: str,
+    ) -> PurchaseIntentResponse:
+        if user.email is None:
+            raise ApiError(
+                status_code=409,
+                code="VERIFIED_EMAIL_REQUIRED",
+                message="A verified Google email is required for digital delivery.",
+                recoverable=True,
+            )
+        if body.billing.email.casefold() != user.email.casefold():
+            raise ApiError(
+                status_code=409,
+                code="CHECKOUT_EMAIL_MISMATCH",
+                message=(
+                    "Use your verified sign-in email for checkout; Jackbox sends "
+                    "the gift card there for manual forwarding."
+                ),
+                recoverable=True,
+            )
+        if self._merchant_checkout is None or self._idempotency_pepper is None:
+            raise ApiError(
+                status_code=503,
+                code="MERCHANT_CHECKOUT_UNAVAILABLE",
+                message="Live merchant checkout is not configured yet.",
+                recoverable=True,
+            )
+        if not IDEMPOTENCY_PATTERN.fullmatch(idempotency_key):
+            raise ApiError(
+                status_code=400,
+                code="IDEMPOTENCY_KEY_INVALID",
+                message="A stable idempotency key is required for the live quote.",
+                recoverable=True,
+            )
+        key_hash = _keyed_hash(
+            self._idempotency_pepper,
+            "merchant-quote-key",
+            idempotency_key.encode(),
+        )
+        canonical_request = json.dumps(
+            body.model_dump(mode="json"),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        request_hash = _keyed_hash(
+            self._idempotency_pepper,
+            "merchant-quote-request",
+            canonical_request,
+        )
+        claim = await self._store.claim_quote(
+            user_id=user.id,
+            purchase_intent_id=purchase_intent_id,
+            key_hash=key_hash,
+            request_hash=request_hash,
+            now=datetime.now(UTC),
+        )
+        if claim.action is QuoteClaimAction.REPLAY:
+            assert claim.existing is not None
+            return claim.existing
+        facts = claim.facts
+        assert facts is not None
+        try:
+            quote = await self._merchant_checkout.quote(
+                MerchantQuoteRequest(
+                    purchase_intent_id=purchase_intent_id,
+                    product_url=facts.product_url,
+                    merchant_variant_id=facts.intent.merchant_variant_id,
+                    expected_item_minor=facts.intent.item_price_minor,
+                    currency="USD",
+                    billing=body.billing,
+                )
+            )
+        except MerchantBrowserError as error:
+            await self._store.fail_quote(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                key_hash=key_hash,
+                reason_code=error.code,
+            )
+            raise ApiError(
+                status_code=503 if error.recoverable else 502,
+                code=error.code,
+                message=error.safe_message,
+                recoverable=error.recoverable,
+            ) from error
+        if quote.total_minor > facts.budget_minor:
+            await self._store.fail_quote(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                key_hash=key_hash,
+                reason_code="MERCHANT_QUOTE_OVER_BUDGET",
+            )
+            raise ApiError(
+                status_code=409,
+                code="MERCHANT_QUOTE_OVER_BUDGET",
+                message="The live merchant total exceeds the saved budget.",
+                recoverable=True,
+            )
+        return await self._store.complete_quote(
+            user_id=user.id,
+            purchase_intent_id=purchase_intent_id,
+            key_hash=key_hash,
+            quote=quote,
+        )
+
     async def create_prava_session(
         self,
         user: AuthenticatedUser,
@@ -250,15 +528,37 @@ class PurchaseService:
                 recoverable=True,
             )
         intent = await self._store.get_intent(user.id, purchase_intent_id)
+        if (
+            self._merchant_checkout is not None
+            and intent.state is TransactionState.READY_FOR_APPROVAL
+            and not await self._merchant_checkout.is_quote_active(purchase_intent_id)
+        ):
+            raise ApiError(
+                status_code=409,
+                code="FRESH_QUOTE_REQUIRED",
+                message="Refresh the live merchant total before opening Prava.",
+                recoverable=True,
+            )
         provider_request = self._session_request(user, intent)
-        request_hash = hashlib.sha256(
-            json.dumps(
-                provider_request.provider_payload(),
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).digest()
-        key_hash = hashlib.sha256(idempotency_key.encode()).digest()
+        canonical_request = json.dumps(
+            provider_request.provider_payload(),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        if self._idempotency_pepper is None:
+            request_hash = hashlib.sha256(canonical_request).digest()
+            key_hash = hashlib.sha256(idempotency_key.encode()).digest()
+        else:
+            request_hash = _keyed_hash(
+                self._idempotency_pepper,
+                "prava-session-request",
+                canonical_request,
+            )
+            key_hash = _keyed_hash(
+                self._idempotency_pepper,
+                "prava-session-key",
+                idempotency_key.encode(),
+            )
         claim = await self._store.claim_session_creation(
             user_id=user.id,
             purchase_intent_id=purchase_intent_id,
@@ -305,6 +605,25 @@ class PurchaseService:
                 message="Start Prava approval before refreshing its status.",
                 recoverable=True,
             )
+        if intent.state in {
+            TransactionState.SUCCEEDED,
+            TransactionState.DECLINED,
+            TransactionState.CANCELLED,
+            TransactionState.EXPIRED,
+            TransactionState.FAILED,
+        }:
+            return intent
+        if intent.state is TransactionState.CHECKOUT_IN_PROGRESS:
+            return await self._store.mark_transaction_unknown(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code="MERCHANT_CHECKOUT_INTERRUPTED",
+                response_id=None,
+            )
+        recovering_unknown_checkout = (
+            intent.state is TransactionState.UNKNOWN
+            and intent.merchant_outcome is MerchantCheckoutOutcome.UNKNOWN
+        )
         if intent.state is TransactionState.UNKNOWN:
             intent = await self._store.begin_reconciliation(
                 user.id,
@@ -326,6 +645,59 @@ class PurchaseService:
                 message="Prava returned a mismatched session.",
                 recoverable=False,
             )
+        known_merchant_outcome = intent.merchant_outcome in {
+            MerchantCheckoutOutcome.ORDER_VERIFIED,
+            MerchantCheckoutOutcome.DECLINED,
+        }
+        if intent.state in {
+            TransactionState.ORDER_VERIFIED,
+            TransactionState.RECONCILING,
+        } and known_merchant_outcome:
+            expected_status = (
+                PravaPaymentStatus.COMPLETED
+                if intent.merchant_outcome is MerchantCheckoutOutcome.ORDER_VERIFIED
+                else PravaPaymentStatus.FAILED
+            )
+            if result.status is expected_status:
+                return await self._store.record_payment_result(
+                    user_id=user.id,
+                    purchase_intent_id=purchase_intent_id,
+                    result=result,
+                    state=(
+                        TransactionState.SUCCEEDED
+                        if intent.merchant_outcome
+                        is MerchantCheckoutOutcome.ORDER_VERIFIED
+                        else TransactionState.DECLINED
+                    ),
+                    reason_code=(
+                        "RECONCILED_VERIFIED_ORDER"
+                        if intent.merchant_outcome
+                        is MerchantCheckoutOutcome.ORDER_VERIFIED
+                        else "RECONCILED_MERCHANT_DECLINE"
+                    ),
+                )
+            if result.status is PravaPaymentStatus.AWAITING_RESULT:
+                _validate_payment_result(intent, result)
+                return await self._report_merchant_result(
+                    user=user,
+                    purchase_intent_id=purchase_intent_id,
+                    approval_session=approval_session,
+                    intent=intent,
+                    payment_result=result,
+                )
+            return await self._store.mark_transaction_unknown(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code="PRAVA_FINAL_RESULT_UNCONFIRMED",
+                response_id=result.response_id,
+            )
+        if intent.state is TransactionState.RECONCILING and recovering_unknown_checkout:
+            return await self._store.mark_transaction_unknown(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code="MERCHANT_CHECKOUT_OUTCOME_UNKNOWN",
+                response_id=result.response_id,
+            )
         _validate_payment_result(intent, result)
         next_state, reason = _state_from_payment_result(result)
         if (
@@ -334,12 +706,177 @@ class PurchaseService:
         ):
             next_state = TransactionState.EXPIRED
             reason = "PRAVA_SESSION_EXPIRED"
-        return await self._store.record_payment_result(
+        updated = await self._store.record_payment_result(
             user_id=user.id,
             purchase_intent_id=purchase_intent_id,
             result=result,
             state=next_state,
             reason_code=reason,
+        )
+        if next_state is not TransactionState.CREDENTIALS_READY:
+            return updated
+        if self._merchant_checkout is None:
+            return updated
+        await self._store.begin_merchant_checkout(
+            user_id=user.id,
+            purchase_intent_id=purchase_intent_id,
+        )
+        txn_ref_id, credential = result.credentials[0]
+        try:
+            merchant_result = await self._merchant_checkout.checkout(
+                purchase_intent_id=purchase_intent_id,
+                credential=credential,
+            )
+        except MerchantBrowserError as error:
+            await self._store.fail_merchant_checkout(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code=error.code,
+                outcome_unknown=error.outcome_unknown,
+            )
+            raise ApiError(
+                status_code=503 if error.recoverable else 502,
+                code=error.code,
+                message=error.safe_message,
+                recoverable=error.recoverable,
+            ) from error
+        merchant_intent = await self._store.record_merchant_checkout(
+            user_id=user.id,
+            purchase_intent_id=purchase_intent_id,
+            result=merchant_result,
+        )
+        if merchant_result.outcome is MerchantCheckoutOutcome.UNKNOWN:
+            return merchant_intent
+        return await self._report_merchant_result(
+            user=user,
+            purchase_intent_id=purchase_intent_id,
+            approval_session=approval_session,
+            intent=merchant_intent,
+            payment_result=result,
+        )
+
+    async def _report_merchant_result(
+        self,
+        *,
+        user: AuthenticatedUser,
+        purchase_intent_id: uuid.UUID,
+        approval_session: ApprovalSessionResponse,
+        intent: PurchaseIntentResponse,
+        payment_result: PravaPaymentResult,
+    ) -> PurchaseIntentResponse:
+        merchant_outcome = intent.merchant_outcome
+        if merchant_outcome not in {
+            MerchantCheckoutOutcome.ORDER_VERIFIED,
+            MerchantCheckoutOutcome.DECLINED,
+        }:
+            raise ApiError(
+                status_code=409,
+                code="MERCHANT_RESULT_NOT_READY",
+                message="The merchant result is not ready to report.",
+                recoverable=True,
+            )
+        _validate_payment_result(intent, payment_result)
+        txn_ref_id = payment_result.transactions[0].line_items[0].txn_ref_id
+        report_outcome = (
+            PravaReportOutcome.APPROVED
+            if merchant_outcome is MerchantCheckoutOutcome.ORDER_VERIFIED
+            else PravaReportOutcome.DECLINED
+        )
+        try:
+            report = await self._prava.report_status(
+                session_id=approval_session.session_id,
+                txn_ref_id=txn_ref_id,
+                outcome=report_outcome,
+            )
+        except PravaGatewayError as error:
+            await self._store.mark_transaction_unknown(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code="PRAVA_REPORT_OUTCOME_UNKNOWN",
+                response_id=error.response_id,
+            )
+            raise ApiError(
+                status_code=503 if error.recoverable else 502,
+                code=error.code,
+                message=error.safe_message,
+                recoverable=error.recoverable,
+            ) from error
+        expected_confirmation = (
+            "SUCCESS"
+            if report_outcome is PravaReportOutcome.APPROVED
+            else "FAILURE"
+        )
+        if (
+            report.txn_ref_id != txn_ref_id
+            or report.txn_status is not report_outcome
+            or report.visa_confirmation != expected_confirmation
+        ):
+            await self._store.mark_transaction_unknown(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code="PRAVA_REPORT_MISMATCH",
+                response_id=report.response_id,
+            )
+            raise ApiError(
+                status_code=502,
+                code="PRAVA_RESPONSE_MISMATCH",
+                message="Prava confirmed a different merchant outcome.",
+                recoverable=False,
+            )
+        await self._store.record_prava_report(
+            user_id=user.id,
+            purchase_intent_id=purchase_intent_id,
+            report=report,
+        )
+        try:
+            final_result = await self._prava.get_payment_result(
+                approval_session.session_id
+            )
+        except PravaGatewayError as error:
+            await self._store.mark_transaction_unknown(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code="PRAVA_FINAL_RESULT_UNCONFIRMED",
+                response_id=error.response_id,
+            )
+            raise ApiError(
+                status_code=503 if error.recoverable else 502,
+                code=error.code,
+                message=error.safe_message,
+                recoverable=error.recoverable,
+            ) from error
+        if final_result.session_id != approval_session.session_id:
+            raise ApiError(
+                status_code=502,
+                code="PRAVA_RESPONSE_INVALID",
+                message="Prava returned a mismatched final session.",
+                recoverable=False,
+            )
+        if (
+            merchant_outcome is MerchantCheckoutOutcome.ORDER_VERIFIED
+            and final_result.status is PravaPaymentStatus.COMPLETED
+        ):
+            final_state = TransactionState.SUCCEEDED
+            final_reason = "PRAVA_AND_MERCHANT_VERIFIED"
+        elif (
+            merchant_outcome is MerchantCheckoutOutcome.DECLINED
+            and final_result.status is PravaPaymentStatus.FAILED
+        ):
+            final_state = TransactionState.DECLINED
+            final_reason = "MERCHANT_DECLINE_REPORTED"
+        else:
+            return await self._store.mark_transaction_unknown(
+                user_id=user.id,
+                purchase_intent_id=purchase_intent_id,
+                reason_code="PRAVA_FINAL_RESULT_MISMATCH",
+                response_id=final_result.response_id,
+            )
+        return await self._store.record_payment_result(
+            user_id=user.id,
+            purchase_intent_id=purchase_intent_id,
+            result=final_result,
+            state=final_state,
+            reason_code=final_reason,
         )
 
     def _session_request(
@@ -418,6 +955,16 @@ class UnavailablePurchaseService:
         purchase_intent_id: uuid.UUID,
     ) -> PurchaseIntentResponse:
         del user, purchase_intent_id
+        raise _unavailable()
+
+    async def quote(
+        self,
+        user: AuthenticatedUser,
+        purchase_intent_id: uuid.UUID,
+        body: PurchaseQuoteRequest,
+        idempotency_key: str,
+    ) -> PurchaseIntentResponse:
+        del user, purchase_intent_id, body, idempotency_key
         raise _unavailable()
 
     async def create_prava_session(
@@ -531,6 +1078,40 @@ class SqlPurchaseStore:
             await session.flush()
             return await _intent_response(session, intent)
 
+    async def fail_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        reason_code: str,
+        outcome_unknown: bool,
+    ) -> PurchaseIntentResponse:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            if intent.state != TransactionState.CHECKOUT_IN_PROGRESS.value:
+                raise ApiError(
+                    status_code=409,
+                    code="TRANSACTION_STATE_CONFLICT",
+                    message="The merchant checkout state changed. Refresh before continuing.",
+                    recoverable=True,
+                )
+            target = (
+                TransactionState.UNKNOWN
+                if outcome_unknown
+                else TransactionState.FAILED
+            )
+            if outcome_unknown:
+                intent.merchant_outcome = MerchantCheckoutOutcome.UNKNOWN.value
+                intent.merchant_attempted_at = datetime.now(UTC)
+            _transition(session, intent, target, reason_code)
+            await session.flush()
+            return await _intent_response(session, intent)
+
     async def get_intent(
         self,
         user_id: uuid.UUID,
@@ -538,6 +1119,220 @@ class SqlPurchaseStore:
     ) -> PurchaseIntentResponse:
         async with self._session_factory() as session:
             intent = await _owned_intent(session, user_id, purchase_intent_id)
+            return await _intent_response(session, intent)
+
+    async def claim_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        request_hash: bytes,
+        now: datetime,
+    ) -> QuoteClaim:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            operation = await session.scalar(
+                select(IdempotencyOperationModel)
+                .where(
+                    IdempotencyOperationModel.purchase_intent_id == purchase_intent_id,
+                    IdempotencyOperationModel.operation == "MERCHANT_QUOTE",
+                )
+                .with_for_update()
+            )
+            if operation is not None:
+                same_key = hmac.compare_digest(operation.key_hash, key_hash)
+                same_request = hmac.compare_digest(
+                    operation.request_hash,
+                    request_hash,
+                )
+                if same_key and not same_request:
+                    raise ApiError(
+                        status_code=409,
+                        code="IDEMPOTENCY_CONFLICT",
+                        message="That quote key was already used with different details.",
+                        recoverable=False,
+                    )
+                if (
+                    same_key
+                    and same_request
+                    and operation.status == "COMPLETED"
+                    and intent.state == TransactionState.READY_FOR_APPROVAL.value
+                    and intent.quote_expires_at is not None
+                    and intent.quote_expires_at > now
+                ):
+                    return QuoteClaim(
+                        action=QuoteClaimAction.REPLAY,
+                        existing=await _intent_response(session, intent),
+                    )
+                if operation.status == "IN_PROGRESS":
+                    raise ApiError(
+                        status_code=409,
+                        code="MERCHANT_QUOTE_IN_PROGRESS",
+                        message="The live merchant quote is already being prepared.",
+                        recoverable=True,
+                    )
+            if intent.state not in {
+                TransactionState.DRAFT.value,
+                TransactionState.FAILED.value,
+                TransactionState.READY_FOR_APPROVAL.value,
+            }:
+                raise ApiError(
+                    status_code=409,
+                    code="TRANSACTION_STATE_CONFLICT",
+                    message="This purchase cannot be re-quoted in its current state.",
+                    recoverable=True,
+                )
+            row = (
+                await session.execute(
+                    select(CandidateSnapshotModel, OccasionModel)
+                    .join(
+                        OccasionModel,
+                        OccasionModel.id == intent.occasion_id,
+                    )
+                    .where(
+                        CandidateSnapshotModel.id == intent.candidate_snapshot_id,
+                        CandidateSnapshotModel.discovery_run_id
+                        == intent.discovery_run_id,
+                        CandidateSnapshotModel.eligible.is_(True),
+                        CandidateSnapshotModel.checkout_supported.is_(True),
+                        CandidateSnapshotModel.source_mode == "LIVE",
+                        OccasionModel.user_id == user_id,
+                    )
+                )
+            ).one_or_none()
+            if row is None:
+                raise ApiError(
+                    status_code=409,
+                    code="CANDIDATE_NOT_PURCHASABLE",
+                    message="This gift no longer has a verified checkout path.",
+                    recoverable=True,
+                )
+            candidate, occasion = row
+            if operation is None:
+                operation = IdempotencyOperationModel(
+                    user_id=user_id,
+                    purchase_intent_id=purchase_intent_id,
+                    operation="MERCHANT_QUOTE",
+                    key_hash=key_hash,
+                    request_hash=request_hash,
+                    status="IN_PROGRESS",
+                )
+                session.add(operation)
+            else:
+                operation.key_hash = key_hash
+                operation.request_hash = request_hash
+                operation.status = "IN_PROGRESS"
+                operation.provider_response_id = None
+                operation.updated_at = now
+            _transition(
+                session,
+                intent,
+                TransactionState.VALIDATING,
+                "MERCHANT_QUOTE_REQUESTED",
+            )
+            await session.flush()
+            return QuoteClaim(
+                action=QuoteClaimAction.CREATE,
+                facts=PurchaseQuoteFacts(
+                    intent=await _intent_response(session, intent),
+                    product_url=candidate.product_url,
+                    budget_minor=occasion.budget_minor,
+                ),
+            )
+
+    async def complete_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        quote: MerchantQuote,
+    ) -> PurchaseIntentResponse:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            operation = await _owned_operation_named(
+                session,
+                purchase_intent_id,
+                "MERCHANT_QUOTE",
+                key_hash,
+            )
+            if operation.status == "COMPLETED":
+                return await _intent_response(session, intent)
+            if (
+                operation.status != "IN_PROGRESS"
+                or intent.state != TransactionState.VALIDATING.value
+            ):
+                raise ApiError(
+                    status_code=409,
+                    code="TRANSACTION_STATE_CONFLICT",
+                    message="The live quote state changed. Refresh before continuing.",
+                    recoverable=True,
+                )
+            intent.item_price_minor = quote.item_minor
+            intent.approved_total_minor = quote.total_minor
+            intent.quote_source = quote.source
+            intent.quote_timestamp = quote.quoted_at
+            intent.quote_expires_at = quote.expires_at
+            intent.delivery_summary = quote.delivery_summary
+            operation.status = "COMPLETED"
+            operation.updated_at = datetime.now(UTC)
+            _transition(
+                session,
+                intent,
+                TransactionState.QUOTED,
+                "MERCHANT_TOTAL_VERIFIED",
+            )
+            _transition(
+                session,
+                intent,
+                TransactionState.READY_FOR_APPROVAL,
+                "MERCHANT_QUOTE_READY_FOR_REVIEW",
+            )
+            await session.flush()
+            return await _intent_response(session, intent)
+
+    async def fail_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        key_hash: bytes,
+        reason_code: str,
+    ) -> PurchaseIntentResponse:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            operation = await _owned_operation_named(
+                session,
+                purchase_intent_id,
+                "MERCHANT_QUOTE",
+                key_hash,
+            )
+            operation.status = "FAILED"
+            operation.updated_at = datetime.now(UTC)
+            if intent.state == TransactionState.VALIDATING.value:
+                _transition(
+                    session,
+                    intent,
+                    TransactionState.FAILED,
+                    reason_code,
+                )
+            await session.flush()
             return await _intent_response(session, intent)
 
     async def claim_session_creation(
@@ -773,6 +1568,142 @@ class SqlPurchaseStore:
             await session.flush()
             return await _intent_response(session, intent)
 
+    async def begin_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+    ) -> PurchaseIntentResponse:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            if intent.state != TransactionState.CREDENTIALS_READY.value:
+                raise ApiError(
+                    status_code=409,
+                    code="TRANSACTION_STATE_CONFLICT",
+                    message="The merchant checkout is not ready to begin.",
+                    recoverable=True,
+                )
+            _transition(
+                session,
+                intent,
+                TransactionState.CHECKOUT_IN_PROGRESS,
+                "MERCHANT_CHECKOUT_STARTED",
+            )
+            await session.flush()
+            return await _intent_response(session, intent)
+
+    async def record_merchant_checkout(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        result: MerchantCheckoutResult,
+    ) -> PurchaseIntentResponse:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            if intent.state != TransactionState.CHECKOUT_IN_PROGRESS.value:
+                raise ApiError(
+                    status_code=409,
+                    code="TRANSACTION_STATE_CONFLICT",
+                    message="The merchant checkout state changed. Refresh before continuing.",
+                    recoverable=True,
+                )
+            if (
+                intent.approved_total_minor is None
+                or result.amount_minor != intent.approved_total_minor
+                or result.currency != intent.currency
+            ):
+                raise ApiError(
+                    status_code=502,
+                    code="MERCHANT_RESULT_MISMATCH",
+                    message="The merchant returned a result for a different total.",
+                    recoverable=False,
+                )
+            intent.merchant_outcome = result.outcome.value
+            intent.merchant_order_id = result.order_id
+            intent.merchant_attempted_at = datetime.now(UTC)
+            target = {
+                MerchantCheckoutOutcome.ORDER_VERIFIED: TransactionState.ORDER_VERIFIED,
+                # The merchant decline is known, but the overall transaction is
+                # not final until Prava confirms the reported outcome.
+                MerchantCheckoutOutcome.DECLINED: TransactionState.UNKNOWN,
+                MerchantCheckoutOutcome.UNKNOWN: TransactionState.UNKNOWN,
+            }[result.outcome]
+            _transition(session, intent, target, result.reason_code)
+            await session.flush()
+            return await _intent_response(session, intent)
+
+    async def record_prava_report(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        report: PravaReportResult,
+    ) -> PurchaseIntentResponse:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            provider_session = await session.scalar(
+                select(PravaSessionModel)
+                .where(PravaSessionModel.purchase_intent_id == purchase_intent_id)
+                .with_for_update()
+            )
+            if (
+                provider_session is None
+                or provider_session.provider_txn_ref_id != report.txn_ref_id
+            ):
+                raise ApiError(
+                    status_code=502,
+                    code="PRAVA_RESPONSE_MISMATCH",
+                    message="Prava reported a result for a different checkout.",
+                    recoverable=False,
+                )
+            provider_session.report_response_id = report.response_id
+            provider_session.visa_confirmation = report.visa_confirmation
+            provider_session.updated_at = datetime.now(UTC)
+            await session.flush()
+            return await _intent_response(session, intent)
+
+    async def mark_transaction_unknown(
+        self,
+        *,
+        user_id: uuid.UUID,
+        purchase_intent_id: uuid.UUID,
+        reason_code: str,
+        response_id: str | None,
+    ) -> PurchaseIntentResponse:
+        async with self._session_factory() as session, session.begin():
+            intent = await _owned_intent(
+                session,
+                user_id,
+                purchase_intent_id,
+                lock=True,
+            )
+            if intent.state != TransactionState.UNKNOWN.value:
+                _transition(
+                    session,
+                    intent,
+                    TransactionState.UNKNOWN,
+                    reason_code,
+                    response_id,
+                )
+                await session.flush()
+            return await _intent_response(session, intent)
+
     async def begin_reconciliation(
         self,
         user_id: uuid.UUID,
@@ -827,20 +1758,33 @@ async def _owned_operation(
     purchase_intent_id: uuid.UUID,
     key_hash: bytes,
 ) -> IdempotencyOperationModel:
+    return await _owned_operation_named(
+        session,
+        purchase_intent_id,
+        "PRAVA_SESSION",
+        key_hash,
+    )
+
+
+async def _owned_operation_named(
+    session: AsyncSession,
+    purchase_intent_id: uuid.UUID,
+    operation_name: str,
+    key_hash: bytes,
+) -> IdempotencyOperationModel:
     operation = await session.scalar(
         select(IdempotencyOperationModel)
         .where(
             IdempotencyOperationModel.purchase_intent_id == purchase_intent_id,
-            IdempotencyOperationModel.operation == "PRAVA_SESSION",
-            IdempotencyOperationModel.key_hash == key_hash,
+            IdempotencyOperationModel.operation == operation_name,
         )
         .with_for_update()
     )
-    if operation is None:
+    if operation is None or not hmac.compare_digest(operation.key_hash, key_hash):
         raise ApiError(
             status_code=409,
             code="TRANSACTION_UNKNOWN",
-            message="Approval state could not be recovered.",
+            message="The operation state could not be recovered.",
             recoverable=True,
         )
     return operation
@@ -876,6 +1820,16 @@ async def _intent_response(
         quote_timestamp=intent.quote_timestamp,
         quote_expires_at=intent.quote_expires_at,
         delivery_summary=intent.delivery_summary,
+        merchant_order_id=intent.merchant_order_id,
+        merchant_outcome=(
+            MerchantCheckoutOutcome(intent.merchant_outcome)
+            if intent.merchant_outcome is not None
+            else None
+        ),
+        merchant_attempted_at=intent.merchant_attempted_at,
+        visa_confirmation=(
+            provider_session.visa_confirmation if provider_session is not None else None
+        ),
         approval_session=(
             ApprovalSessionResponse(
                 session_id=provider_session.provider_session_id,
@@ -925,6 +1879,7 @@ def _require_transition(source: TransactionState, target: TransactionState) -> N
             TransactionState.FAILED,
         },
         TransactionState.READY_FOR_APPROVAL: {
+            TransactionState.VALIDATING,
             TransactionState.SESSION_CREATING,
             TransactionState.EXPIRED,
             TransactionState.CANCELLED,
@@ -957,7 +1912,10 @@ def _require_transition(source: TransactionState, target: TransactionState) -> N
             TransactionState.SUCCEEDED,
             TransactionState.UNKNOWN,
         },
-        TransactionState.UNKNOWN: {TransactionState.RECONCILING},
+        TransactionState.UNKNOWN: {
+            TransactionState.RECONCILING,
+            TransactionState.DECLINED,
+        },
         TransactionState.RECONCILING: {
             TransactionState.AWAITING_USER,
             TransactionState.CREDENTIALS_READY,
@@ -969,6 +1927,10 @@ def _require_transition(source: TransactionState, target: TransactionState) -> N
             TransactionState.FAILED,
             TransactionState.UNKNOWN,
         },
+        TransactionState.FAILED: {TransactionState.VALIDATING},
+        TransactionState.DECLINED: {TransactionState.UNKNOWN},
+        TransactionState.CANCELLED: {TransactionState.VALIDATING},
+        TransactionState.EXPIRED: {TransactionState.VALIDATING},
     }
     if target not in allowed.get(source, set()):
         raise ApiError(
@@ -1078,6 +2040,48 @@ def transaction_status(intent: PurchaseIntentResponse) -> PublicTransactionStatu
     )
 
 
+def receipt(intent: PurchaseIntentResponse) -> ReceiptResponse:
+    if (
+        intent.state is TransactionState.SUCCEEDED
+        and intent.merchant_order_id is not None
+        and intent.provider_status == PravaPaymentStatus.COMPLETED.value
+        and intent.visa_confirmation == "SUCCESS"
+    ):
+        return OrderReceipt(
+            purchase_intent_id=intent.id,
+            merchant_name=intent.merchant_name,
+            title=intent.title,
+            amount_minor=intent.approved_total_minor or intent.item_price_minor,
+            currency="USD",
+            merchant_order_id=intent.merchant_order_id,
+            state=TransactionState.SUCCEEDED,
+            provider_status="completed",
+            visa_confirmation="SUCCESS",
+        )
+    if (
+        intent.state is TransactionState.DECLINED
+        and intent.merchant_outcome is MerchantCheckoutOutcome.DECLINED
+        and intent.provider_status == PravaPaymentStatus.FAILED.value
+        and intent.visa_confirmation == "FAILURE"
+    ):
+        return AuthorizationReceipt(
+            purchase_intent_id=intent.id,
+            merchant_name=intent.merchant_name,
+            title=intent.title,
+            amount_minor=intent.approved_total_minor or intent.item_price_minor,
+            currency="USD",
+            state=TransactionState.DECLINED,
+            provider_status="failed",
+            visa_confirmation="FAILURE",
+        )
+    raise ApiError(
+        status_code=409,
+        code="RECEIPT_NOT_AVAILABLE",
+        message="A final authoritative transaction result is not available yet.",
+        recoverable=True,
+    )
+
+
 def _origin(value: str) -> str:
     parsed = urlsplit(value)
     if parsed.scheme != "https" or parsed.hostname is None:
@@ -1089,6 +2093,14 @@ def _origin(value: str) -> str:
         )
     port = f":{parsed.port}" if parsed.port is not None else ""
     return f"https://{parsed.hostname}{port}"
+
+
+def _keyed_hash(pepper: bytes, purpose: str, value: bytes) -> bytes:
+    return hmac.new(
+        pepper,
+        purpose.encode() + b"\x00" + value,
+        hashlib.sha256,
+    ).digest()
 
 
 def _not_found(code: str, message: str) -> ApiError:
@@ -1114,9 +2126,13 @@ def build_purchase_service(
     session_factory: async_sessionmaker[AsyncSession],
     prava: PravaHttpGateway,
     public_base_url: str,
+    merchant_checkout: MerchantCheckoutGateway | None = None,
+    idempotency_pepper: str | None = None,
 ) -> PurchaseOperations:
     return PurchaseService(
         store=SqlPurchaseStore(session_factory),
         prava=prava,
         public_base_url=public_base_url,
+        merchant_checkout=merchant_checkout,
+        idempotency_pepper=idempotency_pepper,
     )

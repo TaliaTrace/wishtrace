@@ -40,9 +40,11 @@ class Settings(BaseSettings):
     prava_secret_key: SecretStr | None = None
     android_return_uri: str = "wishtrace://prava/return"
     primary_merchant_profile_url: AnyHttpUrl = AnyHttpUrl(
-        "https://hyperx.com/.well-known/ucp"
+        "https://checkout.jackboxgames.com/.well-known/ucp"
     )
-    primary_merchant_endpoint_host: str = "hyperx-us.myshopify.com"
+    primary_merchant_endpoint_host: str = "jackbox-games.myshopify.com"
+    merchant_checkout_enabled: bool = False
+    merchant_browser_executable_path: Path | None = None
     allow_stored_value_products: bool = False
 
     @field_validator("database_url")
@@ -126,6 +128,24 @@ class Settings(BaseSettings):
         ):
             raise ValueError("ANDROID_RETURN_URI must equal wishtrace://prava/return")
         return value
+
+    @field_validator("merchant_browser_executable_path")
+    @classmethod
+    def require_browser_executable(cls, value: Path | None) -> Path | None:
+        if value is None:
+            return None
+        resolved = value.expanduser().resolve()
+        if not resolved.is_absolute() or not resolved.is_file():
+            raise ValueError("MERCHANT_BROWSER_EXECUTABLE_PATH must be an existing file")
+        return resolved
+
+    @model_validator(mode="after")
+    def require_browser_when_checkout_enabled(self) -> "Settings":
+        if self.merchant_checkout_enabled and self.merchant_browser_executable_path is None:
+            raise ValueError(
+                "MERCHANT_BROWSER_EXECUTABLE_PATH is required when checkout is enabled"
+            )
+        return self
 
     @property
     def sqlalchemy_database_url(self) -> str:

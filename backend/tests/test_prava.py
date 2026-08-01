@@ -14,7 +14,7 @@ from app.prava import (
 )
 
 BASE_URL = "https://sandbox.api.prava.space"
-FAKE_SECRET = "sk_test_fixture_value_not_a_real_key"
+FAKE_SECRET = "sandbox-secret-fixture-not-a-real-key"
 
 
 def _request() -> PravaSessionRequest:
@@ -179,7 +179,7 @@ async def test_payment_result_keeps_credentials_secret_and_memory_only() -> None
                                 "merchant_url": "https://merchant.example",
                                 "total_amount": "69.99",
                                 "status": "awaiting_result",
-                                "token": "4111111111111111",
+                                "token": "test-token-redacted",
                                 "dynamic_cvv": "123",
                                 "expiry_month": "12",
                                 "expiry_year": "2030",
@@ -198,11 +198,11 @@ async def test_payment_result_keeps_credentials_secret_and_memory_only() -> None
     assert len(result.credentials) == 1
     txn_ref_id, credential = result.credentials[0]
     assert txn_ref_id == "line-1"
-    assert credential.token.get_secret_value() == "4111111111111111"
+    assert credential.token.get_secret_value() == "test-token-redacted"
     serialized = result.model_dump_json()
-    assert "4111111111111111" not in serialized
+    assert "test-token-redacted" not in serialized
     assert "123" not in serialized
-    assert "4111111111111111" not in repr(result)
+    assert "test-token-redacted" not in repr(result)
 
 
 async def test_payment_result_rejects_partial_or_misplaced_credentials() -> None:
@@ -223,7 +223,7 @@ async def test_payment_result_rejects_partial_or_misplaced_credentials() -> None
                                 "txn_ref_id": "line-1",
                                 "total_amount": "69.99",
                                 "status": "completed",
-                                "token": "4111111111111111",
+                                "token": "test-token-redacted",
                                 "dynamic_cvv": "123",
                                 "expiry_month": "12",
                                 "expiry_year": "2030",

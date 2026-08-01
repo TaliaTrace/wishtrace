@@ -55,8 +55,9 @@ Gift cards are visually recognizable but may introduce policy, merchant or check
 
 | Merchant | Search | Exact variant | Price/stock | Delivery | Quote/checkout | Status |
 |---|---|---|---|---|---|---|
-| HyperX US | 10 live `gaming headset` results | Cloud III Black, `727A8AA` | $64.99 USD, available | unknown | unverified | primary; catalog pass |
-| Turtle Beach USA | 5 live `gift card` results | own $50 digital card, `Gift-Card-50` | $50.00 USD, available | unknown | stored-value unverified | backup; card blocked |
+| Jackbox Games | official UCP profile + product/cart | $5 card, `GC20221246` | $5.00 USD, available | purchaser email then manual forward; timing unknown | live cart and card form; payment pending | primary; stored-value gated |
+| HyperX US | 10 live `gaming headset` results | Cloud III Black, `727A8AA` | $64.99 USD, available | unknown | live checkout form, shipping address required | retired for this user |
+| Turtle Beach USA | 5 live `gift card` results | own $50 digital card, `Gift-Card-50` | $50.00 USD, available | digital email | live card form; payment pending | rejected: $50 minimum |
 
 - Every request supplied the public WishTrace UCP agent profile through `meta.ucp-agent.profile`.
 - HyperX search request: `b0274ee3-4e99-4db4-8c7e-8df9bae7d9e0-1785598670`.
@@ -70,16 +71,33 @@ Gift cards are visually recognizable but may introduce policy, merchant or check
 - Both merchant profiles omitted the recommended cache header. The adapter records the deviation
   and does not cache those profiles.
 - Exact normalized proof is stored in `artifacts/backend/ucp-live-proof-2026-08-01.json`.
+- Jackbox UCP profile: `https://checkout.jackboxgames.com/.well-known/ucp`, version
+  `2026-04-08`, MCP endpoint `jackbox-games.myshopify.com/api/ucp/mcp`.
+- Jackbox product `gid://shopify/Product/6734381809798`, variant
+  `gid://shopify/ProductVariant/39783705149574`, SKU `GC20221246`.
+- A live one-item cart returned `$5.00`, `gift_card=true`, and `requires_shipping=false`.
+  Checkout rendered the exact $5 total, contact, card and billing fields without shipping.
+- The API's production `JackboxPlaywrightCheckoutGateway` then passed a second live, non-payment
+  quote with synthetic US billing: item 500, shipping 0, tax 0 and total 500 USD minor units. Its
+  Windows Proactor worker runs beside the psycopg Selector loop; no payment button was clicked.
+- Jackbox says the purchaser receives the card by email and forwards it to the recipient. It can be
+  used in the Jackbox shop for merchandise or Steam codes; it is not a Steam/Xbox/Amazon wallet card,
+  and its region restriction remains material.
+- No payment data was entered and no order was created. Evidence:
+  `artifacts/backend/jackbox-digital-checkout-probe-2026-08-01.png` and
+  `artifacts/backend/jackbox-runtime-quote-2026-08-01.json`.
 
-Selection: HyperX remains primary because the physical-product path avoids stored-value policy risk.
-Turtle Beach remains backup. Switch only if HyperX cannot produce a refreshed quote and browser
-checkout attempt inside the 90-minute checkout gate.
+Selection: Jackbox supersedes HyperX because it satisfies the user's no-shipping constraint, matches
+Zaid's gaming interest, and provides the exact $5 acceptance target. It remains disabled at runtime
+until Prava confirms stored-value eligibility. If Prava disallows it or the supported geography does
+not fit the real cardholder/recipient, stop and select another observed digital SKU; do not fall back
+to an invented or uncontrolled card.
 
 ## Fallback ladder
 
-1. Primary live merchant.
-2. Backup live merchant.
-3. One fixed live SKU with refreshed price/availability when broad search is unstable.
+1. One fixed Jackbox $5 live SKU with refreshed price and no-shipping checkout.
+2. Another support-approved, observed low-value digital SKU.
+3. Honest unavailable state.
 
 If none works, stop at an honest unavailable state. There is no runtime catalog fixture fallback.
 

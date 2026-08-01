@@ -7,14 +7,14 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0007` | Codex | 2026-08-01 21:33 PKT |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0009` | Codex | 2026-08-01 22:34 PKT |
 | Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — public deploy pending | Codex | 2026-08-01 |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS LOCALLY — one real user/session, public deploy pending | Codex/user | 2026-08-01 |
 | Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | FOUNDATION PASS — exact API adapter + ledger; live hosted flow pending | Codex | 2026-08-01 21:04 PKT |
-| Primary merchant validated | search/product/quote/checkout facts | PARTIAL — HyperX catalog live; MCP `create_checkout` absent, browser path pending | Codex | 2026-08-01 |
-| Backup merchant validated | documented fallback | PARTIAL PASS — Turtle live catalog; stored-value card blocked | Codex | 2026-08-01 |
+| Prava transaction path understood | session + authoritative status | CODE PASS — session → credential → one merchant attempt → report → re-poll tested; live hosted flow pending | Codex | 2026-08-01 22:34 PKT |
+| Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
+| Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | BOUNDARY PASS — strict SDK/schema tests; live provider DNS + zero eligible candidates block runtime proof | Codex/user | 2026-08-01 21:33 PKT |
 | Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
@@ -29,19 +29,51 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Correct `AZURE_OPENAI_BASE_URL` from the Foundry deployment's exact target URI; the current hostname fails DNS. Make the Azure subscription visible to the signed-in CLI account, then deploy the API over HTTPS.
-2. Add the stable local session pepper and permanent `sslmode=require` without sharing either value.
-3. Get Prava's exact Browser Harness/API answer and prove one real HyperX checkout attempt; do not enable candidate checkout before that evidence.
-4. Enter Zaid's real birthday and maximum USD budget on the physical phone, then prove close/reopen persistence.
+1. Get Prava's explicit stored-value answer, then run one hosted sandbox approval and expected-fail tokenized attempt against the exact Jackbox $5 checkout.
+2. Correct `AZURE_OPENAI_BASE_URL` from the Foundry deployment's exact target URI; the current hostname fails DNS. Make the Azure subscription visible to the signed-in CLI account, then deploy the API over HTTPS.
+3. Permanently append `sslmode=require` to the ignored local `DATABASE_URL`; migrations currently use a secure process-only override. Confirm the existing stable session pepper without sharing it.
+4. Enable the Jackbox checkout/stored-value flags only after Prava confirmation, then connect the Android review/return flow.
 
 ## Next
 
-1. Reverify Prava sandbox auth during the official window.
-2. Prove HyperX quote/checkout; switch to Turtle Beach physical products only if the gate fails.
-3. Run hosted Prava approval and the organizer-required real-merchant browser attempt.
+1. Run hosted Prava approval and the organizer-required real-merchant browser attempt.
+2. Prove a live eligible Jackbox candidate can reach grounded Azure ranking.
+3. Wire Android quote/review/Custom Tab/reconcile/message to the real backend.
 4. Repeat the physical-phone flow twice, then apply for production access.
 
 ## Milestone evidence
+
+### 2026-08-01 — Narrow $5 digital commerce and complete backend transaction boundary
+
+- Merchant pivot: the primary path is now the exact Jackbox Games $5 digital card, product
+  `6734381809798`, variant `39783705149574`, SKU `GC20221246`. The live cart returned 500 USD minor
+  units, `gift_card=true`, and `requires_shipping=false`; checkout rendered the exact total, contact,
+  PCI card and billing fields with no shipping address.
+- Amazon scope decision: no Amazon scraping or marketplace integration. Official catalog/gift-card
+  paths require separate onboarding and would not be production-shaped within the event window.
+- Browser boundary: added an exact-host/product/variant allowlist, cart invariant checks, real total
+  refresh after billing, 20-minute quote context, single payment click, explicit order/decline/unknown
+  observation and immediate browser teardown. Billing, token, dynamic CVV and expiry are never stored,
+  logged, screenshotted after entry, or returned to Android. On Windows, a dedicated Proactor loop
+  runs Playwright beside psycopg's Selector loop; the production actor passed a live non-payment quote
+  at item 500, shipping 0, tax 0 and total 500 USD minor units.
+- Transaction orchestration: quote and Prava session creation are idempotent. Reconcile now performs
+  one matching merchant attempt, reports `APPROVED` or `DECLINED`, re-polls Prava, persists public Visa
+  confirmation plus merchant order evidence, and allows `SUCCEEDED` only when both sides verify. If
+  report-status was interrupted after a known merchant result, recovery re-reports that result and
+  never performs a second merchant checkout.
+- Delivery truth: Jackbox emails the purchaser's verified checkout address; the purchaser manually
+  forwards the gift card. Runtime copy does not imply direct recipient delivery or guaranteed timing.
+- Personal message: added authenticated, owner-scoped create/edit/read persistence for one 500-character
+  message per purchase. Runtime starts with user text; no generated memory or delivery claim is invented.
+- Persistence: Supabase advanced through `20260801_0008` and `0009` over verified TLS. PostgreSQL 17.6
+  remained healthy and Alembic reports no model/schema drift.
+- Quality: backend pytest 90 passed; Ruff and strict mypy passed. Android debug assembly, unit tests
+  and lint passed. Live payment remains pending and the
+  stored-value flags remain off by default.
+- Evidence: `artifacts/backend/jackbox-digital-checkout-probe-2026-08-01.png`,
+  `artifacts/backend/jackbox-runtime-quote-2026-08-01.json`, `backend/app/merchant_browser.py`,
+  `backend/app/purchase.py`, and transaction/message tests.
 
 ### 2026-08-01 — Grounded Azure ranking boundary and immutable decision audit
 
@@ -144,7 +176,7 @@ Update this file during the hackathon. Do not manage the project from memory.
   `SourceMode` permits only `LIVE`; controlled values remain confined to historical evidence.
 - Truth corrections: setup no longer offers an unpersisted photo, and it no longer invents a
   birthday-minus-one delivery deadline. Media stays deferred and delivery remains unknown until a
-  real quote requires user-provided shipping context.
+  real quote requires user-provided billing context; the selected digital SKU requires no shipping.
 - Physical evidence: the RMX3201 opened the real Google account chooser and consent surface,
   returned to WishTrace, reached the genuine empty Home state, and created exactly one backend user,
   one active session and one consumed challenge. No raw Google or bearer token was captured.

@@ -528,6 +528,11 @@ class PurchaseIntentModel(Base):
             "approved_total_minor IS NULL OR approved_total_minor > 0",
             name="ck_purchase_approved_total_positive",
         ),
+        CheckConstraint(
+            "merchant_outcome IS NULL OR merchant_outcome IN "
+            "('ORDER_VERIFIED', 'DECLINED', 'UNKNOWN')",
+            name="ck_purchase_merchant_outcome",
+        ),
         UniqueConstraint(
             "user_id",
             "candidate_snapshot_id",
@@ -567,6 +572,11 @@ class PurchaseIntentModel(Base):
     quote_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     quote_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     delivery_summary: Mapped[str | None] = mapped_column(String(500))
+    merchant_order_id: Mapped[str | None] = mapped_column(String(255))
+    merchant_outcome: Mapped[str | None] = mapped_column(String(32))
+    merchant_attempted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -595,9 +605,45 @@ class PurchaseIntentModel(Base):
     )
 
 
+class PersonalMessageModel(Base):
+    __tablename__ = "personal_messages"
+    __table_args__ = (
+        CheckConstraint(
+            "origin IN ('USER', 'AZURE_OPENAI')",
+            name="ck_personal_message_origin",
+        ),
+        UniqueConstraint(
+            "purchase_intent_id",
+            name="uq_personal_message_purchase_intent",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    purchase_intent_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("purchase_intents.id", ondelete="CASCADE"),
+        index=True,
+    )
+    text: Mapped[str] = mapped_column(String(500))
+    origin: Mapped[str] = mapped_column(String(16))
+    edited: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class PravaSessionModel(Base):
     __tablename__ = "prava_sessions"
     __table_args__ = (
+        CheckConstraint(
+            "visa_confirmation IS NULL OR visa_confirmation IN ('SUCCESS', 'FAILURE')",
+            name="ck_prava_visa_confirmation",
+        ),
         UniqueConstraint(
             "purchase_intent_id",
             name="prava_sessions_purchase_intent_id_key",
@@ -622,6 +668,8 @@ class PravaSessionModel(Base):
     provider_txn_ref_id: Mapped[str | None] = mapped_column(String(255))
     provider_status: Mapped[str | None] = mapped_column(String(32))
     last_response_id: Mapped[str | None] = mapped_column(String(255))
+    report_response_id: Mapped[str | None] = mapped_column(String(255))
+    visa_confirmation: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -637,7 +685,10 @@ class PravaSessionModel(Base):
 class IdempotencyOperationModel(Base):
     __tablename__ = "idempotency_operations"
     __table_args__ = (
-        CheckConstraint("operation = 'PRAVA_SESSION'", name="ck_idempotency_operation"),
+        CheckConstraint(
+            "operation IN ('MERCHANT_QUOTE', 'PRAVA_SESSION')",
+            name="ck_idempotency_operation",
+        ),
         CheckConstraint(
             "status IN ('IN_PROGRESS', 'COMPLETED', 'UNKNOWN', 'FAILED')",
             name="ck_idempotency_status",

@@ -248,3 +248,30 @@ Record only decisions that change product, architecture, truth boundary, schedul
   is claimed until both the exact Azure endpoint resolves and a real merchant candidate becomes
   checkout-eligible. A model timeout or invalid response cannot create a product or success state.
 - Owner: WishTrace team / Codex
+
+### 2026-08-01 22:34 PKT — One $5 digital Jackbox card supersedes physical breadth
+
+- Context: The user has no US shipping address and wants the finished system to be capable of a real
+  $5 gift after Prava production access, while backend completion must precede final UX/pitch polish.
+- Evidence: Jackbox Games' official Shopify store publishes UCP `2026-04-08` and an observed $5
+  digital gift-card variant. A live cart returned exactly 500 USD minor units,
+  `gift_card=true`, and `requires_shipping=false`; checkout rendered contact, PCI card and billing
+  fields with no shipping address. Jackbox documents email delivery and store/Steam-code redemption.
+  Amazon catalog and gift-card APIs require separate program onboarding and credentials, and Turtle
+  Beach's observed digital card starts at $50.
+- Decision: Make the exact Jackbox $5 SKU the only primary commerce path. Keep runtime checkout and
+  stored-value eligibility off by default until Prava confirms the policy. Retire HyperX as the
+  primary path for this user; do not add Amazon scraping or a generic gift-card marketplace.
+- User benefit: The flagship story becomes concrete—Zaid likes games, a $5 digital gift needs no
+  shipping, and the purchaser can forward the emailed card—while keeping one recipient, occasion
+  and purchase. WishTrace does not claim that Jackbox sends it directly to the recipient.
+- Judging impact: The same path demonstrates deterministic facts, grounded OpenAI ranking, explicit
+  Visa/Prava consent, one-use credential handling, a real merchant attempt and truthful recovery.
+- Technical consequence: The backend now has an allowlisted Shopify browser actor, peppered quote
+  idempotency, exact merchant/Prava state reconciliation, persisted merchant order evidence, and an
+  owned editable personal message. A dedicated Windows Proactor worker lets Playwright coexist with
+  psycopg's Selector loop, and the production actor passed a live $5 non-payment quote. Supabase
+  migration `20260801_0009` is live over verified TLS.
+- Cut/fallback: If Prava disallows stored value or Jackbox's regional rules reject the real user, show
+  unavailable and select one other observed low-value digital SKU. Never substitute an invented card.
+- Owner: WishTrace team / Codex

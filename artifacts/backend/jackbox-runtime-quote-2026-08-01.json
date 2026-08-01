@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-08-01T22:39:22+05:00",
+  "actor": "backend/app/merchant_browser.py:JackboxPlaywrightCheckoutGateway",
+  "merchant": "Jackbox Games",
+  "source": "JACKBOX_SHOPIFY_BROWSER",
+  "item_minor": 500,
+  "shipping_minor": 0,
+  "tax_minor": 0,
+  "total_minor": 500,
+  "currency": "USD",
+  "quote_is_fresh": true,
+  "synthetic_billing_used_for_non_payment_probe": true,
+  "payment_submitted": false,
+  "order_created": false,
+  "sensitive_data_retained": false,
+  "result": "PASS"
+}

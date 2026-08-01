@@ -25,6 +25,16 @@ loop on Windows. Azure ranking requires all three `AZURE_OPENAI_BASE_URL`,
 exact HTTPS Azure target ending in `/openai/v1/`; copy it from the deployment rather than
 deriving the hostname.
 
+The narrow commerce path is the observed Jackbox Games $5 digital gift card. To exercise
+the real Shopify quote/checkout actor, set `MERCHANT_CHECKOUT_ENABLED=true`, point
+`MERCHANT_BROWSER_EXECUTABLE_PATH` at a local Chrome/Chromium executable, and set
+`ALLOW_STORED_VALUE_PRODUCTS=true` only after Prava confirms stored-value eligibility.
+Billing exists only in request/browser memory; Prava one-time credentials stay in the
+short-lived browser process. Neither is persisted. The live SKU has no shipping
+requirement, but its regional and stored-value restrictions still apply. Jackbox sends
+the card to the purchaser's verified checkout email; the purchaser must forward it to
+the recipient. WishTrace does not claim direct recipient delivery or guaranteed timing.
+
 ## Quality gates
 
 ```powershell
@@ -38,4 +48,6 @@ the UCP catalog capabilities currently implemented by WishTrace; checkout and pa
 capabilities are intentionally absent until they are verified. Authenticated discovery
 ranking uses `POST /v1/discoveries/{id}/rank` and
 `GET /v1/discoveries/{id}/ranking`. Both routes refuse to rank when no live candidate has
-a verified checkout path.
+a verified checkout path. Purchase routes add an idempotent live quote, hosted Prava
+approval, authoritative reconciliation, and an editable personal message. A Prava result
+cannot become an order receipt without a verified merchant order ID.

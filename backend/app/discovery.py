@@ -429,7 +429,7 @@ def _candidate_response(
 def _catalog_query(interests: list[str]) -> str:
     gaming_terms = {"game", "games", "gaming", "video games", "cozy gaming"}
     if any(interest.strip().casefold() in gaming_terms for interest in interests):
-        return "gaming headset"
+        return "gift card"
     return interests[0].strip()
 
 

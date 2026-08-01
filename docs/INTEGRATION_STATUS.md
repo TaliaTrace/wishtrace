@@ -23,14 +23,16 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   freeze as `UNKNOWN`; replay refusal and invalid provider facts pass automated tests; live decline
   and cancel remain pending
 - Production access requested: NO — intentionally gated behind organizer-required sandbox evidence
-- Backend boundary: purchase ledger, hashed idempotency mapping, exact state transitions, fixed app
-  return and authoritative polling are implemented. A repeated session tap cannot issue a second
-  provider call; an uncertain create cannot be blindly retried. Prava facts must match the approved
-  merchant origin and total before credentials become usable.
-- Known blockers: official docs describe Browser Harness but expose no SDK/API invocation contract;
-  no judged-window hosted session, tokenized-card attempt or authoritative result yet. Birdie support
-  answer is required before implementing or inventing this boundary.
-- Last verified: 2026-08-01 21:04 PKT
+- Backend boundary: purchase ledger, peppered quote/session idempotency, exact state transitions,
+  fixed app return, authoritative polling, one-attempt Shopify automation and report-status are
+  implemented. Billing exists only in request/browser memory and Prava credentials stay in the live
+  browser context only. A repeated session tap cannot issue a second provider call; an interrupted
+  checkout becomes `UNKNOWN` and is not blindly retried. If the merchant result was persisted before
+  report-status was interrupted, reconciliation re-reports that result and never checks out again.
+  Prava facts must match the approved merchant origin and total.
+- Known blockers: no judged-window hosted session, tokenized-card attempt or authoritative provider
+  result yet. Stored-value permission for the $5 Jackbox card requires Birdie/Prava confirmation.
+- Last verified: 2026-08-01 22:40 PKT
 - Evidence location: safe response ID above; `backend/app/prava.py`, `backend/app/purchase.py` and
   isolated transport/state tests; no credential or provider payload retained
 
@@ -40,37 +42,42 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 
 ## Commerce
 
-- Primary merchant/path: HyperX US UCP over Shopify MCP
-- Backup merchant/path: Turtle Beach USA UCP over Shopify MCP
+- Primary merchant/path: Jackbox Games official Shopify/UCP store, one fixed $5 digital gift card
+- Backup merchant/path: none enabled; HyperX physical was retired because the user has no US
+  shipping address, and Turtle Beach's digital card starts at $50
 - Mode: live only; no controlled/runtime fixture fallback
-- Search verified: YES — the implemented adapter returned 10 HyperX results for `gaming headset`;
-  request `b0274ee3-4e99-4db4-8c7e-8df9bae7d9e0-1785598670`
-- Product detail verified: YES AT CATALOG LEVEL — HyperX product and exact variant lookup matched
-  product `gid://shopify/Product/7764616118429`, variant
-  `gid://shopify/ProductVariant/43656365375645`, SKU `727A8AA`
-- Price refresh verified: PARTIAL — repeated search plus lookup observed $64.99 USD for the same
-  variant; the final checkout quote/total refresh is not implemented
-- Availability verified: YES AT CATALOG LEVEL — selected variant returned `available=true`; the
-  pre-approval refresh remains required
-- Delivery data verified: NO — normalized as explicit `UNKNOWN`; no delivery promise is shown
-- Quote/total verified: NO
-- Checkout compatibility verified: NO — advertised checkout capability is not treated as execution
-- Checkout probe: HyperX MCP returned `Tool not found: create_checkout` for the official UCP
-  `create_checkout` operation (request
-  `448fec69-405e-4c5b-8642-9d2151f8a729-1785598905`). All runtime candidates therefore remain
-  `UNSUPPORTED_CHECKOUT` until the Prava browser path proves the real merchant handoff.
-- Gift-card fact: Turtle Beach returned its own $50 digital gift-card variant live, but WishTrace
-  classifies it as stored value and rejects it as `UNSUPPORTED_CHECKOUT` until Prava and merchant
-  checkout support are proven. Xbox, Steam and Amazon cards have not been observed and are not shown.
-- Protocol deviation: both observed Shopify UCP profiles omitted `Cache-Control`. WishTrace records
-  `profile_cache_compliant=false`, performs no profile caching, and rejects explicit `private`,
-  `no-store`, or `no-cache`; the WishTrace agent profile itself remains compliant.
-- Known blockers: the advertised HyperX checkout capability is not exposed as an MCP checkout tool;
-  final product refresh, address-dependent quote/delivery, browser checkout and Prava compatibility
-  remain unverified
-- Last verified: 2026-08-01 20:37 PKT during the official window
-- Evidence location: `artifacts/backend/ucp-live-proof-2026-08-01.json`,
-  `backend/app/commerce.py`, `backend/tests/test_commerce.py`
+- UCP profile verified: YES — `checkout.jackboxgames.com/.well-known/ucp` advertises UCP
+  `2026-04-08`, Shopify catalog/cart/checkout/order, and card payment handlers. An app UCP search
+  still requires the permanent public WishTrace profile URL after deployment.
+- Product detail verified: YES — official product `6734381809798`, variant `39783705149574`,
+  SKU `GC20221246`, title `Jackbox Games Gift Card - $5 USD`.
+- Price/availability verified: YES AT PRODUCT/CART LEVEL — official product JSON and a live cart
+  returned exactly 500 USD minor units for one available variant.
+- Shipping verified: NOT REQUIRED — the live cart returned `requires_shipping=false` and
+  `gift_card=true`; checkout showed billing fields and no shipping address.
+- Delivery fact verified: PARTIAL — Jackbox states the purchaser receives the digital card by email
+  and forwards it to the recipient. Exact timing is not promised. Runtime copy identifies the
+  checkout contact and manual-forwarding step rather than claiming direct recipient delivery.
+- Quote/total verified: YES THROUGH THE RUNTIME ACTOR — after synthetic US billing in a non-payment
+  probe, the same gateway wired into the API returned item 500, shipping 0, tax 0 and total 500 USD
+  minor units, with a fresh 20-minute quote. No payment was submitted.
+- Checkout compatibility verified: LIVE QUOTE + FORM + ONE-CLICK BOUNDARY — the exact Shopify card
+  form and PCI iframes were observed. On Windows, Playwright runs on a dedicated Proactor loop beside
+  psycopg's Selector loop; the production gateway passed live with this boundary. No credential or
+  payment was submitted.
+- Prava compatibility: CONTRACT/TESTED BOUNDARY ONLY — code accepts one matching in-memory
+  credential, makes one merchant attempt, reports `APPROVED`/`DECLINED`, and re-polls. Stored-value
+  permission and the live sandbox attempt remain pending.
+- Runtime gate: checkout and stored value are disabled by default. The candidate cannot become
+  eligible until both explicit server flags are enabled after Prava confirmation.
+- Amazon decision: rejected for this sprint. Its current catalog and Incentives gift-card APIs need
+  separate program onboarding/credentials and cannot provide a truthful hackathon integration now.
+- Geography risk: Jackbox limits purchase/use to supported regions. A future real $5 gift remains
+  conditional on the cardholder/recipient region and Prava's stored-value policy.
+- Last verified: 2026-08-01 22:40 PKT during the official window
+- Evidence location: `artifacts/backend/jackbox-digital-checkout-probe-2026-08-01.png`,
+  `artifacts/backend/jackbox-runtime-quote-2026-08-01.json`,
+  `backend/app/merchant_browser.py`, `backend/tests/test_merchant_browser.py`
 
 ## OpenAI
 
@@ -100,16 +107,17 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Path: session pooler on port 5432 with SQLAlchemy async psycopg 3 and `NullPool`
 - Client TLS verified: YES via libpq `ssl_in_use`
 - Server version observed: PostgreSQL 17.6
-- Migration status: `20260801_0007 (head)`; Alembic model/schema drift check passes
+- Migration status: `20260801_0009 (head)`; Alembic model/schema drift check passes
 - Migration content: foundation; Google users/challenges/sessions; owned recipients, preferences,
   hints and occasions; one-recipient Gold uniqueness; owned immutable discovery runs, live candidate
   snapshots and deterministic rejection records; exact purchase snapshots, public Prava session
   identifiers, hashed idempotency operations and immutable transaction transitions; owned ranking
-  runs, immutable evidence snapshots and ordered evidence-linked decisions
+  runs, immutable evidence snapshots and ordered evidence-linked decisions; idempotent merchant
+  quotes, merchant/Prava outcome evidence, and one owned editable personal message per purchase
 - Permanent local `.env` contains `sslmode=require`: USER CONFIRMATION PENDING; verification used a process-only secure override
 - Stable local `SESSION_TOKEN_PEPPER`: USER CONFIRMATION PENDING; the current local server uses a
   process-only value and must not be restarted before the permanent value is added
-- Last verified: 2026-08-01 21:33 PKT during official window
+- Last verified: 2026-08-01 22:34 PKT during official window
 
 ## Android
 

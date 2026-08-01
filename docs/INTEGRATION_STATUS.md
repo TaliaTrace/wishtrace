@@ -93,7 +93,8 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   opaque test candidate through the production transport. The response carried a safe provider
   request ID. Strict dynamic JSON Schema, `store=false`, known candidate/evidence enums and
   post-response validation also pass automated tests. No recipient hint or payment fact was used in
-  the live probe.
+  the live probe. A subsequent authenticated physical-phone run passed the exact eligible live
+  Jackbox candidate through the same boundary and rendered the validated decision.
 - Multimodal verified:
 - Message generation verified:
 - Invalid-output fallback tested: YES — malformed schema, unknown/rejected candidate ID, unsupported
@@ -103,14 +104,13 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Backend boundary: authenticated rank/read routes persist one immutable evidence-linked decision per
   discovery. Only still-eligible `LIVE` snapshots can reach the model; recipient name, merchant URL,
   money, delivery and payment data are omitted from provider input.
-- Known blockers: the Azure staging revision now permits the exact live Jackbox candidate to cross
-  deterministic eligibility into ranking. The remaining proof is one authenticated phone run with
-  real user-created context; the provider itself is no longer a blocker.
+- Known blockers: none at the ranking boundary. The remaining flow blocker is the human-entered
+  billing/Prava interaction after ranking; the provider itself is no longer a blocker.
 - Azure runtime: DEPLOYED — Azure Container Apps serves the locked browser image over managed HTTPS
   from a single active revision. A Basic ACR uses a managed pull identity; secrets are Container Apps
   secret references, not image or Android values. Public health reports PostgreSQL TLS true and the
   public UCP profile returns `2026-04-08` with cache headers.
-- Last verified: 2026-08-02 00:37 PKT; live provider and public runtime proofs passed
+- Last verified: 2026-08-02 01:05 PKT; live provider, public runtime and exact-candidate phone proofs passed
 
 ## Supabase PostgreSQL
 
@@ -142,7 +142,9 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Google account validation: VERIFIED on the physical phone through a real nonce-bound Google
   exchange; one backend user, active session and consumed challenge observed without capturing tokens
 - API connection verified: YES over public Azure HTTPS on the physical phone; the existing real
-  Google session reopened an authenticated, genuinely empty Home after the public-URL APK update
+  Google session reopened an authenticated, genuinely empty Home after the public-URL APK update.
+  The user then created one real runtime recipient/occasion context and a force-stop/relaunch restored
+  it from the backend.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
   Apps behind managed HTTPS; one healthy revision receives 100% traffic
 - Custom tab/hosted approval verified: CODE + BUILD — AndroidX Browser `1.10.0` opens only the exact
@@ -151,15 +153,19 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   UUID reached the singleTop activity, called the authenticated public backend and rendered its safe
   `PURCHASE_INTENT_NOT_FOUND` recovery instead of trusting browser state. An actual Prava return
   remains pending.
-- Process recreation tested:
+- Process recreation tested: PASS for authenticated recipient/home recovery after a physical-device
+  force-stop/relaunch; payment-return process-death recovery still needs the hosted run.
 - Accessibility checked: primary/back targets asserted at 48dp; semantic headings/labels and onboarding page semantics present; core contrast pairs are 5.95:1–14.91:1; onboarding captured at 130% text scale; motion snaps when animator duration is disabled. TalkBack/manual switch-access testing remains pending.
 - Keyboard/IME checked: API 30 physical-device form collapse was fixed by removing duplicate IME
   inset consumption; connected Compose regression passed 1/1 with name and relationship visible
 - Evidence location: `artifacts/screenshots/milestone-4/`, `artifacts/screenshots/milestone-3/`, `artifacts/screenshots/milestone-2/`, `android/evidence/`, `android/app/build/reports/androidTests/connected/debug/`
-- Known blockers: the recipient's actual occasion date still needs user input before the first
-  truthful run. Live discovery/ranking, exact quote, idempotent approval, return reconciliation,
-  authoritative result and persisted personal-message routes are now wired; the physical transaction
-  remains unproven until that context and the Prava hosted interaction are completed.
+- Live decision proof: PASS — the phone submitted user-created recipient context and a
+  user-authorized editable 2026-08-09 sandbox occasion, restored it after restart, retrieved the
+  real Jackbox $5 candidate and rendered the grounded Azure ranking. The date is not claimed as the
+  recipient's verified birthday.
+- Known blockers: the app is at the just-in-time billing form. Exact live quote, Prava hosted
+  interaction, tokenized merchant attempt, authoritative reconciliation and persisted message remain
+  unproven until the user completes the private billing and hosted approval steps.
 
 ## Demo
 

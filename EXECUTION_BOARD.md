@@ -10,12 +10,12 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0009` | Codex | 2026-08-01 22:34 PKT |
 | Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — Azure HTTPS health/UCP; database TLS true | Codex | 2026-08-02 00:37 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
-| Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
+| Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
 | Prava transaction path understood | session + authoritative status | CODE PASS — session → credential → one merchant attempt → report → re-poll tested; live hosted flow pending | Codex | 2026-08-01 22:34 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
-| OpenAI structured output works | valid live candidate IDs returned | PROVIDER PASS — strict schema response; exact-candidate phone run pending | Codex/user | 2026-08-02 00:37 PKT |
+| OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
 | Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
@@ -29,9 +29,9 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Enter the user-provided recipient context and $5 USD budget on the physical phone.
-2. Run live discovery → Azure ranking → exact Jackbox quote → hosted Prava approval.
-3. Capture the expected sandbox merchant decline, reconciled authorization result and persisted note.
+1. Complete the just-in-time billing form on the physical phone and request the exact Jackbox quote.
+2. Run hosted Prava approval and the one tokenized real-merchant browser attempt.
+3. Capture the expected sandbox merchant result, reconcile it, and persist the personal note.
 
 ## Next
 
@@ -40,6 +40,22 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Apply for production access only with the captured sandbox evidence.
 
 ## Milestone evidence
+
+### 2026-08-02 — Real context persistence and grounded phone decision
+
+- Physical persistence: a signed-in user created one recipient with a user-authorized editable
+  sandbox occasion date, Gaming/Fitness interests and a $5 USD budget. Force-stopping and reopening
+  the app restored the same server-backed context; no seeded runtime record was used.
+- Live discovery: the public Azure API retrieved the observed Jackbox Games $5 digital gift-card
+  variant, enforced the exact budget and retained delivery as unconfirmed rather than inventing a
+  promise.
+- Grounded ranking: the deployed Azure model selected that still-eligible live candidate and the
+  Android recommendation rendered its exact merchant, price, source mode and source timestamp.
+- Review boundary: selecting the candidate created the owned purchase flow and reached the
+  just-in-time billing form. The address is not persisted and no quote, Prava session, credential,
+  merchant payment attempt or order has occurred at this checkpoint.
+- Private evidence: a physical-phone screenshot was captured only in the local temporary directory;
+  it is not tracked because it contains recipient context.
 
 ### 2026-08-02 — Public Azure runtime and real Android commerce wiring
 

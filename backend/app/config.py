@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=REPOSITORY_ENV_FILE,
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
         extra="ignore",
         case_sensitive=False,
     )
@@ -138,14 +139,6 @@ class Settings(BaseSettings):
         if not resolved.is_absolute() or not resolved.is_file():
             raise ValueError("MERCHANT_BROWSER_EXECUTABLE_PATH must be an existing file")
         return resolved
-
-    @model_validator(mode="after")
-    def require_browser_when_checkout_enabled(self) -> "Settings":
-        if self.merchant_checkout_enabled and self.merchant_browser_executable_path is None:
-            raise ValueError(
-                "MERCHANT_BROWSER_EXECUTABLE_PATH is required when checkout is enabled"
-            )
-        return self
 
     @property
     def sqlalchemy_database_url(self) -> str:

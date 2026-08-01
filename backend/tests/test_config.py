@@ -122,3 +122,18 @@ def test_azure_openai_foundry_endpoint_is_accepted() -> None:
     )
 
     assert settings.azure_openai_deployment == "wishtrace-ranking"
+
+
+def test_checkout_can_use_playwright_managed_browser() -> None:
+    settings = Settings(
+        app_env="test",
+        database_url=SecretStr(
+            "postgresql://wishtrace:password@database.invalid:5432/"
+            "wishtrace?sslmode=require"
+        ),
+        merchant_checkout_enabled=True,
+        merchant_browser_executable_path=None,
+    )
+
+    assert settings.merchant_checkout_enabled is True
+    assert settings.merchant_browser_executable_path is None

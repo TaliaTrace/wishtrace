@@ -275,3 +275,17 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Cut/fallback: If Prava disallows stored value or Jackbox's regional rules reject the real user, show
   unavailable and select one other observed low-value digital SKU. Never substitute an invented card.
 - Owner: WishTrace team / Codex
+
+### 2026-08-01 22:58 PKT — Deploy the browser actor as a locked Azure container
+
+- Context: A normal Python web host can serve FastAPI but does not prove that the exact Shopify
+  checkout actor has a compatible Chromium binary and OS dependencies.
+- Evidence: Playwright requires a browser revision matching its installed package. Azure Container
+  Apps can build a local Dockerfile and expose its target port over managed HTTPS. The repository lock
+  currently resolves Python 3.12 and Playwright 1.62.0.
+- Decision: Package FastAPI and the Playwright-managed Chromium revision in one Python 3.12 container,
+  install from frozen `uv.lock`, and allow an omitted machine-specific browser path. Keep checkout and
+  stored-value flags off, exclude secrets from the build context, and require deliberate migrations.
+- Consequence: Deployment can execute the same allowlisted browser boundary as local development,
+  while cloud resource creation and spend remain pending explicit subscription/cost confirmation.
+- Owner: WishTrace team / Codex

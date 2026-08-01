@@ -131,6 +131,9 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Google account validation: VERIFIED on the physical phone through a real nonce-bound Google
   exchange; one backend user, active session and consumed challenge observed without capturing tokens
 - API connection verified: YES locally through ADB reverse to `127.0.0.1:8000`; public HTTPS deploy pending
+- Azure runtime packaging: CODE COMPLETE / NOT DEPLOYED — `backend/Dockerfile` installs
+  frozen Python dependencies and matching Playwright Chromium so the exact checkout actor can run
+  without a developer-machine Chrome path. No Azure resource or spend has been created.
 - Custom tab/hosted approval verified:
 - App link verified:
 - Process recreation tested:

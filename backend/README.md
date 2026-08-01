@@ -27,8 +27,12 @@ deriving the hostname.
 
 The narrow commerce path is the observed Jackbox Games $5 digital gift card. To exercise
 the real Shopify quote/checkout actor, set `MERCHANT_CHECKOUT_ENABLED=true`, point
-`MERCHANT_BROWSER_EXECUTABLE_PATH` at a local Chrome/Chromium executable, and set
+`MERCHANT_BROWSER_EXECUTABLE_PATH` at a local Chrome/Chromium executable when using a
+machine-installed browser, and set
 `ALLOW_STORED_VALUE_PRODUCTS=true` only after Prava confirms stored-value eligibility.
+When the executable path is omitted, WishTrace uses the Chromium revision installed by
+the matching Playwright package. The deployment container installs that exact revision
+from `uv.lock`; the browser is therefore not coupled to a developer-machine path.
 Billing exists only in request/browser memory; Prava one-time credentials stay in the
 short-lived browser process. Neither is persisted. The live SKU has no shipping
 requirement, but its regional and stored-value restrictions still apply. Jackbox sends
@@ -51,3 +55,18 @@ ranking uses `POST /v1/discoveries/{id}/rank` and
 a verified checkout path. Purchase routes add an idempotent live quote, hosted Prava
 approval, authoritative reconciliation, and an editable personal message. A Prava result
 cannot become an order receipt without a verified merchant order ID.
+
+## Azure container boundary
+
+`Dockerfile` is the production-shaped deployment boundary for Azure Container Apps. It
+uses Python 3.12, installs dependencies from the frozen `uv.lock`, installs only
+Playwright Chromium plus its OS dependencies, and exposes the API on port 8000. It does
+not copy the repository `.env`, enable checkout, enable stored-value products, run a
+migration, or contain any secret.
+
+Do not create cloud resources until the intended Azure subscription and cost are
+confirmed. Once approved, Azure Container Apps can build this directory with
+`az containerapp up --source . --ingress external --target-port 8000`; provider secrets
+must then be supplied through Azure Container Apps secrets/environment references, not
+command history or image layers. Run `uv run alembic upgrade head` as a deliberate
+deployment step before shifting traffic.

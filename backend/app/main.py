@@ -77,9 +77,10 @@ def create_app(
     if resolved_settings.merchant_checkout_enabled:
         try:
             browser_path = resolved_settings.merchant_browser_executable_path
-            assert browser_path is not None
             merchant_checkout = JackboxPlaywrightCheckoutGateway(
-                browser_executable_path=str(browser_path)
+                browser_executable_path=(
+                    str(browser_path) if browser_path is not None else None
+                )
             )
         except ValueError:
             merchant_checkout = None

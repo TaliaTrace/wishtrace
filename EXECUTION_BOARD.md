@@ -8,7 +8,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0009` | Codex | 2026-08-01 22:34 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — public deploy pending | Codex | 2026-08-01 |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — Azure browser container ready; public deploy pending | Codex | 2026-08-01 22:58 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS LOCALLY — one real user/session, public deploy pending | Codex/user | 2026-08-01 |
 | Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
@@ -43,6 +43,17 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Milestone evidence
 
+### 2026-08-01 — Azure browser-runtime packaging
+
+- Added a Python 3.12 container that installs the frozen backend environment plus only the matching
+  Playwright Chromium runtime and exposes FastAPI on port 8000.
+- The image build context excludes environment files and test artifacts. Checkout and stored-value
+  flags remain off, migrations remain deliberate, and no Azure resource or spend has been created.
+- Playwright-managed Chromium is now supported when a machine-specific executable path is absent;
+  local explicit Chrome paths remain supported.
+- Quality: backend pytest 91 passed; Ruff and strict mypy passed; Android debug assembly, unit tests
+  and lint passed; Supabase probe reported TLS true and Alembic reported no schema drift.
+
 ### 2026-08-01 — Narrow $5 digital commerce and complete backend transaction boundary
 
 - Merchant pivot: the primary path is now the exact Jackbox Games $5 digital card, product
@@ -68,7 +79,7 @@ Update this file during the hackathon. Do not manage the project from memory.
   message per purchase. Runtime starts with user text; no generated memory or delivery claim is invented.
 - Persistence: Supabase advanced through `20260801_0008` and `0009` over verified TLS. PostgreSQL 17.6
   remained healthy and Alembic reports no model/schema drift.
-- Quality: backend pytest 90 passed; Ruff and strict mypy passed. Android debug assembly, unit tests
+- Quality: backend pytest 91 passed; Ruff and strict mypy passed. Android debug assembly, unit tests
   and lint passed. Live payment remains pending and the
   stored-value flags remain off by default.
 - Evidence: `artifacts/backend/jackbox-digital-checkout-probe-2026-08-01.png`,

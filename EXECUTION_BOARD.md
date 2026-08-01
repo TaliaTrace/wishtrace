@@ -7,14 +7,14 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0004` | Codex | 2026-08-01 |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0005` | Codex | 2026-08-01 |
 | Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — public deploy pending | Codex | 2026-08-01 |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS LOCALLY — one real user/session, public deploy pending | Codex/user | 2026-08-01 |
 | Recipient persistence | owned create + close/reopen recovery | API + SCHEMA PASS — real phone entry pending | Codex/user | 2026-08-01 |
-| Prava auth works | smallest official sandbox request | PRE-KICKOFF ONLY — REVERIFY | Codex/user | 2026-08-01 |
+| Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
 | Prava transaction path understood | session + authoritative status | NOT STARTED | | |
-| Primary merchant validated | search/product/quote/checkout facts | NOT STARTED | | |
-| Backup merchant validated | documented fallback | NOT STARTED | | |
+| Primary merchant validated | search/product/quote/checkout facts | PARTIAL — HyperX catalog live; MCP `create_checkout` absent, browser path pending | Codex | 2026-08-01 |
+| Backup merchant validated | documented fallback | PARTIAL PASS — Turtle live catalog; stored-value card blocked | Codex | 2026-08-01 |
 | OpenAI structured output works | valid live candidate IDs returned | PRE-KICKOFF SMOKE ONLY | Codex/user | 2026-08-01 |
 | Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
@@ -31,18 +31,45 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 1. Enter one actual recipient/occasion on the physical phone and prove close/reopen persistence.
 2. Add the stable local session pepper and permanent `sslmode=require`, then deploy the API over HTTPS.
-3. Prove one live merchant path before ranking or payment UI claims.
-4. Preserve the pre-kickoff prototype disclosure and never use fixtures as judged runtime fallback.
+3. Rank only persisted eligible live candidate IDs with Azure OpenAI structured output.
+4. Refresh one exact HyperX variant into a real quote before any payment UI claim.
 
 ## Next
 
 1. Reverify Prava sandbox auth during the official window.
-2. Prove HyperX US catalog/search/lookup; try Turtle Beach only if the 90-minute gate fails.
-3. Rank only live eligible candidates with Azure OpenAI.
-4. Run hosted Prava approval and the organizer-required real-merchant browser attempt.
-5. Repeat the physical-phone flow twice, then apply for production access.
+2. Prove HyperX quote/checkout; switch to Turtle Beach physical products only if the gate fails.
+3. Run hosted Prava approval and the organizer-required real-merchant browser attempt.
+4. Repeat the physical-phone flow twice, then apply for production access.
 
 ## Milestone evidence
+
+### 2026-08-01 — Live UCP discovery and immutable candidate evidence
+
+- Live commerce: the production-shaped adapter negotiated both merchant UCP profiles and supplied the
+  public WishTrace platform profile in every MCP call. HyperX returned 10 live gaming-headset products;
+  Turtle Beach returned five results for `gift card`.
+- Exact facts: HyperX Cloud III Black variant `43656365375645`, SKU `727A8AA`, was observed at
+  $64.99 USD and available. Turtle Beach's own $50 digital gift-card variant was observed live.
+  All candidates remain rejected as `UNSUPPORTED_CHECKOUT` because no checkout path is yet proven;
+  the gift card additionally carries stored-value risk.
+- Truth boundary: catalog search/lookup, price and availability are live. Delivery is `UNKNOWN`.
+  Quote, tax, shipping, checkout, Prava compatibility and order completion remain unverified.
+- Persistence: migration `20260801_0005` created owned discovery runs, immutable candidate snapshots
+  and separate deterministic rejection audit records in Supabase over verified TLS.
+- API: authenticated `POST /v1/discoveries` and `GET /v1/discoveries/{id}` derive the query from saved
+  interests, send no recipient name/hint to merchants, enforce checkout → availability → variant →
+  budget → dislike rejection order, and expose only persisted `LIVE` facts.
+- Protocol handling: both merchant profiles omitted `Cache-Control`; WishTrace records them as
+  noncompliant and does not cache them. Its own public profile returns `public, max-age=300`.
+- Checkout correction: the official UCP MCP `create_checkout` call returned `Tool not found` from
+  HyperX despite its advertised capability. Profile advertisement never flips runtime eligibility;
+  only a verified Prava browser checkout path may do so.
+- Quality: backend pytest 33 passed; Ruff passed; strict mypy passed; Alembic reports
+  `20260801_0005 (head)`; PostgreSQL 17.6 connection reports TLS true. Android
+  `:app:assembleDebug`, `:app:testDebugUnitTest`, and `:app:lintDebug` also passed after the slice.
+- Evidence: `artifacts/backend/ucp-live-proof-2026-08-01.json` and merchant request IDs in
+  `docs/MERCHANT_VALIDATION.md`.
+
 
 ### 2026-08-01 — Real Google authentication and owned context runtime
 

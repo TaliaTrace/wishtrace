@@ -1,0 +1,71 @@
+{
+  "truth_boundary": {
+    "live": ["catalog search", "exact product and variant IDs", "price", "availability"],
+    "unknown": ["delivery"],
+    "unverified": ["quote total", "tax", "shipping", "checkout", "Prava compatibility", "order"]
+  },
+  "platform_profile": {
+    "transport": "temporary Cloudflare test tunnel",
+    "submission_evidence": false,
+    "ucp_version": "2026-04-08"
+  },
+  "observations": [
+    {
+      "merchant_id": "hyperx-us",
+      "query": "gaming headset",
+      "request_id": "b0274ee3-4e99-4db4-8c7e-8df9bae7d9e0-1785598670",
+      "source_timestamp": "2026-08-01T15:37:50.339918+00:00",
+      "profile_cache_compliant": false,
+      "candidate_count": 10,
+      "eligible_count": 0,
+      "sample": {
+        "source_key": "live_6866c28425ff60a98b2b0d90",
+        "merchant_product_id": "gid://shopify/Product/7764616118429",
+        "merchant_variant_id": "gid://shopify/ProductVariant/43656365375645",
+        "sku": "727A8AA",
+        "title": "HyperX Cloud III – Gaming Headset",
+        "variant_title": "Black",
+        "amount": 6499,
+        "currency": "USD",
+        "availability": "AVAILABLE",
+        "kind": "PHYSICAL",
+        "delivery": "UNKNOWN",
+        "eligible": false,
+        "rejection": "UNSUPPORTED_CHECKOUT"
+      }
+    },
+    {
+      "merchant_id": "turtle-beach-us",
+      "query": "gift card",
+      "request_id": "eeeebea9-ed97-4087-9ffd-dfa479a93886-1785598670",
+      "source_timestamp": "2026-08-01T15:37:50.662827+00:00",
+      "profile_cache_compliant": false,
+      "candidate_count": 5,
+      "eligible_count": 0,
+      "sample": {
+        "source_key": "live_30952ba7fe13959044778caf",
+        "merchant_product_id": "gid://shopify/Product/7782517702758",
+        "merchant_variant_id": "gid://shopify/ProductVariant/43502781726822",
+        "sku": "Gift-Card-50",
+        "title": "Digital Gift Cards",
+        "variant_title": "$50",
+        "amount": 5000,
+        "currency": "USD",
+        "availability": "AVAILABLE",
+        "kind": "STORED_VALUE",
+        "delivery": "UNKNOWN",
+        "eligible": false,
+        "rejection": "UNSUPPORTED_CHECKOUT"
+      }
+    }
+  ],
+  "checkout_probe": {
+    "merchant_id": "hyperx-us",
+    "operation": "create_checkout",
+    "request_id": "448fec69-405e-4c5b-8642-9d2151f8a729-1785598905",
+    "http_status": 200,
+    "protocol_error": "Tool not found: create_checkout",
+    "checkout_created": false,
+    "eligibility_effect": "All candidates remain UNSUPPORTED_CHECKOUT"
+  }
+}

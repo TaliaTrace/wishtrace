@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.auth import AuthOperations, build_auth_service
 from app.auth_api import build_auth_router
+from app.commerce import UcpMerchantGateway
 from app.config import Settings, get_settings
 from app.context_api import build_context_router
 from app.database import (
@@ -13,6 +14,12 @@ from app.database import (
     create_database_session_factory,
     probe_database,
 )
+from app.discovery import (
+    DiscoveryOperations,
+    UnavailableDiscoveryService,
+    build_discovery_service,
+)
+from app.discovery_api import build_discovery_router
 from app.errors import register_error_handlers
 from app.observability import configure_logging, register_request_context
 from app.recipient_context import ContextOperations, SqlContextStore
@@ -24,6 +31,7 @@ def create_app(
     database_probe: DatabaseProbeCallable | None = None,
     auth_operations: AuthOperations | None = None,
     context_operations: ContextOperations | None = None,
+    discovery_operations: DiscoveryOperations | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     engine = None
@@ -56,6 +64,24 @@ def create_app(
     resolved_context_operations = context_operations
     if resolved_context_operations is None and session_factory is not None:
         resolved_context_operations = SqlContextStore(session_factory)
+    resolved_discovery_operations = discovery_operations
+    if resolved_discovery_operations is None and session_factory is not None:
+        try:
+            merchant = UcpMerchantGateway(
+                merchant_id="hyperx-us",
+                merchant_name="HyperX US",
+                business_profile_url=str(resolved_settings.primary_merchant_profile_url),
+                allowed_endpoint_host=resolved_settings.primary_merchant_endpoint_host,
+                agent_profile_url=resolved_settings.ucp_agent_profile_url,
+                checkout_verified=False,
+            )
+            resolved_discovery_operations = build_discovery_service(
+                session_factory=session_factory,
+                merchant=merchant,
+                allow_stored_value_products=resolved_settings.allow_stored_value_products,
+            )
+        except ValueError:
+            resolved_discovery_operations = UnavailableDiscoveryService()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -77,5 +103,8 @@ def create_app(
     if resolved_context_operations is not None:
         app.state.context_operations = resolved_context_operations
         app.include_router(build_context_router())
+    if resolved_discovery_operations is not None:
+        app.state.discovery_operations = resolved_discovery_operations
+        app.include_router(build_discovery_router())
     app.include_router(build_system_router(resolved_settings, resolved_database_probe))
     return app

@@ -51,6 +51,30 @@ Pick the highest reliable option, not the most famous brand.
 
 Gift cards are visually recognizable but may introduce policy, merchant or checkout constraints. Do not commit to Microsoft/Xbox/Steam gift cards until the full flow is verified. The app concept may be updated to a physical gift without weakening WishTrace.
 
+## Official-window evidence — 2026-08-01
+
+| Merchant | Search | Exact variant | Price/stock | Delivery | Quote/checkout | Status |
+|---|---|---|---|---|---|---|
+| HyperX US | 10 live `gaming headset` results | Cloud III Black, `727A8AA` | $64.99 USD, available | unknown | unverified | primary; catalog pass |
+| Turtle Beach USA | 5 live `gift card` results | own $50 digital card, `Gift-Card-50` | $50.00 USD, available | unknown | stored-value unverified | backup; card blocked |
+
+- Every request supplied the public WishTrace UCP agent profile through `meta.ucp-agent.profile`.
+- HyperX search request: `b0274ee3-4e99-4db4-8c7e-8df9bae7d9e0-1785598670`.
+- Turtle Beach search request: `eeeebea9-ed97-4087-9ffd-dfa479a93886-1785598670`.
+- HyperX lookup request: `5d190aa1-95a5-4fe9-b626-0ecb83f443d6-1785597811`.
+- HyperX official `create_checkout` probe: request
+  `448fec69-405e-4c5b-8642-9d2151f8a729-1785598905` returned MCP protocol error
+  `Tool not found: create_checkout`. The advertised capability is not treated as a working tool.
+- The public Cloudflare profile URL used for this proof is temporary test transport, not deployment
+  or submission evidence.
+- Both merchant profiles omitted the recommended cache header. The adapter records the deviation
+  and does not cache those profiles.
+- Exact normalized proof is stored in `artifacts/backend/ucp-live-proof-2026-08-01.json`.
+
+Selection: HyperX remains primary because the physical-product path avoids stored-value policy risk.
+Turtle Beach remains backup. Switch only if HyperX cannot produce a refreshed quote and browser
+checkout attempt inside the 90-minute checkout gate.
+
 ## Fallback ladder
 
 1. Primary live merchant.

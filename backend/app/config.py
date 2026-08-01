@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     azure_openai_deployment: str | None = None
     prava_base_url: AnyHttpUrl | None = None
     prava_secret_key: SecretStr | None = None
+    primary_merchant_profile_url: AnyHttpUrl = AnyHttpUrl(
+        "https://hyperx.com/.well-known/ucp"
+    )
+    primary_merchant_endpoint_host: str = "hyperx-us.myshopify.com"
+    allow_stored_value_products: bool = False
 
     @field_validator("database_url")
     @classmethod
@@ -70,6 +75,10 @@ class Settings(BaseSettings):
         if raw.startswith("postgresql://"):
             return raw.replace("postgresql://", "postgresql+psycopg://", 1)
         return raw.replace("postgres://", "postgresql+psycopg://", 1)
+
+    @property
+    def ucp_agent_profile_url(self) -> str:
+        return f"{str(self.public_base_url).rstrip('/')}/.well-known/ucp"
 
 
 @lru_cache(maxsize=1)

@@ -192,3 +192,23 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Consequence: Replay, wrong audience, expiry, logout and unauthorized recovery have explicit
   boundaries. Stable local/deployed pepper configuration is mandatory before server restart or deploy.
 - Owner: WishTrace team / Codex
+
+### 2026-08-01 20:37 PKT — Live physical catalog first; stored value remains gated
+
+- Context: The user wants recognizable Xbox/Steam-style gift cards, while the finalist flow needs a
+  real product and Prava-compatible checkout rather than attractive catalog imagery.
+- Evidence: The implemented UCP adapter returned 10 live HyperX gaming products with exact variants,
+  prices and availability. Turtle Beach returned its own live digital gift card, but no Xbox, Steam
+  or Amazon card was observed. Both Shopify UCP profiles omitted the recommended cache header.
+- Decision: Keep HyperX physical products as the primary path. Preserve observed gift cards as live
+  candidate facts but deterministically reject stored value until an actual merchant + Prava checkout
+  proves support. Accept a missing business-profile cache header without caching, record the deviation,
+  and reject explicitly unsafe cache directives; keep WishTrace's own agent profile compliant.
+- Consequence: Ranking can use only persisted live eligible candidate IDs. Because HyperX's MCP
+  endpoint returned `Tool not found` for the official `create_checkout` probe, current candidates are
+  stored but rejected as `UNSUPPORTED_CHECKOUT`. Product imagery and prices may appear only from live
+  snapshots. Delivery remains unknown, and neither catalog capability nor a Prava session may be
+  described as an order.
+- Rollback/fallback: Turtle Beach physical products are the backup. Gift cards can be enabled only by
+  changing the server-side policy after end-to-end stored-value checkout evidence exists.
+- Owner: WishTrace team / Codex

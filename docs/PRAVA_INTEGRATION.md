@@ -6,6 +6,21 @@ Use **Prava SDK/API** for the Android product through the backend. The Builder H
 
 MCP and CLI are not the default because the handbook describes them as production-only options and WishTrace needs a custom native payment UX.
 
+Current official SDK/API contract verified on 2026-08-01:
+
+- `POST /v1/sessions` creates a 15-minute, single-use hosted `full_checkout` session;
+- `GET /v1/sessions/{sessionId}/payment-result` returns `pending`, `awaiting_result`,
+  `completed`, or `failed`;
+- single-use token, dynamic CVV and expiry appear only at `awaiting_result` and remain backend-memory
+  only;
+- `POST /v1/sessions/{sessionId}/report-status` must receive `APPROVED` or `DECLINED` after
+  the merchant attempt;
+- the documented Browser Harness reconciles a Shopify checkout and returns a verified result, but
+  the public SDK/API reference currently exposes no callable Browser Harness endpoint or method.
+
+Do not invent that missing invocation. A support request is pending for the exact hackathon sandbox
+contract; implement only the documented session/poll/report boundary until it is answered.
+
 ## Meaningful role
 
 Prava is not a button after recommendation. It enables WishTrace to move from a selected gift to an authorized and verified commercial result without exposing card details to the model or app.

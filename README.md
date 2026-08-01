@@ -26,7 +26,7 @@ Open `CODEX_BOOTSTRAP.md` and give it to Codex from the repository root. Do not 
 - One recipient, one occasion, one validated merchant path and one completed transaction are enough for the MVP.
 - The model ranks only real candidate products supplied by the commerce adapter. It never invents products, prices, availability or delivery promises.
 - Hard constraints are enforced by deterministic code.
-- Primary targets are Overall/Prava, Best UX/Mac mini, Visa, OpenAI and Localhost.
+- Primary targets are the open Finalists award, Visa Intelligent Commerce and Best UX; OpenAI and Localhost strengthen the same narrow flow.
 - UX is a major prize objective, but it cannot delay proof of a working end-to-end transaction.
 - Linq is optional and may be added only after the main Android + Prava demo is stable; recipient-only notification does not count as a strong Linq implementation.
 - Generated UI images are art direction, not proof of a working product and not a pixel-perfect source of truth.
@@ -97,11 +97,33 @@ occasion + recipient context
 → personal message attached
 ```
 
-A narrower working flow beats a broad unfinished app.
+A narrower working flow beats a broad unfinished app. Runtime routes never substitute seeded,
+controlled or simulated content when an integration is unavailable; they show a truthful empty,
+unavailable or recovery state instead.
+
+## Backend
+
+The FastAPI service lives in `backend/`. It requires Python 3.12 and `uv`, loads secrets from the
+ignored repository-root `.env`, rejects PostgreSQL connections without `sslmode=require`, and
+publishes `/health` plus the public UCP platform profile.
+
+```powershell
+cd backend
+uv sync --dev
+uv run python -m pytest
+uv run python -m ruff check .
+uv run python -m mypy app scripts
+uv run python -m alembic upgrade head
+uv run uvicorn app.main:create_app --factory
+```
+
+Copy variable names from `templates/.env.example`; never commit the populated `.env`.
 
 ## Android prototype
 
-The native client lives in `android/`. It currently uses explicitly seeded demo data and does not claim backend, merchant, OpenAI or Prava connectivity.
+The native client lives in `android/`. Its pre-kickoff routes still contain disclosed local fixture
+implementations that are being replaced by authenticated backend repositories. They are not an
+acceptable judged runtime or fallback and do not claim merchant, OpenAI or Prava connectivity.
 
 Requirements:
 

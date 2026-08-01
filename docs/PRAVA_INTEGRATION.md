@@ -21,7 +21,7 @@ Prava is not a button after recommendation. It enables WishTrace to move from a 
 6. Android opens hosted approval flow.
 7. User approves, cancels or fails.
 8. Android returns through configured link.
-9. Backend reconciles with Prava and/or verified webhook.
+9. Backend polls Prava's official payment-result endpoint and reconciles the callback/app return.
 10. Android polls/refreshes purchase intent.
 11. UI shows authoritative final state and evidence.
 ```
@@ -64,7 +64,9 @@ UNKNOWN → RECONCILING → terminal state or manual support
 - Keys only on backend.
 - No card data stored.
 - Validate redirect targets.
-- Verify webhooks using current official method.
+- Poll only the documented payment-result endpoint; do not invent a webhook contract.
+- Report the merchant attempt as `APPROVED` or `DECLINED` through the documented report-status endpoint.
+- Keep single-use card token, dynamic CVV and expiry in backend memory only; never log, persist or send them to Android.
 - Redact sensitive logs.
 - Use HTTPS.
 - Limit production access to the approved window and use case.
@@ -82,11 +84,16 @@ Capture:
 - app receipt/result screen;
 - logs showing no duplicate operation.
 
-Do not claim an order if only a payment/session was completed. Describe the exact result.
+Do not claim an order if only a payment/session was completed. A sandbox tokenized-card attempt
+against a real merchant is valid organizer evidence even when the merchant checkout fails, but the
+result must say authorization/attempt rather than “Gift secured.”
 
 ## Production access
 
-The handbook allows participants to request temporary production access from August 1 through August 8, subject to review. Request it only after the sandbox flow works reliably.
+Do not apply prematurely. The organizer's 2026-08-01 announcement requires an end-to-end sandbox
+integration inside the app, including a tokenized test-card transaction attempted through browser
+automation against a real merchant. The expected merchant failure is accepted as a working sandbox
+flow. Apply only after that evidence, a meaningful Prava role, and the non-mock Android journey exist.
 
 Organizer Discord also indicated that participants without a compatible card could build in sandbox and contact the team for help with a compatible Visa card for production testing. Treat that as support intent, not a guarantee. Keep the sandbox submission complete on its own.
 

@@ -113,7 +113,7 @@ The handbook prioritizes end-to-end functionality, novelty, user value, Prava im
 
 Proof required:
 
-- live or clearly controlled real-product discovery;
+- live, source-timestamped real-product discovery;
 - visible decision rather than generic text generation;
 - completed Prava sandbox result;
 - user value without a long explanation;
@@ -176,11 +176,11 @@ Show:
 
 ### Track priority and optional Linq
 
-Primary targets are:
+Primary targets, verified against the live Devfolio prize page on 2026-08-01, are:
 
-1. Overall / Prava finalists
-2. Best UX / Mac mini
-3. Visa Intelligent Commerce
+1. Open Finalists ($10,000 pool)
+2. Visa Intelligent Commerce ($5,000)
+3. Best UX ($800)
 4. OpenAI
 5. Localhost Most Startup-Ready Product
 
@@ -198,7 +198,7 @@ NANDA and Senso remain out of scope unless the core submission is already comple
 
 - Native Android experience.
 - One end-to-end gifting flow.
-- Real product data or a clearly disclosed controlled catalog of real products.
+- Live product data with recorded source evidence; unavailable integrations fail honestly.
 - OpenAI ranks product IDs, not invented products.
 - Deterministic hard constraints.
 - Prava SDK/API sandbox transaction.
@@ -213,7 +213,7 @@ NANDA and Senso remain out of scope unless the core submission is already comple
 - FastAPI versus Node backend.
 - Exact OpenAI model.
 - Exact merchant and SKU.
-- UCP, merchant API, MCP-backed catalog adapter or controlled real-product feed.
+- UCP, merchant API or MCP-backed live catalog adapter.
 - Database choice.
 - Audio implementation.
 - Rive versus native Compose motion.
@@ -252,12 +252,13 @@ No flexible choice should remain open after it begins blocking implementation.
 
 ### Bronze floor
 
-- Seeded recipient and occasion
-- Small controlled catalog of real products from one merchant
-- OpenAI selects only from the catalog
-- Completed Prava sandbox payment flow
-- Text note
-- Verifiable receipt/result
+- Real Google-authenticated user
+- One user-created recipient and occasion persisted in Supabase
+- One small live catalog from a verified merchant path
+- OpenAI selects only from the eligible live candidates
+- Completed Prava sandbox approval and real-merchant browser attempt
+- Editable text note
+- Authoritative result labeled to the strongest proven boundary
 
 A stable Bronze submission beats a Gold plan with a broken transaction.
 
@@ -286,7 +287,8 @@ A stable Bronze submission beats a Gold plan with a broken transaction.
 - Settings
 - Multiple recipients
 
-Onboarding is cut first if it threatens the core flow. A demo can begin from a seeded home screen.
+Onboarding is cut first if it threatens the core flow. The judged flow may begin after real sign-in,
+but never from a seeded or locally bypassed session.
 
 ---
 
@@ -301,7 +303,7 @@ Android Compose client
       → deterministic product validator
       → OpenAI orchestration
       → Prava SDK/API adapter
-      → transaction ledger and webhook handling
+      → transaction ledger and polling/callback reconciliation
   ← typed UI state and evidence
 ```
 
@@ -338,8 +340,10 @@ A directory listing is not proof of successful checkout. Validate the complete f
 
 1. Merchant with a tested Prava-compatible path and simple product/checkout flow.
 2. Merchant API or UCP flow that can be validated end to end.
-3. Controlled catalog of real products paired with a real Prava sandbox payment flow, with the boundary disclosed.
-4. Final fallback: one known fixed SKU and exact amount if the merchant integration is unstable.
+3. One known live fixed SKU and exact refreshed amount if broad merchant search is unstable.
+
+There is no runtime controlled-catalog fallback. If neither merchant path can be proven, stop with
+an explicit unavailable state and preserve the evidence instead of fabricating inventory.
 
 Do not attempt a multi-store basket.
 
@@ -382,7 +386,7 @@ Allowed planning only:
 ### Hours 6–12: Android skeleton
 
 - Compose theme and navigation.
-- Seeded home, recipient and discovery screens.
+- Empty/network-backed home, recipient and discovery screens.
 - Network client and typed states.
 - Recommendation screen.
 - Prava handoff/deep-link return handling.
@@ -390,7 +394,7 @@ Allowed planning only:
 
 ### Hours 12–18: integrate the full vertical slice
 
-- Connect real/controlled candidate data.
+- Connect live candidate data.
 - Run validator and model ranking.
 - Create purchase intent.
 - Open Prava approval.
@@ -456,7 +460,7 @@ The MVP is done only when:
 
 - a fresh install opens;
 - the flagship flow can be completed without developer intervention;
-- candidate products are real or their controlled boundary is disclosed;
+- candidate products are live and source-timestamped;
 - the model output is grounded in candidate IDs;
 - deterministic constraints are enforced;
 - the user sees exact merchant and amount;

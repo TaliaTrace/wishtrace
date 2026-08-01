@@ -2,9 +2,9 @@
 
 | Risk | Probability | Impact | Trigger | Mitigation | Fallback |
 |---|---:|---:|---|---|---|
-| merchant path fails | high | critical | no full path in 90 min | validate first, keep backup | controlled real-product catalog + real Prava sandbox |
+| merchant path fails | high | critical | no full path in 90 min | validate HyperX first, then one timed Turtle Beach attempt | narrow to one proven live SKU or show unavailable honestly |
 | Prava API uncertainty | medium | critical | undocumented/failed request | use official docs, Birdie, IDs | reduce to smallest official session flow |
-| payment status unclear | medium | critical | return says pending/unknown | reconcile backend/webhook | show unknown honestly and use recorded proof |
+| payment status unclear | medium | critical | return says pending/unknown | poll official result and reconcile app return | show unknown honestly and use recorded proof |
 | stored-value gift card restricted | medium | high | merchant/Prava fails | avoid commitment | physical gift SKU |
 | OpenAI output invalid | medium | medium | schema/ID errors | structured output + validation | deterministic score/user selection |
 | UI polish consumes schedule | high | high | transaction not done by hour 16 | gate UX work | cut onboarding/advanced motion |
@@ -14,7 +14,7 @@
 | generated concepts mislead | medium | medium | screenshot shown as build | label assets | use real app captures |
 | deadline confusion | low | critical | conflicting schedule text | follow hard-deadline section | internal target 2.5h early |
 | secret leak | low | critical | key in client/repo | env vars, scan | rotate immediately |
-| demo network failure | medium | high | live request unavailable | recorded backup, controlled mode | play truthful backup video |
+| demo network failure | medium | high | live request unavailable | record a complete real run and retain correlation evidence | play truthful backup video; never switch to fixtures |
 | overclaiming order completion | medium | critical | only session/payment exists | precise language | describe exact transaction result |
 
 ## Review cadence

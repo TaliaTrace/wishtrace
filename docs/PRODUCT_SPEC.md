@@ -156,7 +156,7 @@ Acceptance:
 - Idempotent transaction creation.
 - Resilient return/reconciliation.
 - Accessible light-mode interface.
-- Demo can run from seeded data.
+- Runtime routes never use seeded, controlled or simulated user, product or transaction data.
 - Critical flow works with predictable latency or visible progress.
 
 ## Privacy
@@ -166,5 +166,5 @@ Hints may contain private relationship context. For the MVP:
 - collect only what is needed;
 - avoid sending irrelevant full conversations to the model;
 - redact or summarize before logging;
-- do not expose hints in public demo screenshots beyond seeded fictional data;
+- redact personal hints and account data from public screenshots;
 - allow hint editing/deletion in future product scope, though full account privacy controls may be outside the MVP.

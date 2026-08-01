@@ -18,7 +18,7 @@ WishTrace backend
   ├── OpenAI orchestrator
   ├── purchase-intent service
   ├── Prava adapter
-  ├── webhook/reconciliation service
+  ├── Prava polling/callback reconciliation service
   └── persistence / audit-safe logs
 ```
 
@@ -52,7 +52,8 @@ POST /purchase-intents
 POST /purchase-intents/{id}/message
 POST /purchase-intents/{id}/prava-session
 GET  /purchase-intents/{id}
-POST /integrations/prava/webhook
+POST /purchase-intents/{id}/reconcile
+GET  /purchase-intents/{id}/status
 GET  /health
 ```
 
@@ -100,7 +101,7 @@ Choose the fastest proven backend hosting. Requirements:
 
 - HTTPS;
 - secret environment variables;
-- stable callback/webhook URL;
+- stable HTTPS callback URL;
 - logs accessible during demo;
 - rollback or redeploy within minutes.
 

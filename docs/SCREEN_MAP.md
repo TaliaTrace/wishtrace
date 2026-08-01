@@ -2,7 +2,8 @@
 
 ## 0. Entry and session
 
-Welcome leads to Google sign-in. `Not now` creates a local-only session. Controlled Talia/Sophie fixtures exist only for development evidence and are not a consumer-facing demo mode.
+Welcome leads to Google sign-in. There is no `Not now`, local session or runtime fixture path. A
+newly authenticated user enters the real empty state and creates their recipient and occasion.
 
 ## 1. Onboarding value and trust
 
@@ -185,6 +186,11 @@ Use four equal primary destinations: Home, People, Occasions and Profile. Add ac
 
 ## Implemented route evidence
 
-As of UI milestone 4, Welcome, Sign-in, Home, People, Recipient detail, Occasions, Profile, Add/Edit person, Add/Edit occasion, Discovery, Recommendation and Personal note are navigable. The shared controlled repository lets an edit update Home, People, Recipient detail and Occasions consistently.
+As of the disclosed pre-kickoff UI milestone 4, Welcome, Sign-in, Home, People, Recipient detail,
+Occasions, Profile, Add/Edit person, Add/Edit occasion, Discovery, Recommendation and Personal note
+are navigable. Their runtime fixture repositories are temporary technical debt and must be replaced
+before the judged path is accepted.
 
-Discovery reaches the Recommendation route only after all four local preparation stages. Until a merchant source is verified, Recommendation intentionally renders `SourceNeeded`; the sourced content state is model-driven and refuses to substitute a fictional candidate. Personal note is complete and preserves user/generated origin metadata. Review, Prava and receipt routes begin in milestone 5.
+The final Discovery route starts a backend discovery and reaches Recommendation only with live,
+validated candidates. An unavailable merchant returns a recoverable unavailable state; it never
+routes to a fabricated recommendation. Personal note preserves user/generated origin metadata.

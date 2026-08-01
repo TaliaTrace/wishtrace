@@ -65,7 +65,7 @@ Record a full successful run before submission. Keep:
 - cloud-accessible MP4;
 - screenshots;
 - transaction evidence;
-- seeded controlled-data mode if external merchant fails live.
+- the last complete real run recording plus correlation/transaction evidence.
 
 The backup must be truthful. Do not splice a fake transaction into a live flow.
 
@@ -77,7 +77,7 @@ The backup must be truthful. Do not splice a fake transaction into a live flow.
 4. Why Prava is central.
 5. Why OpenAI is material.
 6. What was built during the hackathon.
-7. What is live, controlled or simulated.
+7. Exact live/sandbox truth boundary and any unavailable step.
 8. Demo/repo links.
 9. Continuation plan.
 10. Learning and limitations.

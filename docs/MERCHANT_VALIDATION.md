@@ -19,7 +19,7 @@ For each merchant/path, verify:
 
 | Capability | Evidence |
 |---|---|
-| product search/listing | real request or documented controlled feed |
+| product search/listing | observed live request and timestamp |
 | stable product ID | observed response |
 | current price/currency | observed response and timestamp |
 | availability | observed or explicitly unknown |
@@ -55,14 +55,15 @@ Gift cards are visually recognizable but may introduce policy, merchant or check
 
 1. Primary live merchant.
 2. Backup live merchant.
-3. Controlled catalog of real products with real Prava sandbox transaction, clearly disclosed.
-4. One fixed real SKU and exact amount.
+3. One fixed live SKU with refreshed price/availability when broad search is unstable.
+
+If none works, stop at an honest unavailable state. There is no runtime catalog fixture fallback.
 
 ## Integration status template
 
 ```text
 Merchant:
-Mode: live / controlled / hybrid
+Mode: live
 Search:
 Product detail:
 Price refresh:

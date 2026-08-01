@@ -11,6 +11,16 @@ android/local.properties
 *.iml
 captures/
 
+# Python / backend
+backend/.venv/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.coverage
+backend/htmlcov/
+**/__pycache__/
+*.py[cod]
+
 # Secrets and signing
 .env
 .env.*

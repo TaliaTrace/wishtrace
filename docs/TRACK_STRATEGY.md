@@ -2,13 +2,23 @@
 
 This file defines which prizes WishTrace actively targets, what proof each one needs, and when optional integrations may be added.
 
-## Priority order
+## Live prize facts and priority order
+
+Verified from the public Devfolio prize page on 2026-08-01:
+
+- Open Finalists: $10,000 pool;
+- Best UX: $800;
+- Best Visa Intelligent Commerce Implementation: $5,000;
+- OpenAI Winners & Finalists: $9,000, separate from participation credits;
+- Localhost Most Startup-Ready Product: $5,000.
+
+Source: <https://agentic-commerce.devfolio.co/prizes>
 
 ### Tier 1: build for these from the beginning
 
-1. **Overall / Prava finalists**
-2. **Best UX / Mac mini**
-3. **Visa Intelligent Commerce**
+1. **Open Finalists**
+2. **Visa Intelligent Commerce**
+3. **Best UX**
 4. **OpenAI**
 5. **Localhost Most Startup-Ready Product**
 
@@ -33,16 +43,30 @@ Do not add sponsor technology merely for eligibility.
 
 | Target | What judges must see | Required evidence | Stop condition |
 |---|---|---|---|
-| Overall / Prava | A coherent product that discovers, decides and completes a useful transaction | Working end-to-end demo, Prava result, logs or receipt, clear user problem | Stop adding features if the transaction is not reliable |
-| Best UX / Mac mini | A memorable, understandable and trustworthy experience | Five-second comprehension, polished hero flow, real loading/error/success states, clear payment permission | No decorative polish that delays the working transaction |
-| Visa | Explicit permission, spending controls, safe credential handling and transaction completion | Merchant, amount, authorization boundary, status, idempotency, no card data in client/model | Do not make unsupported Visa claims |
+| Open Finalists | A coherent product that discovers, decides and attempts a useful transaction | Real-account end-to-end Android demo, live candidate evidence, grounded ranking, authoritative Prava result and truthful failure boundary | Stop adding features if the core run cannot repeat |
+| Visa | Explicit consent, bounded merchant/amount, safe token handling and authoritative transaction status | Review snapshot, idempotency proof, backend-only single-use credential handling, real-merchant browser attempt and reconciled result | Never imply Visa rails/card usage unless the observed Prava result proves it |
+| Best UX | A memorable, understandable and trustworthy experience | Five-second comprehension, polished hero flow, real loading/error/result states, clear permission, accessible physical-device capture | No decorative polish that delays the working transaction |
 | OpenAI | Model use materially improves product selection or personalization | Grounded candidate ranking, structured output, evidence-linked reasoning, fallback behavior | Do not use model output for prices, stock or delivery facts |
 | Localhost | A product that can continue after the hackathon | Sharp wedge, repeat-use loop, distribution story, 90-day roadmap, founder commitment | Do not inflate market claims without evidence |
 | Linq | Messaging is a core product interface, with Prava powering the transaction | Sender can initiate or manage the gifting flow through iMessage/RCS/SMS; recipient delivery alone is insufficient | Drop immediately if access, reliability or setup threatens the main submission |
 
 ---
 
-## Best UX / Mac mini strategy
+## Visa strategy
+
+Visa is a primary implementation target, but the product should earn it through commerce controls:
+
+1. The user sees the exact merchant, product/variant, refreshed amount and currency.
+2. One explicit approval creates one idempotent operation; repeated taps reuse it.
+3. Prava's single-use token, dynamic CVV and expiry remain backend-memory-only.
+4. Deterministic code enforces budget, availability and variant constraints before the model ranks.
+5. Android displays `UNKNOWN`, cancellation, decline and failed merchant attempts precisely.
+6. Evidence includes the organizer-required real-merchant browser attempt, even when sandbox checkout fails as expected.
+
+The submission copy describes only observed payment network/card facts. “Visa intelligent commerce”
+is the prize category, not permission to claim an unobserved Visa transaction.
+
+## Best UX strategy
 
 The UX prize is a primary target, not an afterthought.
 
@@ -62,9 +86,12 @@ The signature sequence should be:
 recipient clues
 → invalid gifts visibly removed
 → selected gift becomes the approval card
-→ Prava result becomes “gift secured”
+→ verified merchant order becomes “Gift secured”
 → personal message is attached
 ```
+
+If sandbox produces authorization without a verified merchant order, the emotional payoff remains
+strong but uses precise wording such as “Approval complete — merchant attempt recorded.”
 
 ---
 

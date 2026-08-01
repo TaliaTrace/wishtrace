@@ -16,13 +16,13 @@
 - commerce adapter normalization;
 - OpenAI structured output;
 - Prava sandbox session;
-- webhook verification;
+- Prava payment-result polling and report-status reconciliation;
 - reconciliation;
 - Android API client.
 
 ### End to end
 
-- seeded flagship flow;
+- clean-install real-account flagship flow;
 - cancel and retry;
 - decline/failure;
 - process death or app background during approval;
@@ -60,10 +60,10 @@
 - decline;
 - session expiry;
 - network lost after approval;
-- webhook before app return;
-- app return before webhook;
+- polling resolves before app return;
+- app return occurs before polling resolves;
 - duplicate tap;
-- duplicate webhook;
+- duplicate status/report request;
 - unknown status;
 - refresh resolves unknown;
 - changed price requires new approval.
@@ -86,7 +86,7 @@
 - airplane mode off;
 - battery charged;
 - notification privacy enabled;
-- seeded data reset;
+- test account has no unintended prior recipient or purchase intent;
 - server health checked;
 - test credentials ready;
 - screen recording storage available;

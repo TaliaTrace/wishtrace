@@ -6,12 +6,15 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
-| Prava auth works | smallest official sandbox request | NOT STARTED | | |
+| Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0001` | Codex | 2026-08-01 |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS LOCALLY — public deploy pending | Codex | 2026-08-01 |
+| Prava auth works | smallest official sandbox request | PRE-KICKOFF ONLY — REVERIFY | Codex/user | 2026-08-01 |
 | Prava transaction path understood | session + authoritative status | NOT STARTED | | |
 | Primary merchant validated | search/product/quote/checkout facts | NOT STARTED | | |
 | Backup merchant validated | documented fallback | NOT STARTED | | |
-| OpenAI structured output works | valid candidate IDs returned | NOT STARTED | | |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — INDIGO RESET | Codex | 2026-07-30 16:54 PKT |
+| OpenAI structured output works | valid live candidate IDs returned | PRE-KICKOFF SMOKE ONLY | Codex/user | 2026-08-01 |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS BASELINE — runtime fixtures remain | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — UI MILESTONE 4 | Codex | 2026-07-30 19:34 PKT |
@@ -24,20 +27,32 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Complete the purchase review and Prava state shell without inventing Prava behavior.
-2. Obtain current official Prava sandbox behavior/access from the user before wiring the handoff.
-3. Preserve the controlled-data boundary until merchant, OpenAI and Prava access is proven.
-4. Preserve the pre-kickoff prototype evidence and do not present it as judged-window work.
+1. Finish and deploy the secure FastAPI foundation.
+2. Implement real Google challenge/exchange and Supabase-owned recipient/occasion persistence.
+3. Replace every Android runtime seed/local-session path with authenticated network state.
+4. Prove one live merchant path before ranking or payment UI claims.
+5. Preserve the pre-kickoff prototype disclosure and never use fixtures as judged runtime fallback.
 
 ## Next
 
-1. Prove Prava sandbox access.
-2. Prove one merchant/catalog path.
-3. Build the backend vertical skeleton after the official window begins.
-4. Connect ranking and Prava reconciliation.
-5. Run end to end.
+1. Reverify Prava sandbox auth during the official window.
+2. Prove HyperX US catalog/search/lookup; try Turtle Beach only if the 90-minute gate fails.
+3. Rank only live eligible candidates with Azure OpenAI.
+4. Run hosted Prava approval and the organizer-required real-merchant browser attempt.
+5. Repeat the physical-phone flow twice, then apply for production access.
 
 ## Milestone evidence
+
+### 2026-08-01 — Judged-window security and backend foundation
+
+- Kickoff: local clock verified after the official opening.
+- Baseline: initialized Git after a tracked-file secret scan and committed all disclosed pre-kickoff work as `283f5be`.
+- Backend: FastAPI/Pydantic v2, async SQLAlchemy + psycopg 3, Alembic, correlation/error middleware, audit-safe request logging, `/health`, and catalog-only `/.well-known/ucp`.
+- Database: application-to-pooler TLS verified through libpq `ssl_in_use`; observed PostgreSQL 17.6; Alembic upgraded to `20260801_0001 (head)` using `NullPool`.
+- Backend quality: pytest 7 passed; Ruff passed; strict mypy passed. These commands must be rerun after the final foundation diff.
+- Android baseline: debug assembly, unit tests and lint passed during the official window. Physical RMX3201/API 30 with Google Play Services is ADB-authorized for real OAuth testing.
+- Track evidence: live Devfolio page verified the Open Finalists, Visa and Best UX prizes; the proof strategy now uses one shared real transaction path.
+- Truth boundary: the backend foundation and database migration are live. Public Azure deployment, real auth, runtime persistence, merchant calls, grounded ranking and judged-window Prava calls are not yet complete. Current Android runtime fixtures remain pre-kickoff technical debt and are not acceptable demo evidence.
 
 ### 2026-07-30 — UI milestone 4: grounded decision and personal note
 

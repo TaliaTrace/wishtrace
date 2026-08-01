@@ -116,3 +116,43 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Consequence: The UI journey and recovery behavior can be tested without making a commerce claim. A real source can replace the state without redesigning the screen.
 - Rollback/fallback: A recorded real-product fixture may populate the content state only after its source timestamp and mode are stored. Never use an invented fixture to bypass the empty edge.
 - Owner: WishTrace team / Codex
+
+### 2026-08-01 14:29 PKT — Official window opened and baseline frozen
+
+- Context: Judged implementation must be distinguishable from the disclosed pre-kickoff prototype.
+- Evidence: Local time was `2026-08-01 14:29:55 +05:00`, after the 07:00 PKT kickoff. The workspace had no Git metadata.
+- Decision: Initialize Git, secret-scan tracked candidates, and commit the complete pre-kickoff state as `283f5be` before judged-window implementation.
+- Consequence: Every later commit and execution-board entry can be attributed to the official window. The baseline contains no tracked `.env`.
+- Owner: WishTrace team / Codex
+
+### 2026-08-01 — No runtime fixtures or local authentication escape hatch
+
+- Context: Earlier plans allowed a controlled Bronze fallback and the prototype still wires seeded repositories plus `Not now` local auth.
+- Evidence: The user explicitly requires no placeholders/demo behavior and is available to provide integration access. Runtime truth is also stronger finalist evidence than a polished simulation.
+- Decision: Supersede every controlled-runtime fallback. Seeded/controlled data may remain only in tests, Compose previews and the preexisting-work disclosure; unavailable integrations produce honest empty/error/recovery states.
+- Consequence: The current Android runtime is temporarily noncompliant until network repositories replace the pre-kickoff implementations. It must not be used as judged end-to-end evidence.
+- Owner: WishTrace team / Codex
+
+### 2026-08-01 — Prava proof uses documented polling and a real-merchant attempt
+
+- Context: Older architecture notes assumed a webhook and treated production access as a general next step.
+- Evidence: Current Prava docs expose hosted full-checkout session creation, payment-result polling and report-status. The latest organizer announcement requires a sandbox tokenized test-card attempt through browser automation against a real merchant, accepts the expected failure, and warns against premature production applications.
+- Decision: Implement create → hosted approval → poll → browser checkout attempt → report status → reconcile. Do not invent a webhook or Browser Harness endpoint. Gate production access until this flow is captured inside the app.
+- Consequence: A successful Prava authorization without a verified merchant order produces an authorization/attempt result, never `Gift secured`.
+- Owner: WishTrace team / Codex
+
+### 2026-08-01 — Finalist, Visa and UX are the primary proof stack
+
+- Context: The user wants the strongest chance of becoming a finalist and specifically prioritizes Visa and UX.
+- Evidence: The live Devfolio prize page lists a $10,000 Open Finalists pool, $5,000 Best Visa Intelligent Commerce Implementation and $800 Best UX. OpenAI has a separate $9,000 winners/finalists pool.
+- Decision: Optimize one shared vertical slice: reliable real transaction evidence for finalist judging, explicit consent/token isolation/idempotency for Visa, and five-second comprehension/recovery/emotional completion for UX. OpenAI grounded ranking supports the same flow.
+- Consequence: No extra sponsor integration or decorative feature may displace transaction reliability, permission clarity or physical-device UX proof.
+- Owner: WishTrace team / Codex
+
+### 2026-08-01 — Supabase TLS proof uses the client connection
+
+- Context: `pg_stat_ssl` observed through Supabase's pooler can describe the pooler's server-side hop rather than the application-to-pooler connection.
+- Evidence: psycopg/libpq exposes `PGconn.ssl_in_use` for the actual client connection. A secure process-only DSN override returned TLS `true` and PostgreSQL `17.6`; Alembic reached `20260801_0001 (head)`.
+- Decision: Require `sslmode=require` in configuration and health-check client TLS through libpq. Use SQLAlchemy `NullPool` with the session pooler.
+- Consequence: Migrations and runtime startup reject an insecure database URL; secrets remain outside tracked files.
+- Owner: WishTrace team / Codex

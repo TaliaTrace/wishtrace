@@ -289,3 +289,21 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Consequence: Deployment can execute the same allowlisted browser boundary as local development,
   while cloud resource creation and spend remain pending explicit subscription/cost confirmation.
 - Owner: WishTrace team / Codex
+
+### 2026-08-01 23:23 PKT — Use the proven Azure v1 resource endpoint
+
+- Context: The first provider probe used a guessed Foundry hostname and timed out at DNS, while the
+  Azure portal and CLI exposed several endpoint families for the same AI Services account.
+- Evidence: Microsoft documents both the Azure OpenAI resource endpoint and the AI Services resource
+  endpoint with `/openai/v1/` for the OpenAI SDK. Tenant-scoped CLI access showed that
+  `gpt-5.6-terra` is the account's only succeeded deployment. The configured
+  `services.ai.azure.com/openai/v1/` endpoint then returned a completed strict-schema response in
+  3,662 ms with a provider request ID and `store=false`.
+- Decision: Keep the existing OpenAI SDK boundary and the proven resource v1 endpoint. Do not add a
+  Foundry agent framework, project-scoped API, model fallback or another deployment to this narrow
+  flow.
+- Consequence: Azure is now live-provider proven. Runtime gift ranking remains gated only by real
+  candidate eligibility and Prava's stored-value answer, not by model connectivity.
+- Rollback/fallback: A provider outage yields the existing explicit recovery/user-choice state; it
+  never creates a candidate or bypasses deterministic rules.
+- Owner: WishTrace team / Codex

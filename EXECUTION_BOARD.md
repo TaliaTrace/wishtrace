@@ -15,7 +15,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Prava transaction path understood | session + authoritative status | CODE PASS — session → credential → one merchant attempt → report → re-poll tested; live hosted flow pending | Codex | 2026-08-01 22:34 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
-| OpenAI structured output works | valid live candidate IDs returned | BOUNDARY PASS — strict SDK/schema tests; live provider DNS + zero eligible candidates block runtime proof | Codex/user | 2026-08-01 21:33 PKT |
+| OpenAI structured output works | valid live candidate IDs returned | PROVIDER PASS — `gpt-5.6-terra` returned strict schema output; runtime candidate remains gated by stored-value policy | Codex/user | 2026-08-01 23:23 PKT |
 | Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
@@ -30,9 +30,9 @@ Update this file during the hackathon. Do not manage the project from memory.
 ## Now
 
 1. Get Prava's explicit stored-value answer, then run one hosted sandbox approval and expected-fail tokenized attempt against the exact Jackbox $5 checkout.
-2. Correct `AZURE_OPENAI_BASE_URL` from the Foundry deployment's exact target URI; the current hostname fails DNS. Make the Azure subscription visible to the signed-in CLI account, then deploy the API over HTTPS.
-3. Permanently append `sslmode=require` to the ignored local `DATABASE_URL`; migrations currently use a secure process-only override. Confirm the existing stable session pepper without sharing it.
-4. Enable the Jackbox checkout/stored-value flags only after Prava confirmation, then connect the Android review/return flow.
+2. Deploy the locked browser container over public Azure HTTPS. CLI access, the existing subscription
+   and the live Foundry deployment are proven; no hosting resource exists yet.
+3. Enable the Jackbox checkout/stored-value flags only after Prava confirmation, then connect the Android review/return flow.
 
 ## Next
 
@@ -42,6 +42,20 @@ Update this file during the hackathon. Do not manage the project from memory.
 4. Repeat the physical-phone flow twice, then apply for production access.
 
 ## Milestone evidence
+
+### 2026-08-01 — Live Azure provider and deployment-readiness hardening
+
+- Tenant-scoped interactive Azure CLI login succeeded against the enabled subscription. Read-only
+  inventory found the existing AI Services project/deployment but no App Service plan, Web App,
+  Container App or registry.
+- The configured `gpt-5.6-terra` deployment returned a completed strict-schema response through the
+  real production transport in 3,662 ms. The probe used one opaque candidate ID, `store=false`, no
+  recipient hint and no payment data; a safe provider request ID was observed.
+- Permanent ignored configuration now validates with `sslmode=require`, a stable session pepper,
+  Google authentication and Prava present. Checkout and stored-value flags remain deliberately off.
+- Added fail-closed deployed configuration checks for public origin, Google client ID, Azure/Prava
+  completeness, Prava origin, stored-value dependency and security/no-cache response headers.
+- No Azure hosting resource or spend was created in this milestone.
 
 ### 2026-08-01 — Azure browser-runtime packaging
 

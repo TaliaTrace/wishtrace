@@ -67,3 +67,15 @@ async def test_invalid_correlation_id_is_replaced(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.headers["X-Correlation-ID"] != "bad id"
+
+
+async def test_sensitive_api_responses_are_not_cacheable(client: AsyncClient) -> None:
+    response = await client.post("/v1/auth/google/challenge")
+
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Pragma"] == "no-cache"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+
+    profile = await client.get("/.well-known/ucp")
+    assert profile.headers["Cache-Control"] == "public, max-age=300"

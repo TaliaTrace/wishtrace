@@ -9,6 +9,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPOSITORY_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 AZURE_DEPLOYMENT_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,200}$")
+GOOGLE_CLIENT_ID_PATTERN = re.compile(
+    r"^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$"
+)
+PRAVA_API_HOSTS = {"sandbox.api.prava.space", "api.prava.space"}
 
 
 class Settings(BaseSettings):
@@ -66,6 +70,33 @@ class Settings(BaseSettings):
             raise ValueError("PUBLIC_BASE_URL must use HTTPS outside local/test environments")
         return self
 
+    @field_validator("public_base_url")
+    @classmethod
+    def require_origin_public_base_url(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        parsed = urlsplit(str(value))
+        if (
+            parsed.path.rstrip("/")
+            or parsed.query
+            or parsed.fragment
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise ValueError("PUBLIC_BASE_URL must be an origin without path or credentials")
+        return value
+
+    @field_validator("google_web_client_id")
+    @classmethod
+    def validate_google_web_client_id(
+        cls,
+        value: SecretStr | None,
+    ) -> SecretStr | None:
+        if value is None:
+            return None
+        normalized = value.get_secret_value().strip()
+        if GOOGLE_CLIENT_ID_PATTERN.fullmatch(normalized) is None:
+            raise ValueError("GOOGLE_WEB_CLIENT_ID is invalid")
+        return SecretStr(normalized)
+
     @field_validator("session_token_pepper")
     @classmethod
     def require_strong_session_pepper(cls, value: SecretStr | None) -> SecretStr | None:
@@ -112,6 +143,58 @@ class Settings(BaseSettings):
         assert self.azure_openai_api_key is not None
         if len(self.azure_openai_api_key.get_secret_value()) < 16:
             raise ValueError("AZURE_OPENAI_API_KEY is invalid")
+        return self
+
+    @field_validator("prava_base_url")
+    @classmethod
+    def validate_prava_base_url(cls, value: AnyHttpUrl | None) -> AnyHttpUrl | None:
+        if value is None:
+            return None
+        parsed = urlsplit(str(value))
+        if (
+            parsed.scheme != "https"
+            or (parsed.hostname or "").casefold() not in PRAVA_API_HOSTS
+            or parsed.path.rstrip("/")
+            or parsed.query
+            or parsed.fragment
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.port not in (None, 443)
+        ):
+            raise ValueError("PRAVA_BASE_URL must use an allowlisted HTTPS API origin")
+        return value
+
+    @field_validator("prava_secret_key")
+    @classmethod
+    def validate_prava_secret_key(
+        cls,
+        value: SecretStr | None,
+    ) -> SecretStr | None:
+        if value is not None and len(value.get_secret_value()) < 16:
+            raise ValueError("PRAVA_SECRET_KEY is invalid")
+        return value
+
+    @model_validator(mode="after")
+    def validate_deployment_readiness(self) -> "Settings":
+        prava_values = (self.prava_base_url, self.prava_secret_key)
+        if any(value is not None for value in prava_values) and not all(
+            value is not None for value in prava_values
+        ):
+            raise ValueError("Prava configuration must be complete")
+        if self.app_env in {"staging", "production"} and (
+            self.google_web_client_id is None or self.session_token_pepper is None
+        ):
+            raise ValueError("Deployed authentication configuration must be complete")
+        if self.allow_stored_value_products and not self.merchant_checkout_enabled:
+            raise ValueError(
+                "Stored-value products require the merchant checkout boundary"
+            )
+        if (
+            self.app_env in {"staging", "production"}
+            and self.merchant_checkout_enabled
+            and (self.prava_base_url is None or self.prava_secret_key is None)
+        ):
+            raise ValueError("Deployed merchant checkout requires Prava configuration")
         return self
 
     @field_validator("android_return_uri")

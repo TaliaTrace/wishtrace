@@ -37,6 +37,35 @@ def test_deployed_public_url_requires_https() -> None:
         )
 
 
+def test_public_base_url_rejects_path_and_credentials() -> None:
+    with pytest.raises(ValidationError, match="origin without path or credentials"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            public_base_url="https://api.wishtrace.invalid/nested",
+        )
+
+
+def test_deployed_authentication_must_be_complete() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="Deployed authentication configuration must be complete",
+    ):
+        Settings(
+            app_env="production",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            public_base_url="https://api.wishtrace.invalid",
+            google_web_client_id=None,
+            session_token_pepper=None,
+        )
+
+
 def test_configured_session_pepper_must_be_strong() -> None:
     with pytest.raises(ValidationError, match="at least 32 bytes"):
         Settings(
@@ -45,6 +74,18 @@ def test_configured_session_pepper_must_be_strong() -> None:
                 "postgresql://wishtrace:password@database.invalid:5432/wishtrace?sslmode=require"
             ),
             session_token_pepper=SecretStr("too-short"),
+        )
+
+
+def test_google_web_client_id_must_use_google_origin() -> None:
+    with pytest.raises(ValidationError, match="GOOGLE_WEB_CLIENT_ID is invalid"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            google_web_client_id=SecretStr("not-a-google-client"),
         )
 
 
@@ -137,3 +178,42 @@ def test_checkout_can_use_playwright_managed_browser() -> None:
 
     assert settings.merchant_checkout_enabled is True
     assert settings.merchant_browser_executable_path is None
+
+
+def test_prava_configuration_must_be_complete_and_allowlisted() -> None:
+    with pytest.raises(ValidationError, match="allowlisted HTTPS API origin"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            prava_base_url="https://attacker.invalid",
+            prava_secret_key=SecretStr("not-a-real-key-but-long-enough"),
+        )
+
+    with pytest.raises(ValidationError, match="Prava configuration must be complete"):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            prava_base_url="https://sandbox.api.prava.space",
+            prava_secret_key=None,
+        )
+
+
+def test_stored_value_products_require_checkout_boundary() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="Stored-value products require the merchant checkout boundary",
+    ):
+        Settings(
+            app_env="test",
+            database_url=SecretStr(
+                "postgresql://wishtrace:password@database.invalid:5432/"
+                "wishtrace?sslmode=require"
+            ),
+            allow_stored_value_products=True,
+        )

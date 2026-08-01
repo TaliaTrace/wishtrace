@@ -59,6 +59,11 @@ def register_request_context(app: FastAPI) -> None:
         started = time.perf_counter()
         response = await call_next(request)
         response.headers["X-Correlation-ID"] = correlation_id
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        if request.url.path == "/health" or request.url.path.startswith("/v1/"):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
         logger.info(
             "request_complete",
             extra={

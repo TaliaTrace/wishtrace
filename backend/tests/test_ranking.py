@@ -156,7 +156,7 @@ class StaticAuth:
     def __init__(self, user: AuthenticatedUser) -> None:
         self.user = user
 
-    async def challenge(self) -> ChallengeResponse:
+    async def create_challenge(self) -> ChallengeResponse:
         raise NotImplementedError
 
     async def exchange(self, body: GoogleExchangeRequest) -> SessionResponse:

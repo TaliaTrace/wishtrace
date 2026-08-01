@@ -82,25 +82,31 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 ## OpenAI
 
 - Account/project used: Azure AI Foundry, configured in ignored environment
-- Model selected: configured Azure deployment; name intentionally not duplicated in docs
+- Model selected: `gpt-5.6-terra`, the only observed deployment in the account with provisioning
+  state `Succeeded`
 - Structured extraction verified:
-- Structured ranking verified: CONTRACT + SDK WIRE TEST — strict dynamic JSON Schema, official
-  Responses client, `store=false`, known candidate/evidence enums and post-response validation pass
-  automated tests. No runtime recommendation has been generated.
+- Structured ranking verified: LIVE PROVIDER + CONTRACT — the configured
+  `services.ai.azure.com/openai/v1/` endpoint returned a completed, schema-valid response for an
+  opaque test candidate through the production transport. The response carried a safe provider
+  request ID. Strict dynamic JSON Schema, `store=false`, known candidate/evidence enums and
+  post-response validation also pass automated tests. No recipient hint or payment fact was used in
+  the live probe.
 - Multimodal verified:
 - Message generation verified:
 - Invalid-output fallback tested: YES — malformed schema, unknown/rejected candidate ID, unsupported
   commerce claim, model no-selection, provider failure, one repair, direct-evidence fallback and
   explicit user-choice recovery are covered
-- Latency: no judged-window provider latency available
+- Latency: 3,662 ms for the 2026-08-01 judged-window structured-output probe
 - Backend boundary: authenticated rank/read routes persist one immutable evidence-linked decision per
   discovery. Only still-eligible `LIVE` snapshots can reach the model; recipient name, merchant URL,
   money, delivery and payment data are omitted from provider input.
-- Known blockers: all observed live products currently fail checkout support, so runtime ranking
-  correctly stops before Azure. The configured Azure hostname also failed DNS resolution during a
-  2026-08-01 21:31 PKT test-only structured-output probe; the SDK returned `MODEL_TIMEOUT`. Replace
-  `AZURE_OPENAI_BASE_URL` with the exact deployment target URI from Foundry before retesting.
-- Last verified: 2026-08-01 21:33 PKT; implementation/tests current, live provider proof blocked
+- Known blockers: the exact live Jackbox candidate remains deterministically ineligible while the
+  checkout and stored-value policy flags are off pending Prava approval, so the authenticated runtime
+  discovery route correctly stops before ranking. The provider itself is no longer a blocker.
+- Azure access: interactive tenant-scoped CLI login succeeded. The subscription is enabled and the
+  account can read the existing Foundry resources. No App Service plan, Web App, Container App or
+  registry currently exists, and no hosting resource or spend has been created by WishTrace.
+- Last verified: 2026-08-01 23:23 PKT; live provider proof passed
 
 ## Supabase PostgreSQL
 
@@ -114,10 +120,11 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   identifiers, hashed idempotency operations and immutable transaction transitions; owned ranking
   runs, immutable evidence snapshots and ordered evidence-linked decisions; idempotent merchant
   quotes, merchant/Prava outcome evidence, and one owned editable personal message per purchase
-- Permanent local `.env` contains `sslmode=require`: USER CONFIRMATION PENDING; verification used a process-only secure override
-- Stable local `SESSION_TOKEN_PEPPER`: USER CONFIRMATION PENDING; the current local server uses a
-  process-only value and must not be restarted before the permanent value is added
-- Last verified: 2026-08-01 22:34 PKT during official window
+- Permanent ignored local `.env` contains `sslmode=require`: YES; a fresh settings load and read-only
+  connection probe used that value directly and reported client TLS true
+- Stable local `SESSION_TOKEN_PEPPER`: YES; presence and minimum length were checked without printing
+  the value
+- Last verified: 2026-08-01 23:23 PKT during official window
 
 ## Android
 

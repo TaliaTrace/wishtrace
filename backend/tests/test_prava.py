@@ -422,9 +422,8 @@ async def test_create_mandate_session_sends_setup_block_and_discards_token() -> 
             },
         )
 
-    session = await _gateway(httpx.MockTransport(handler)).create_mandate_session(
-        _mandate_request()
-    )
+    request = _mandate_request().model_copy(update={"card_id": "card-enrollment-1"})
+    session = await _gateway(httpx.MockTransport(handler)).create_mandate_session(request)
 
     assert observed["mandate_setup"] == {
         "intent": "mandate_setup",
@@ -434,10 +433,66 @@ async def test_create_mandate_session_sends_setup_block_and_discards_token() -> 
         "valid_until": "2031-08-01T00:00:00Z",
     }
     assert observed["integration_type"] == "full_checkout"
+    assert observed["card"] == {"card_id": "card-enrollment-1"}
     assert "authorize_only" not in observed
     assert session.session_id == "session-m1"
     assert session.hosted_url == "https://sandbox.collect.prava.space/checkout?session=m1"
     assert "provider-session-token-must-not-escape" not in session.model_dump_json()
+
+
+async def test_list_cards_returns_only_non_sensitive_metadata() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/listCards"
+        assert dict(request.url.params) == {
+            "customer_id": "user-123",
+            "status": "active",
+        }
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/json"},
+            json={
+                "cards": [
+                    {
+                        "card_id": "card-enrollment-1",
+                        "card_last4": "7789",
+                        "card_brand": "visa",
+                        "card_exp_month": 12,
+                        "card_exp_year": 2027,
+                        "is_default": True,
+                        "status": "active",
+                        "created_at": "2026-08-02T18:15:30Z",
+                    }
+                ],
+                "count": 1,
+            },
+        )
+
+    cards = await _gateway(httpx.MockTransport(handler)).list_cards("user-123")
+
+    assert len(cards) == 1
+    assert cards[0].card_id == "card-enrollment-1"
+    assert cards[0].last4 == "7789"
+    assert cards[0].is_default is True
+    assert "card_number" not in cards[0].model_dump()
+
+
+async def test_list_cards_treats_new_customer_as_no_saved_cards() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            404,
+            headers={"Content-Type": "application/json"},
+            json={
+                "error": {
+                    "code": "CUSTOMER_NOT_FOUND",
+                    "message": "No customer for the given customer_id",
+                }
+            },
+        )
+
+    cards = await _gateway(httpx.MockTransport(handler)).list_cards("user-new")
+
+    assert cards == []
 
 
 async def test_create_mandate_session_rejects_checkout_contradiction() -> None:

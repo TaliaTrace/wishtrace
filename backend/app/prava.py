@@ -173,6 +173,7 @@ class PravaMandateSessionRequest(BaseModel):
     quantity: int = Field(default=1, gt=0, le=100)
     callback_url: str
     external_order_ref: str = Field(min_length=1, max_length=255)
+    card_id: str | None = Field(default=None, pattern=PROVIDER_ID_REGEX)
 
     recurring_frequency: PravaMandateFrequency
     merchant_scope: PravaMandateScope = PravaMandateScope.LISTED
@@ -202,7 +203,7 @@ class PravaMandateSessionRequest(BaseModel):
         return value
 
     def provider_payload(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "user_id": self.user_id,
             "user_email": self.user_email,
             "total_amount": _minor_to_decimal(self.total_minor),
@@ -235,6 +236,9 @@ class PravaMandateSessionRequest(BaseModel):
                 "valid_until": self.valid_until,
             },
         }
+        if self.card_id is not None:
+            payload["card"] = {"card_id": self.card_id}
+        return payload
 
 
 class HostedPravaSession(BaseModel):
@@ -326,6 +330,17 @@ class PravaMandateInfo(BaseModel):
     remaining_charges: int = 0
     merchant_name: str = ""
     external_user_id: str | None = None
+
+
+class PravaCardInfo(BaseModel):
+    """Non-sensitive enrolled-card metadata from GET /v1/listCards."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    card_id: str = Field(pattern=PROVIDER_ID_REGEX)
+    last4: str = Field(pattern=r"^\d{4}$")
+    status: Literal["active", "deleted"]
+    is_default: bool
 
 
 class PravaMandateChargeResult(BaseModel):
@@ -484,6 +499,22 @@ class _RawMandateList(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     mandates: list[_RawMandate] = Field(default_factory=list)
+
+
+class _RawCard(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    card_id: str = Field(pattern=PROVIDER_ID_REGEX)
+    card_last4: str = Field(pattern=r"^\d{4}$")
+    status: Literal["active", "deleted"]
+    is_default: bool = False
+
+
+class _RawCardList(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    cards: list[_RawCard] = Field(default_factory=list)
+    count: int = Field(ge=0)
 
 
 class _RawChargeCredentials(BaseModel):
@@ -697,6 +728,36 @@ class PravaHttpGateway:
             response_id=_response_id(response),
             mandate_id=raw.mandate_id,
         )
+
+    async def list_cards(self, customer_id: str) -> list[PravaCardInfo]:
+        """Return active saved cards so setup can avoid provisioning duplicates."""
+
+        _require_provider_id(customer_id, "customer_id")
+        try:
+            response = await self._request(
+                "GET",
+                "/v1/listCards",
+                params={"customer_id": customer_id, "status": "active"},
+            )
+        except PravaGatewayError as error:
+            if error.provider_code == "CUSTOMER_NOT_FOUND":
+                return []
+            raise
+        try:
+            raw = _RawCardList.model_validate(response.json())
+        except (ValueError, ValidationError) as error:
+            raise _invalid_response(response) from error
+        if raw.count != len(raw.cards):
+            raise _invalid_response(response)
+        return [
+            PravaCardInfo(
+                card_id=card.card_id,
+                last4=card.card_last4,
+                status=card.status,
+                is_default=card.is_default,
+            )
+            for card in raw.cards
+        ]
 
     async def get_mandate(self, mandate_id: str) -> PravaMandateInfo:
         _require_provider_id(mandate_id, "mandate_id")

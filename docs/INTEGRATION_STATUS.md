@@ -13,11 +13,12 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Session creation verified: LIVE SANDBOX — a real authorize-only mandate setup session was created
   by the deployed backend and its allowlisted hosted URL opened in an Android Custom Tab. Exact
   decimal money, response-ID handling and session-token discard also pass transport tests.
-- Hosted approval verified: PROVIDER SETUP BLOCKED — an exact-contract hosted attempt returned
-  authoritative `failed` with safe categories `PROVISION_ERROR` and `DEVICE_BINDING_FAILED` before
-  creating a mandate or credential. A later session remains `pending` with zero transactions and
-  zero credentials. Prava support has been given the safe session/response evidence; no hosted
-  card-page screenshot or dump was retained.
+- Hosted approval verified: LIVE APPROVAL PENDING — an earlier exact-contract hosted attempt
+  returned authoritative `failed` with safe categories `PROVISION_ERROR` and
+  `DEVICE_BINDING_FAILED` before creating a mandate or credential. A later abandoned session
+  expired with zero transactions/credentials. The production adapter then observed one active
+  default saved-card enrollment for the current customer and explicitly preselected it in one fresh
+  setup. That setup is `pending` with zero charges and no setup error; user passkey approval remains.
 - App return verified: PARTIAL — the hosted failure remained in the Custom Tab, so no automatic
   Prava redirect was observed. A validated physical-phone app-link opened WishTrace and reconciled
   the exact backend failure into its terminal recovery UI.
@@ -45,16 +46,21 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   Prava facts must match the approved merchant origin and total.
 - Request sanitation: PASS — explicit mandate `intent` and `integration_type`, routable-email
   enforcement, delegated bare HTTPS merchant origin, exact decimal money, actual item price,
-  single user-triggered retry boundary, Custom Tab handoff, and safe provider failure categories.
+  single user-triggered retry boundary, active saved-card preselection, Custom Tab handoff, and safe
+  provider failure categories.
   The observed sandbox create response omitted documented `authorizeOnly`; omission is accepted only
   with explicit request intent, while an explicit `false` fails closed.
-- Known blockers: Prava must verify/reset the organizer card/device binding, then the user must
-  complete the existing hosted setup manually. Only after a live mandate and one-use credential
-  exist can WishTrace run the organizer-required merchant attempt and report its result. Staging
-  permits the exact $5 stored-value path solely for that proof.
-- Last verified: 2026-08-02 23:46 PKT
+- Saved-card fact: LIVE SANDBOX — exactly one active default Visa enrollment ending `7789` is scoped
+  to the current WishTrace customer. The organizer card ending `2218` is not returned for that
+  customer, so WishTrace does not claim it is enrolled or silently substitute it.
+- Known blockers: the user must complete the current hosted passkey approval manually. Only after a
+  live mandate and one-use credential exist can WishTrace run the organizer-required merchant
+  attempt and report its result. If device binding still fails, Prava support must reset/verify it;
+  WishTrace will not create another blind retry. Staging permits the exact $5 stored-value path
+  solely for this proof.
+- Last verified: 2026-08-03 00:11 PKT
 - Evidence location: safe response ID above; migration `20260802_0012`; deployed revision
-  `wishtrace-api--pravaaudit1`; 140 backend tests plus Android build/unit/lint. No credential, card
+  `wishtrace-api--savedcard1`; 143 backend tests plus Android build/unit/lint. No credential, card
   data or provider payload retained.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in

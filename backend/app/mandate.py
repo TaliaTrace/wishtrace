@@ -48,6 +48,7 @@ from app.models import (
 )
 from app.prava import (
     HostedPravaSession,
+    PravaCardInfo,
     PravaGatewayError,
     PravaMandateChargeResult,
     PravaMandateFrequency,
@@ -209,6 +210,14 @@ class MandateStore(Protocol):
         failure_code: str | None = None,
     ) -> MandateResponse: ...
 
+    async def expire_setup(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        response_id: str | None,
+    ) -> MandateResponse: ...
+
     async def get(
         self,
         *,
@@ -226,6 +235,8 @@ class MandateStore(Protocol):
 
 
 class MandatePravaOperations(Protocol):
+    async def list_cards(self, customer_id: str) -> list[PravaCardInfo]: ...
+
     async def create_mandate_session(
         self, request: PravaMandateSessionRequest
     ) -> HostedPravaSession: ...
@@ -418,8 +429,14 @@ class MandateService:
             occasion_id=occasion_id,
             candidate_id=body.candidate_id,
         )
-        request = self._setup_request(user, occasion_id, facts)
         try:
+            cards = await self._prava.list_cards(str(user.id))
+            request = self._setup_request(
+                user,
+                occasion_id,
+                facts,
+                card_id=_preferred_card_id(cards),
+            )
             session = await self._prava.create_mandate_session(request)
         except PravaGatewayError as error:
             logger.warning(
@@ -513,6 +530,16 @@ class MandateService:
                             response_id=result.response_id,
                             provider_status=result.status.value,
                             failure_code="MANDATE_NOT_FOUND_AFTER_APPROVAL",
+                        )
+                    if (
+                        result.status is PravaPaymentStatus.PENDING
+                        and approval.expires_at is not None
+                        and approval.expires_at <= datetime.now(UTC)
+                    ):
+                        return await self._store.expire_setup(
+                            user_id=user.id,
+                            occasion_id=occasion_id,
+                            response_id=result.response_id,
                         )
                     return mandate
                 if len(matches) > 1:
@@ -817,6 +844,8 @@ class MandateService:
         user: AuthenticatedUser,
         occasion_id: uuid.UUID,
         facts: MandateSetupFacts,
+        *,
+        card_id: str | None,
     ) -> PravaMandateSessionRequest:
         if user.email is None:
             raise ApiError(
@@ -848,6 +877,7 @@ class MandateService:
             quantity=1,
             callback_url=callback_url,
             external_order_ref=f"mandate-{facts.setup_id.hex}",
+            card_id=card_id,
             recurring_frequency=facts.recurring_frequency,
             merchant_scope=facts.merchant_scope,
             max_charges=facts.max_charges,
@@ -1028,6 +1058,20 @@ class SqlMandateStore:
                 mandate,
                 MandateState.UNKNOWN if unknown else MandateState.FAILED,
             )
+            return await _flush_mandate_response(db, mandate)
+
+    async def expire_setup(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        response_id: str | None,
+    ) -> MandateResponse:
+        async with self._session_factory() as db, db.begin():
+            mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
+            mandate.last_response_id = response_id
+            mandate.setup_failure_code = "SESSION_EXPIRED"
+            _transition(mandate, MandateState.EXPIRED)
             return await _flush_mandate_response(db, mandate)
 
     async def get(
@@ -1324,6 +1368,18 @@ def _safe_provider_code(value: str) -> str:
 
     normalized = value.strip().upper()
     return normalized if re.fullmatch(r"[A-Z0-9_:-]{1,100}", normalized) else "UNKNOWN"
+
+
+def _preferred_card_id(cards: list[PravaCardInfo]) -> str | None:
+    """Reuse one unambiguous active enrollment; never guess between cards."""
+
+    active = [card for card in cards if card.status == "active"]
+    defaults = [card for card in active if card.is_default]
+    if len(defaults) == 1:
+        return defaults[0].card_id
+    if len(active) == 1:
+        return active[0].card_id
+    return None
 
 
 def _state_from_mandate_status(

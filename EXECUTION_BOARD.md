@@ -8,11 +8,11 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260802_0012` | Codex | 2026-08-02 23:39 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 140 tests; healthy Azure revision `pravaaudit1`; database TLS true | Codex | 2026-08-02 23:45 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 143 tests; healthy Azure revision `savedcard1`; database TLS true | Codex | 2026-08-03 00:11 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | LIVE PROVIDER BLOCKER — exact setup contract accepted; prior setup failed before credential issuance; current session is pending with zero transactions/credentials | Codex/user | 2026-08-02 23:46 PKT |
+| Prava transaction path understood | session + authoritative status | LIVE APPROVAL PENDING — exact setup accepted; one active saved card is explicitly preselected; current session has zero charges and awaits user passkey approval | Codex/user | 2026-08-03 00:11 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
@@ -29,9 +29,9 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Wait for Prava support to verify/reset the organizer card's provisioning/device binding.
-2. User completes the already-pending hosted setup manually; Codex performs no Chrome automation.
-3. On mandate activation, execute exactly one tokenized merchant attempt and capture its expected sandbox decline.
+1. User completes the fresh saved-card hosted approval manually before it expires; Codex performs no Chrome automation or card entry.
+2. Reconcile the mandate once and, only if it is `ACTIVE`, execute exactly one tokenized merchant attempt.
+3. If Prava still rejects device binding, retain the safe failure evidence and escalate without another blind retry.
 
 ## Next
 
@@ -40,6 +40,23 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Apply for production access only with the captured sandbox evidence.
 
 ## Milestone evidence
+
+### 2026-08-03 — Reuse the enrolled card and expire abandoned approval sessions
+
+- The production adapter now reads the official customer-scoped active-card list and supplies
+  `card.card_id` only when one active default enrollment, or one unambiguous active enrollment,
+  exists. It never chooses between multiple cards and never reads or persists PAN/CVV data.
+- The live sandbox returned exactly one active default enrollment for the current WishTrace user.
+  A single fresh mandate setup preselected it and returned `AWAITING_APPROVAL/pending`, with zero
+  charges and no setup error. The organizer card ending `2218` is not the enrollment returned for
+  this customer; WishTrace does not claim that it was pre-saved.
+- A prior untouched pending setup passed its provider expiry. Refresh now converts that state to
+  `EXPIRED/SESSION_EXPIRED` instead of leaving the app waiting forever.
+- Quality: 143 backend tests, Ruff, strict mypy and Alembic head checks pass. ACR run `chc`
+  succeeded; healthy Azure revision `wishtrace-api--savedcard1` serves 100% traffic and `/health`
+  reports PostgreSQL 17.6 with TLS true.
+- Truth boundary: a real hosted approval is pending. No passkey approval, mandate activation,
+  one-use credential, merchant attempt, Prava report, Visa confirmation or order is claimed.
 
 ### 2026-08-02 — Exact Prava request audit and deployed failure diagnostics
 

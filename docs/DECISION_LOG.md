@@ -390,3 +390,25 @@ Record only decisions that change product, architecture, truth boundary, schedul
   state and submit no production-access claim; do not substitute a shared card or fabricate the
   organizer-required merchant attempt.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 00:11 PKT — Reuse one unambiguous enrolled card and expire stale setup state
+
+- Context: Repeated hosted mandate setup entered card provisioning/device binding even though the
+  current Prava customer already had a saved enrollment. Separately, a provider-pending session
+  remained locally `AWAITING_APPROVAL` after its documented expiry.
+- Evidence: Current official Prava docs allow `card.card_id` on session creation and expose
+  non-sensitive active enrollments through `GET /v1/listCards`. The live sandbox returned exactly
+  one active default enrollment for the current WishTrace customer. The old pending session passed
+  its provider expiry with zero transactions and credentials.
+- Decision: Before mandate setup, list active cards for the exact WishTrace customer. Preselect the
+  sole active default, otherwise the sole active card; if there is ambiguity, send no card ID rather
+  than guessing. Persist a still-pending setup as `EXPIRED/SESSION_EXPIRED` once its authoritative
+  session deadline passes.
+- Consequence: A single fresh setup now reuses the existing enrollment and is truthfully
+  `AWAITING_APPROVAL/pending` with zero charges. Azure revision `wishtrace-api--savedcard1` is
+  healthy at 100% traffic. User-controlled passkey approval, mandate activation, credential minting
+  and merchant checkout remain unclaimed.
+- Rollback/fallback: If the saved enrollment still fails device binding, stop creating sessions and
+  escalate the safe failure evidence to Prava. Never choose between multiple enrollments or insert
+  card credentials into WishTrace.
+- Owner: WishTrace team / Codex

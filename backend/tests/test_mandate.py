@@ -27,6 +27,7 @@ from app.merchant_browser import (
 )
 from app.prava import (
     HostedPravaSession,
+    PravaCardInfo,
     PravaGatewayError,
     PravaLineItemResult,
     PravaMandateChargeResult,
@@ -199,6 +200,22 @@ class MemoryMandateStore:
                 "state": MandateState.UNKNOWN if unknown else MandateState.FAILED,
                 "provider_status": provider_status,
                 "setup_failure_code": failure_code,
+            }
+        )
+        return self.mandate
+
+    async def expire_setup(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        response_id: str | None,
+    ) -> MandateResponse:
+        del user_id, occasion_id, response_id
+        self.mandate = self.mandate.model_copy(
+            update={
+                "state": MandateState.EXPIRED,
+                "setup_failure_code": "SESSION_EXPIRED",
             }
         )
         return self.mandate
@@ -382,11 +399,16 @@ class FakeMandatePrava:
         self.report_error: PravaGatewayError | None = None
         self.mandate_info: PravaMandateInfo | None = None
         self.listed_mandates: list[PravaMandateInfo] = []
+        self.listed_cards: list[PravaCardInfo] = []
         self.payment_result: PravaPaymentResult | None = None
         self.list_calls: list[str] = []
         self.payment_result_calls: list[str] = []
         self.charge_calls: list[tuple[str, int, str]] = []
         self.report_calls: list[tuple[str, str, PravaReportOutcome]] = []
+
+    async def list_cards(self, customer_id: str) -> list[PravaCardInfo]:
+        self.list_calls.append(f"cards:{customer_id}")
+        return self.listed_cards
 
     async def create_mandate_session(
         self, request: PravaMandateSessionRequest
@@ -787,6 +809,14 @@ async def test_execute_report_mismatch_marks_charge_unknown() -> None:
 async def test_setup_creates_session_with_frequency_and_records_awaiting() -> None:
     store = MemoryMandateStore(_mandate())
     prava = FakeMandatePrava()
+    prava.listed_cards = [
+        PravaCardInfo(
+            card_id="card-saved-1",
+            last4="7789",
+            status="active",
+            is_default=True,
+        )
+    ]
     service = _service(store, prava, checkout=None)
 
     result = await service.setup(
@@ -805,6 +835,7 @@ async def test_setup_creates_session_with_frequency_and_records_awaiting() -> No
     assert request.max_charges == 1
     assert request.total_minor == 500
     assert request.product_unit_minor == store.mandate.item_price_minor
+    assert request.card_id == "card-saved-1"
     assert request.external_order_ref == f"mandate-{store.mandate.id.hex}"
     # The callback routes Prava's approval redirect back through our return path.
     assert "/v1/prava/mandate-return" in request.callback_url
@@ -957,6 +988,28 @@ async def test_refresh_keeps_pending_hosted_setup_awaiting() -> None:
     assert prava.payment_result_calls == [approval.session_id]
     assert result.state is MandateState.AWAITING_APPROVAL
     assert result.provider_status == "pending"
+
+
+async def test_refresh_expires_pending_hosted_setup_after_session_deadline() -> None:
+    approval = MandateApprovalSession(
+        session_id="session-expired-1",
+        hosted_url="https://sandbox.collect.prava.space/checkout?session=expired",
+        expires_at=datetime(2026, 8, 1, 16, 0, tzinfo=UTC),
+    )
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.AWAITING_APPROVAL,
+            provider_mandate_id=None,
+        ).model_copy(update={"approval_session": approval, "provider_status": "pending"})
+    )
+    prava = FakeMandatePrava()
+    service = _service(store, prava, checkout=None)
+
+    result = await service.refresh(_user(), store.mandate.occasion_id)
+
+    assert prava.payment_result_calls == [approval.session_id]
+    assert result.state is MandateState.EXPIRED
+    assert result.setup_failure_code == "SESSION_EXPIRED"
 
 
 async def test_refresh_rejects_ambiguous_current_customer_mandates() -> None:

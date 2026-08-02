@@ -83,6 +83,8 @@ data class MandateDetails(
     val merchantOutcome: MandateMerchantOutcome?,
     val visaConfirmation: MandateVisaConfirmation?,
     val lastChargeState: String?,
+    val lastChargeAmountMinor: Int?,
+    val lastChargeFailureCode: String?,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

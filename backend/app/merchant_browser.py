@@ -758,7 +758,11 @@ async def _wait_for_quote(page: Page, item_minor: int) -> tuple[int, int]:
         else:
             previous = total
             stable_count = 0
-        if stable_count >= 2 and total >= item_minor:
+        # Shopify may initially paint the item subtotal as the total and apply
+        # location-based tax a moment later. Require three full seconds of an
+        # unchanged total so credentials are never minted against that transient
+        # first paint.
+        if stable_count >= 5 and total >= item_minor:
             return item_minor, total
     raise _quote_unavailable("MERCHANT_QUOTE_INCOMPLETE")
 

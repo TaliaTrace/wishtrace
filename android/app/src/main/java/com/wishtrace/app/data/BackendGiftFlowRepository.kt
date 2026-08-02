@@ -339,10 +339,8 @@ private fun JSONObject.toMandateDetails(): MandateDetails {
         getJSONObject("approval_session").optionalString("hosted_url")
     }
     val charges = getJSONArray("charges")
-    val lastChargeState = if (charges.length() == 0) {
-        null
-    } else {
-        charges.getJSONObject(charges.length() - 1).requiredString("state")
+    val lastCharge = if (charges.length() == 0) null else {
+        charges.getJSONObject(charges.length() - 1)
     }
     return MandateDetails(
         id = requiredString("id"),
@@ -366,7 +364,9 @@ private fun JSONObject.toMandateDetails(): MandateDetails {
             ?.let(MandateMerchantOutcome::fromWire),
         visaConfirmation = optionalString("visa_confirmation")
             ?.let(MandateVisaConfirmation::fromWire),
-        lastChargeState = lastChargeState,
+        lastChargeState = lastCharge?.requiredString("state"),
+        lastChargeAmountMinor = lastCharge?.getInt("amount_minor"),
+        lastChargeFailureCode = lastCharge?.optionalString("failure_code"),
         createdAt = requiredInstant("created_at"),
         updatedAt = requiredInstant("updated_at"),
     )

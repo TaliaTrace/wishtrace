@@ -1,6 +1,7 @@
 package com.wishtrace.app.ui
 
 import com.wishtrace.app.data.MandateGateway
+import com.wishtrace.app.data.WishTraceApiException
 import com.wishtrace.app.domain.BillingContact
 import com.wishtrace.app.domain.MandateDetails
 import com.wishtrace.app.domain.MandateMerchantOutcome
@@ -49,8 +50,61 @@ class MandateSetupViewModelTest {
 
         assertEquals(1, gateway.executeCalls)
         assertEquals("owner@example.com", gateway.lastBilling?.email)
+        assertEquals("OR", gateway.lastBilling?.region)
+        assertEquals("97205", gateway.lastBilling?.postalCode)
         assertEquals(1, gateway.executeKeys.distinct().size)
+        assertEquals("mandate-proof-mandate", gateway.executeKeys.single())
         assertEquals(MandateSetupStep.PROOF_DECLINED, viewModel.state.value.step)
+    }
+
+    @Test
+    fun openingExistingMandateAlwaysRefreshesProviderState() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            current = details(MandateStatus.AWAITING_APPROVAL)
+            refreshResult = details(MandateStatus.ACTIVE)
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+        assertEquals(MandateSetupStep.AWAITING_APPROVAL, viewModel.state.value.step)
+
+        viewModel.openExisting("occasion")
+        advanceUntilIdle()
+
+        assertEquals(1, gateway.refreshCalls)
+        assertEquals(MandateSetupStep.ACTIVE, viewModel.state.value.step)
+    }
+
+    @Test
+    fun executeFailureReconcilesServerStateAndCannotLookActive() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            executeFailureState = details(
+                status = MandateStatus.ACTIVE,
+                lastChargeState = "FAILED",
+                lastChargeAmountMinor = 1_101,
+                lastChargeFailureCode = "MERCHANT_TOTAL_EXCEEDS_MANDATE",
+            )
+            executeError = WishTraceApiException(
+                message = "The live total is \$11.01, above your \$10.00 autopilot cap.",
+                code = "MERCHANT_TOTAL_EXCEEDS_MANDATE",
+                recoverable = true,
+            )
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+        viewModel.executeSandboxProof("owner@example.com")
+        advanceUntilIdle()
+
+        assertEquals(1, gateway.executeCalls)
+        assertEquals(MandateSetupStep.PROOF_BLOCKED, viewModel.state.value.step)
+        assertEquals(
+            "MERCHANT_TOTAL_EXCEEDS_MANDATE",
+            viewModel.state.value.mandate?.lastChargeFailureCode,
+        )
+        assertTrue(viewModel.state.value.error?.contains("\$11.01") == true)
     }
 
     @Test
@@ -85,6 +139,40 @@ class MandateSetupViewModelTest {
 
         assertEquals(MandateSetupStep.PROOF_COMPLETE, viewModel.state.value.step)
         assertTrue(viewModel.state.value.mandate?.merchantOrderId == "order-safe-id")
+    }
+
+    @Test
+    fun consumedSandboxDeclineIsNotPresentedAsOrderSuccess() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            current = details(
+                status = MandateStatus.CONSUMED,
+                merchantOutcome = MandateMerchantOutcome.DECLINED,
+                lastChargeState = "DECLINED",
+            )
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+
+        assertEquals(MandateSetupStep.PROOF_DECLINED, viewModel.state.value.step)
+    }
+
+    @Test
+    fun activeProviderCannotHideUnknownMerchantAttempt() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            current = details(
+                status = MandateStatus.ACTIVE,
+                merchantOutcome = MandateMerchantOutcome.UNKNOWN,
+                lastChargeState = "UNKNOWN",
+            )
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+
+        assertEquals(MandateSetupStep.UNKNOWN, viewModel.state.value.step)
     }
 
     @Test
@@ -133,8 +221,12 @@ class MandateSetupViewModelTest {
         var current = details(MandateStatus.ACTIVE)
         var setupResult: MandateDetails? = null
         var setupCalls = 0
+        var refreshCalls = 0
+        var refreshResult: MandateDetails? = null
         var lastCandidateId: String? = null
         var executeCalls = 0
+        var executeError: WishTraceApiException? = null
+        var executeFailureState: MandateDetails? = null
         var lastBilling: BillingContact? = null
         val executeKeys = mutableListOf<String>()
 
@@ -149,7 +241,11 @@ class MandateSetupViewModelTest {
             return setupResult ?: current
         }
 
-        override suspend fun refresh(occasionId: String): MandateDetails = current
+        override suspend fun refresh(occasionId: String): MandateDetails {
+            refreshCalls += 1
+            current = refreshResult ?: current
+            return current
+        }
 
         override suspend fun execute(
             occasionId: String,
@@ -160,6 +256,10 @@ class MandateSetupViewModelTest {
             lastBilling = billing
             executeKeys += idempotencyKey
             delay(10)
+            executeError?.let { error ->
+                executeFailureState?.let { current = it }
+                throw error
+            }
             current = details(
                 status = MandateStatus.DECLINED,
                 merchantOutcome = MandateMerchantOutcome.DECLINED,
@@ -175,6 +275,8 @@ class MandateSetupViewModelTest {
             merchantOutcome: MandateMerchantOutcome? = null,
             orderId: String? = null,
             lastChargeState: String? = null,
+            lastChargeAmountMinor: Int? = null,
+            lastChargeFailureCode: String? = null,
             setupFailureCode: String? = null,
         ) = MandateDetails(
             id = "mandate",
@@ -203,6 +305,8 @@ class MandateSetupViewModelTest {
                 }
             },
             lastChargeState = lastChargeState,
+            lastChargeAmountMinor = lastChargeAmountMinor,
+            lastChargeFailureCode = lastChargeFailureCode,
             createdAt = Instant.parse("2026-08-02T00:00:00Z"),
             updatedAt = Instant.parse("2026-08-02T00:01:00Z"),
         )

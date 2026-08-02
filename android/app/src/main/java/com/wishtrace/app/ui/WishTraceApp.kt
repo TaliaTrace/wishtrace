@@ -1,6 +1,7 @@
 package com.wishtrace.app.ui
 
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,6 +52,8 @@ import com.wishtrace.app.ui.screens.recommendation.RecommendationUiState
 import com.wishtrace.app.ui.screens.setup.RecipientSetupRoute
 import com.wishtrace.app.ui.screens.setup.RecipientSetupStep
 import com.wishtrace.app.ui.screens.setup.RecipientSetupViewModel
+import com.wishtrace.app.ui.theme.BrandIndigo
+import com.wishtrace.app.ui.theme.Canvas
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -134,6 +138,19 @@ fun WishTraceApp(
         }
     }
 
+    fun openGiftJourney() {
+        val content = homeState as? HomeUiState.Content
+        val existingMandate = content?.mandate
+        if (content != null && existingMandate != null) {
+            mandateViewModel.openExisting(content.snapshot.occasion.id)
+            navController.navigate(Destination.MandateSetup) {
+                launchSingleTop = true
+            }
+        } else {
+            navController.navigate(Destination.Discovery)
+        }
+    }
+
     LaunchedEffect(session, currentRoute) {
         when {
             session != null && currentRoute == Destination.Welcome -> enterApp()
@@ -187,9 +204,7 @@ fun WishTraceApp(
         }
         checkoutViewModel.consumeApprovalUrl()
         runCatching {
-            CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
+            buildPravaCustomTab()
                 .launchUrl(context, requireNotNull(uri))
         }.onFailure {
             checkoutViewModel.approvalLaunchFailed()
@@ -208,9 +223,7 @@ fun WishTraceApp(
         }
         mandateViewModel.consumeApprovalUrl()
         runCatching {
-            CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
+            buildPravaCustomTab()
                 .launchUrl(context, requireNotNull(uri))
         }.onFailure {
             mandateViewModel.approvalLaunchFailed()
@@ -276,18 +289,7 @@ fun WishTraceApp(
                     state = homeState,
                     giverDisplayName = session?.user?.displayName,
                     onRetry = homeViewModel::retry,
-                    onFindGift = {
-                        val content = homeState as? HomeUiState.Content
-                        val existingMandate = content?.mandate
-                        if (existingMandate?.isArmed == true) {
-                            mandateViewModel.start(content.snapshot.occasion.id)
-                            navController.navigate(Destination.MandateSetup) {
-                                launchSingleTop = true
-                            }
-                        } else {
-                            navController.navigate(Destination.Discovery)
-                        }
-                    },
+                    onFindGift = ::openGiftJourney,
                     onReviewRecipient = { navController.navigate(Destination.Recipient) },
                     onAddPerson = { navController.navigate(Destination.GiftDna) },
                 )
@@ -331,7 +333,7 @@ fun WishTraceApp(
                     state = homeState,
                     onBack = navController::popBackStack,
                     onRetry = homeViewModel::retry,
-                    onFindGift = { navController.navigate(Destination.Discovery) },
+                    onFindGift = ::openGiftJourney,
                     onEdit = { navController.navigate(Destination.EditPerson) },
                 )
             }
@@ -446,6 +448,11 @@ fun WishTraceApp(
                         candidateId = selectedCandidateId.orEmpty(),
                         verifiedEmail = session?.user?.email,
                         onBack = navController::popBackStack,
+                        onChooseAnotherGift = {
+                            navController.navigate(Destination.Discovery) {
+                                popUpTo(Destination.MandateSetup) { inclusive = true }
+                            }
+                        },
                         onArmed = {
                             navController.popBackStack()
                             homeViewModel.retry()
@@ -553,4 +560,16 @@ fun WishTraceApp(
         }
     }
 
+}
+
+private fun buildPravaCustomTab(): CustomTabsIntent {
+    val colors = CustomTabColorSchemeParams.Builder()
+        .setToolbarColor(BrandIndigo.toArgb())
+        .setNavigationBarColor(Canvas.toArgb())
+        .build()
+    return CustomTabsIntent.Builder()
+        .setShowTitle(false)
+        .setShareState(CustomTabsIntent.SHARE_STATE_OFF)
+        .setDefaultColorSchemeParams(colors)
+        .build()
 }

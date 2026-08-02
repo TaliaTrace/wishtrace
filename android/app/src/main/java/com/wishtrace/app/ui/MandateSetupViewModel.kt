@@ -23,6 +23,7 @@ enum class MandateSetupStep {
     AWAITING_APPROVAL,
     REFRESHING,
     ACTIVE,
+    PROOF_BLOCKED,
     EXECUTING,
     PROOF_COMPLETE,
     PROOF_DECLINED,
@@ -80,6 +81,11 @@ class MandateSetupViewModel(
                 .onSuccess { mandate -> applyMandate(mandate) }
                 .onFailure(::showError)
         }
+    }
+
+    /** Opens an existing occasion mandate and reconciles Prava before showing its state. */
+    fun openExisting(occasionId: String) {
+        reconcile(occasionId)
     }
 
     /** Begins an explicit new gift selection without replaying the prior attempt. */
@@ -147,6 +153,10 @@ class MandateSetupViewModel(
 
     /** The deep link came back — poll /refresh until ACTIVE or a terminal state. */
     fun resumeFromReturn(occasionId: String) {
+        reconcile(occasionId)
+    }
+
+    private fun reconcile(occasionId: String) {
         if (occasionId.isBlank() || mutableState.value.busy) return
         // Persist the id up front so a cold-start deep link keeps the screen mounted
         // through the REFRESHING window, before applyMandate echoes it back.
@@ -186,19 +196,30 @@ class MandateSetupViewModel(
             return
         }
         val stableKey = executeKey
-            ?: "mandate-proof-${UUID.randomUUID()}".also { executeKey = it }
+            ?: "mandate-proof-${current.mandate.id}".also { executeKey = it }
         mutableState.update {
             it.copy(step = MandateSetupStep.EXECUTING, error = null)
         }
         viewModelScope.launch {
-            runCatching {
+            val result = runCatching {
                 gateway.execute(
                     occasionId = occasionId,
                     billing = sandboxBilling(email),
                     idempotencyKey = stableKey,
                 )
-            }.onSuccess(::applyMandate)
-                .onFailure(::showError)
+            }
+            result.onSuccess(::applyMandate)
+            result.onFailure { error ->
+                val reconciled = runCatching { gateway.fetch(occasionId) }.getOrNull()
+                if (reconciled == null) {
+                    showError(error)
+                } else {
+                    applyMandate(reconciled)
+                    mutableState.update {
+                        it.copy(error = safeMessage(error))
+                    }
+                }
+            }
         }
     }
 
@@ -209,32 +230,7 @@ class MandateSetupViewModel(
             }
             return
         }
-        val step = when (mandate.status) {
-            MandateStatus.SETUP_CREATING,
-            MandateStatus.AWAITING_APPROVAL,
-            -> MandateSetupStep.AWAITING_APPROVAL
-
-            MandateStatus.ACTIVE -> MandateSetupStep.ACTIVE
-            MandateStatus.CHARGING,
-            MandateStatus.CHECKOUT_IN_PROGRESS,
-            MandateStatus.REPORTING,
-            -> MandateSetupStep.EXECUTING
-
-            MandateStatus.SUCCEEDED,
-            MandateStatus.CONSUMED,
-            -> MandateSetupStep.PROOF_COMPLETE
-
-            MandateStatus.DECLINED -> if (mandate.lastChargeState == null) {
-                MandateSetupStep.DECLINED
-            } else {
-                MandateSetupStep.PROOF_DECLINED
-            }
-            MandateStatus.CANCELLED -> MandateSetupStep.CANCELLED
-            MandateStatus.EXPIRED -> MandateSetupStep.EXPIRED
-            MandateStatus.FAILED -> MandateSetupStep.FAILED
-            MandateStatus.PAUSED -> MandateSetupStep.READY_TO_ARM
-            MandateStatus.UNKNOWN -> MandateSetupStep.UNKNOWN
-        }
+        val step = mandate.toStep()
         mutableState.update {
             it.copy(
                 step = step,
@@ -250,41 +246,65 @@ class MandateSetupViewModel(
     }
 
     private fun showError(error: Throwable) {
-        val safeMessage = (error as? WishTraceApiException)?.message
-            ?: "WishTrace could not complete that step. Try again."
-        val fallback = mutableState.value.mandate?.status?.toStep() ?: MandateSetupStep.FAILED
-        mutableState.update { it.copy(step = fallback, error = safeMessage) }
+        val fallback = mutableState.value.mandate?.toStep() ?: MandateSetupStep.FAILED
+        mutableState.update { it.copy(step = fallback, error = safeMessage(error)) }
     }
 }
 
-private fun MandateStatus?.toStep(): MandateSetupStep = when (this) {
+private fun safeMessage(error: Throwable): String =
+    (error as? WishTraceApiException)?.message
+        ?: "WishTrace could not complete that step. Try again."
+
+private fun MandateDetails.toStep(): MandateSetupStep = when (status) {
     MandateStatus.AWAITING_APPROVAL,
     MandateStatus.SETUP_CREATING,
     -> MandateSetupStep.AWAITING_APPROVAL
 
-    MandateStatus.ACTIVE,
-    -> MandateSetupStep.ACTIVE
+    MandateStatus.ACTIVE -> when (lastChargeState) {
+        null -> MandateSetupStep.ACTIVE
+        "FAILED" -> MandateSetupStep.PROOF_BLOCKED
+        "UNKNOWN" -> MandateSetupStep.UNKNOWN
+        "DECLINED" -> MandateSetupStep.PROOF_DECLINED
+        "SUCCEEDED" -> MandateSetupStep.PROOF_COMPLETE
+        "CHARGING", "CHECKOUT_IN_PROGRESS", "REPORTING" -> MandateSetupStep.EXECUTING
+        else -> MandateSetupStep.UNKNOWN
+    }
 
-    MandateStatus.SUCCEEDED,
-    MandateStatus.CONSUMED,
-    -> MandateSetupStep.PROOF_COMPLETE
+    MandateStatus.CHARGING,
+    MandateStatus.CHECKOUT_IN_PROGRESS,
+    MandateStatus.REPORTING,
+    -> MandateSetupStep.EXECUTING
 
-    MandateStatus.DECLINED -> MandateSetupStep.DECLINED
+    MandateStatus.SUCCEEDED -> MandateSetupStep.PROOF_COMPLETE
+    MandateStatus.CONSUMED -> if (
+        merchantOutcome == com.wishtrace.app.domain.MandateMerchantOutcome.DECLINED
+    ) {
+        MandateSetupStep.PROOF_DECLINED
+    } else {
+        MandateSetupStep.PROOF_COMPLETE
+    }
+
+    MandateStatus.DECLINED -> if (lastChargeState == null) {
+        MandateSetupStep.DECLINED
+    } else {
+        MandateSetupStep.PROOF_DECLINED
+    }
     MandateStatus.CANCELLED -> MandateSetupStep.CANCELLED
     MandateStatus.EXPIRED -> MandateSetupStep.EXPIRED
+    MandateStatus.FAILED -> MandateSetupStep.FAILED
+    MandateStatus.PAUSED -> MandateSetupStep.READY_TO_ARM
     MandateStatus.UNKNOWN -> MandateSetupStep.UNKNOWN
-    else -> MandateSetupStep.READY_TO_ARM
 }
 
 private fun sandboxBilling(email: String) = BillingContact(
     email = email,
-    firstName = "Test",
-    lastName = "Gifter",
-    addressLine1 = "123 Test Street",
+    firstName = "Sandbox",
+    lastName = "Buyer",
+    addressLine1 = "1 Test Checkout Way",
     addressLine2 = null,
-    city = "Seattle",
-    region = "WA",
-    postalCode = "98101",
+    city = "Portland",
+    region = "OR",
+    postalCode = "97205",
     countryCode = "US",
     phone = null,
 )

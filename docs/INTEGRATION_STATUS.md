@@ -40,7 +40,8 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   charges. It failed identically as transaction `txn_01KZ218YJV1NBFM3DZH9T54N7M`, response
   `67174297-c74e-4f54-beb3-e5ac17f08660`, again before credentials or merchant submission.
 - Mandate report verified: CURRENT CONTRACT + MOCK TRANSPORT — current completed/failed result,
-  mandate/transaction identity and Visa confirmation are checked; no live charge has been reported.
+  mandate/transaction identity and Visa confirmation are checked; the live merchant attempt remained
+  unknown, so WishTrace correctly did not report an invented approval or decline.
 - Standard hosted-session fallback: LIVE PROVIDER FAILURE — one real hosted session was created for
   purchase intent `36e40790-751f-451d-9b45-6f3e7b59338c` and the same exact `$5.00` Jackbox quote.
   Prava displayed that identity was verified but payment could not complete. Authoritative
@@ -49,8 +50,10 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   `FETCH_AGENTIC_CREDS_ERROR`. Reopening the same existing hosted URL created no new session; the
   provider page recorded transaction `txn_01KZ21X8G8RRP5CNYM535W5NMK` with
   `FIDO_START_FAILED`. No usable credential was issued in either attempt.
-- Real-merchant browser attempt verified: NO — both Prava routes stopped before a credential, so
-  the allowlisted Jackbox actor was not called with payment data.
+- Real-merchant browser attempt verified: LIVE SANDBOX PARTIAL PASS — the newest mandate produced a
+  one-time credential and the allowlisted Jackbox actor clicked Pay once for exact Drawful 2 at
+  `$9.99`. The page exposed neither a verified order nor a recognized explicit decline within 45
+  seconds, so the immutable result is `UNKNOWN`; no report or retry followed.
 - Authoritative success verified:
 - Decline/cancel/unknown tested: create timeout, server error, unsafe redirect and malformed success
   freeze as `UNKNOWN`; replay refusal and invalid provider facts pass automated tests. A live hosted
@@ -76,24 +79,22 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   retire `7789`. WishTrace now preselects a card only when exactly one active enrollment exists;
   with these two cards it omits `card_id` and requires the owner to choose in Prava's hosted UI.
   Card metadata is used only to distinguish enrollments and no PAN/CVV is stored.
-- Latest approval evidence: LIVE SANDBOX FAILURE — the phone explicitly selected `7912`, reached
-  Prava's security step and returned `FIDO_START_FAILED`. A bounded operator diagnostic then reached
-  Visa OTP and its Secure Payment Confirmation popup but returned `AUTH_FAILED`. Both results were
-  reconciled as terminal setup failures with zero mandates, credentials, charges or merchant calls.
-  Agent-driven hosted verification is stopped; the user owns the next phone attempt.
+- Latest approval evidence: LIVE SANDBOX PARTIAL PASS — the phone completed hosted approval for a
+  `$10` Drawful 2 mandate and returned through the app. A later mandate charge returned a one-time
+  credential, and the Jackbox actor submitted Pay once at `$9.99`. WishTrace did not expose or
+  persist the credential. No merchant order or accepted decline is claimed.
 - Sandbox browser-automation contract: ORGANIZER-CONFIRMED — Prava's hosted Browser Harness is not
   available in sandbox. Teams must build their own automation and call report-status themselves.
   WishTrace's exact-product Playwright actor is therefore the correct post-mint implementation.
-- Known blocker: a user-controlled phone approval must create an authoritative active mandate. Only
-  then may the one-shot execution request mint a credential and invoke the merchant actor. If minting
-  again returns `NO_TOKEN`/`FETCH_AGENTIC_CREDS_ERROR`, stop and treat it as a provider blocker.
-- Last verified: 2026-08-03 02:33 PKT
-- Evidence location: safe response ID above; migration `20260803_0014`; ACR build `che`, image
-  digest `sha256:f3e7cb7ddd3272109b6200f180d374f690e625511d132e2e41da78c9bc8e3081`, and healthy deployed
-  revision `wishtrace-api--cardchoice1` at 100% traffic. Public health reports PostgreSQL TLS true;
-  149 backend tests plus Android build/unit/lint pass. The updated APK is installed without clearing
-  the authenticated user. No credential, card data or provider payload is retained; the explicit-card
-  phone recovery reached security verification but did not arm a mandate.
+- Known blocker: none that justifies another payment attempt. The observed post-mint merchant result
+  is unknown and must remain locked; UX/submission work proceeds without claiming a decline/order.
+- Last verified: 2026-08-03 03:21 PKT
+- Evidence location: migration `20260803_0014`; ACR build `chg`, image digest
+  `sha256:0ca8f34bccd0a20f6481985da76f0f7384770ec93e24e7a566d2b2c4a2e1bd37`, and healthy deployed
+  revision `wishtrace-api--statefix1` at 100% traffic. Public health reports PostgreSQL 17.6 over
+  TLS; the UCP profile returns 200 with `public, max-age=300`; 154 backend tests plus Android
+  build/unit/lint pass; the matching APK installed in place. No credential, card data or provider
+  payload is retained.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -211,10 +212,11 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   The user then created one real runtime recipient/occasion context and a force-stop/relaunch restored
   it from the backend.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
-  Apps behind managed HTTPS; one healthy revision receives 100% traffic
-- Custom tab/hosted approval verified: LIVE FAILURE — AndroidX Browser `1.10.0` opened the real Prava
-  sandbox collection host. The user completed the visible identity/approval step, but Prava failed
-  before issuing a credential; the backend reconciled the purchase intent to terminal `FAILED`.
+  Apps behind managed HTTPS; healthy revision `wishtrace-api--statefix1` receives 100% traffic
+- Custom tab/hosted approval verified: LIVE SANDBOX PASS — AndroidX Browser `1.10.0` opened the real
+  Prava sandbox collection host, the user completed approval, the app return reconciled an active
+  `$10` mandate, and Prava later issued one one-time credential to the backend-only merchant path.
+  An earlier standard purchase-intent session remains truthfully recorded as terminal `FAILED`.
 - App link verified: DEVICE RECOVERY PASS — a synthetic return carrying only a random, nonexistent
   UUID reached the singleTop activity, called the authenticated public backend and rendered its safe
   `PURCHASE_INTENT_NOT_FOUND` recovery instead of trusting browser state. An actual Prava return
@@ -229,15 +231,17 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   user-authorized editable 2026-08-09 sandbox occasion, restored it after restart, retrieved the
   real Jackbox $5 candidate and rendered the grounded Azure ranking. The date is not claimed as the
   recipient's verified birthday.
-- Current local recovery: PASS — recommendation alternatives are selectable, prior failed attempts
-  route back to discovery, and a newly selected product starts a fresh mandate while preserving all
-  earlier audit rows. Home distinguishes active autopilot, handled, awaiting approval and failed
-  attempt states. The updated APK assembled, passed unit/lint checks and installed in place.
+- Current local recovery: PASS — recommendation alternatives are selectable and a newly selected
+  product starts a fresh mandate while preserving earlier audit rows. Once an occasion has any
+  mandate, Home and recipient actions reopen and refresh that Autopilot state instead of silently
+  restarting discovery. Home distinguishes active, handled, awaiting-approval and failed-attempt
+  states. The updated APK assembled, passed unit/lint checks and installed in place.
 - Current recovery UX: passkey start/authentication/cancellation failures name the exact pre-mandate
   boundary and expose one explicit `Retry Prava approval` action. Provisioning and mint failures stay
   terminal. Debug assembly, unit tests and lint pass; the updated APK is installed in place.
-- Known blockers: one user-controlled phone approval selecting saved card `7912` must reach active.
-  Tokenized merchant attempt, Prava report, Visa confirmation and order remain unproven.
+- Known blockers: no further payment attempt is safe for this mandate. Prava report, Visa
+  confirmation and merchant order remain unproven; the installed recovery build must show the
+  sticky unknown state without a looping action.
 
 ## Demo
 

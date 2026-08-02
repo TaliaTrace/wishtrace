@@ -8,20 +8,20 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260803_0014` | Codex | 2026-08-03 01:54 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 149 tests; healthy Azure revision `wishtrace-api--cardchoice1` serves 100% traffic | Codex | 2026-08-03 02:04 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 154 tests; healthy Azure revision `wishtrace-api--statefix1` serves 100% traffic | Codex | 2026-08-03 03:21 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | PASS CONTRACT / BLOCKED AT PASSKEY — explicit `7912` selection reached Visa verification; phone returned `FIDO_START_FAILED`, controlled automation returned `AUTH_FAILED`; no mandate/card/merchant attempt | Codex/user | 2026-08-03 02:33 PKT |
-| Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — $5 card plus three distinct $9.99 digital games have exact live product/variant/cart evidence; Prava credential still required | Codex | 2026-08-03 01:54 PKT |
+| Prava transaction path understood | session + authoritative status | PARTIAL LIVE PASS — approval and one-time credential succeeded; Jackbox Pay was attempted once, but the browser observed no definitive order/decline within 45 seconds, so the result is locked `UNKNOWN` | Codex/user | 2026-08-03 03:17 PKT |
+| Primary merchant validated | search/product/quote/checkout facts | PARTIAL LIVE PASS — four exact products have live facts; a tokenized Drawful 2 Pay attempt occurred, with no confirmed order or decline | Codex | 2026-08-03 03:17 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — selectable recommendation/recovery APK built, tested, linted and installed in place on the connected phone | Codex | 2026-08-03 01:54 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — sticky-unknown recovery, existing-mandate routing and branded secure Prava handoff built, tested, linted and installed in place | Codex | 2026-08-03 03:21 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
 | Android device UX evidence | API 31 route tests + screenshots + text scale + contrast | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
-| Android return flow works | approval → app → reconciled state | PARTIAL — physical app-link reconciliation rendered the authoritative hosted failure; automatic Prava redirect still pending | Codex/user | 2026-08-02 22:34 PKT |
+| Android return flow works | approval → app → reconciled state | PASS — hosted approval returned through the app link and the backend observed the active Prava mandate | Codex/user | 2026-08-03 02:55 PKT |
 | Bronze flow repeats twice | full device demo | NOT STARTED | | |
 | Five-second UX understood | fresh viewer explanation | NOT STARTED | | |
 | Clean build works | fresh checkout command log | NOT STARTED | | |
@@ -29,10 +29,11 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. User runs one fresh hosted approval from the installed APK, explicitly choosing saved card `7912`.
-2. If the mandate becomes active, user taps the one-shot merchant proof once; WishTrace handles mint,
-   Playwright checkout and report-status automatically.
-3. Preserve the exact result and move immediately to the bento-grid UI/submission pass.
+1. Deploy/install the sticky-unknown fix so Prava's still-active authorization cannot erase the
+   unresolved post-mint merchant result or trigger another one-time card.
+2. Freeze the backend at the observed boundary: approval, credential mint and one tokenized Jackbox
+   Pay attempt are proven; merchant decline/order and Prava report are not.
+3. Move immediately to the red/blue/green/yellow bento-question UX and submission pass.
 
 ## Next
 
@@ -41,6 +42,54 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Move immediately to the UX/submission pass after the single bounded payment proof.
 
 ## Milestone evidence
+
+### 2026-08-03 — Tokenized merchant attempt completed; unresolved result locked
+
+- The latest `$10` Drawful 2 mandate reused its already-completed approval. Prava minted a one-time
+  credential and the Jackbox actor clicked Pay exactly once at the stable `$9.99` Oregon total.
+- The merchant page exposed neither a verified order nor a recognized explicit decline within the
+  45-second observation window. The ledger therefore records charge `UNKNOWN`, merchant outcome
+  `UNKNOWN`, no order, no Visa confirmation and no Prava report. This is not presented as the
+  organizer's accepted decline.
+- A provider refresh reported that the underlying authorization remained active and incorrectly
+  moved the parent mandate back to `ACTIVE`, while the charge correctly remained `UNKNOWN`. Android
+  then displayed a disabled “Starting merchant proof…” state and refused to run another operation.
+- The state machine now makes unresolved post-mint charge state sticky across provider refresh,
+  refuses every new idempotency reference while one exists, and defensively maps
+  `ACTIVE + UNKNOWN charge` to the honest unknown-result UI.
+- Evidence: the single `/mandate/execute` request ran for 66.8 seconds and returned once; its ledger
+  has a provider charge, no provider transaction reference, no order and zero counted charges.
+  Backend tests now total 154; Ruff, strict mypy, Android assemble/unit/lint all pass. ACR build
+  `chg` produced digest `sha256:0ca8f34bccd0a20f6481985da76f0f7384770ec93e24e7a566d2b2c4a2e1bd37`;
+  healthy revision `wishtrace-api--statefix1` serves 100% traffic. Public health confirms PostgreSQL
+  17.6 over TLS and the UCP profile remains cache-compliant. The matching APK installed in place.
+- Truth boundary: tokenized merchant submission is live sandbox evidence. Merchant decline, order,
+  report and Visa confirmation remain unproven. No retry is authorized.
+
+### 2026-08-03 — Approval succeeded; total race isolated and fixed
+
+- The physical phone completed hosted Prava approval for Drawful 2. Prava exposed an active `$10`
+  one-time mandate and successfully minted a one-time credential for the `$9.99` charge.
+- Jackbox had not yet received Pay: its checkout total changed after the initial quote stabilized,
+  so WishTrace stopped before submission. Two later taps produced conflicts rather than another mint;
+  no duplicate merchant action or order exists.
+- Root cause: the actor compared the final total to the item price and accepted Shopify's transient
+  pre-tax first paint. It now waits three unchanged seconds, records the tax-inclusive quote, allows
+  totals only within the approved cap, and locks any uncertain post-mint outcome.
+- Android now uses a process-stable mandate proof key, reconciles the server after an execution error,
+  starts the sandbox proof automatically on activation, and never renders a consumed merchant decline
+  as an order success.
+- Home now refreshes existing mandate state and routes any existing approval, active execution,
+  blocked proof or terminal result directly to Autopilot. The recipient action uses the same rule;
+  only an occasion with no mandate enters discovery.
+- A retry created a second legitimate `$10` provider mandate. The latest local setup now excludes an
+  older otherwise-identical approval using a five-second clock-skew window, so refresh can bind the
+  intended active mandate without another passkey.
+- Evidence: 152 backend tests, Ruff, strict mypy, Android assemble/unit/lint all pass. ACR build
+  `chf` produced digest `sha256:7c69ddaed855b1713b7f871c54f84baabc745663b0883f82c5d3c18ada3f2205`;
+  healthy revision `wishtrace-api--autopilot1` serves 100% traffic and the APK installed in place.
+  A final Android rebuild completed `assembleDebug`, all unit tests and `lintDebug` in 2m13s; the
+  matching APK installed in place. The user-owned phone verification remains pending.
 
 ### 2026-08-03 — Passkey boundary isolated; verification returned to the user
 

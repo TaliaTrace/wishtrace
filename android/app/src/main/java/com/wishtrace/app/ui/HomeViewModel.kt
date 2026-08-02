@@ -56,9 +56,14 @@ class HomeViewModel(
                 if (snapshot == null) {
                     HomeUiState.Empty
                 } else {
-                    val mandate = runCatching {
+                    val storedMandate = runCatching {
                         mandateGateway.fetch(snapshot.occasion.id)
                     }.getOrNull()
+                    val mandate = storedMandate?.let { stored ->
+                        runCatching {
+                            mandateGateway.refresh(snapshot.occasion.id)
+                        }.getOrElse { stored }
+                    }
                     HomeUiState.Content(snapshot = snapshot, mandate = mandate)
                 }
             } catch (_: Exception) {

@@ -9,12 +9,15 @@ from app.errors import ApiError
 from app.mandate import (
     ChargeClaim,
     MandateApprovalSession,
+    MandateChargeState,
+    MandateChargeView,
     MandateExecuteRequest,
     MandateResponse,
     MandateService,
     MandateSetupFacts,
     MandateSetupRequest,
     MandateState,
+    _state_from_mandate_status,
 )
 from app.merchant_browser import (
     JACKBOX_VARIANT_GID,
@@ -88,13 +91,15 @@ def _mandate(
     recurring_frequency: PravaMandateFrequency = PravaMandateFrequency.ONE_TIME,
     max_charges: int = 1,
     charges_used: int = 0,
+    approved_amount_minor: int = 500,
+    item_price_minor: int = 500,
 ) -> MandateResponse:
     return MandateResponse(
         id=uuid.uuid4(),
         recipient_id=uuid.uuid4(),
         occasion_id=uuid.uuid4(),
         state=state,
-        approved_amount_minor=500,
+        approved_amount_minor=approved_amount_minor,
         currency="USD",
         recurring_frequency=recurring_frequency,
         merchant_scope=PravaMandateScope.LISTED,
@@ -107,7 +112,7 @@ def _mandate(
         merchant_product_id="gid://shopify/Product/6734381809798",
         merchant_variant_id=JACKBOX_VARIANT_GID,
         product_title="Jackbox Games Gift Card - $5 USD",
-        item_price_minor=500,
+        item_price_minor=item_price_minor,
         provider_mandate_id=provider_mandate_id,
         provider_status="active" if state is MandateState.ACTIVE else None,
         setup_failure_code=None,
@@ -131,6 +136,7 @@ class MemoryMandateStore:
         self.mandate = mandate
         self.setup_facts: MandateSetupFacts | None = None
         self.charges_by_reference: dict[str, uuid.UUID] = {}
+        self.charge_amounts: dict[uuid.UUID, int] = {}
         self.settled_charges: list[uuid.UUID] = []
         self.declined_charges: list[uuid.UUID] = []
         self.unknown_charges: list[tuple[uuid.UUID, str]] = []
@@ -262,15 +268,28 @@ class MemoryMandateStore:
         reference: str,
         amount_minor: int,
     ) -> ChargeClaim:
-        del user_id, occasion_id, amount_minor
+        del user_id, occasion_id
         if reference in self.charges_by_reference:
             return ChargeClaim(id=self.charges_by_reference[reference], replayed=True)
         charge_id = uuid.uuid4()
         self.charges_by_reference[reference] = charge_id
+        self.charge_amounts[charge_id] = amount_minor
         self.mandate = self.mandate.model_copy(
             update={"state": MandateState.CHARGING}
         )
         return ChargeClaim(id=charge_id, replayed=False)
+
+    async def record_charge_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        charge_id: uuid.UUID,
+        amount_minor: int,
+    ) -> MandateResponse:
+        del user_id, occasion_id
+        self.charge_amounts[charge_id] = amount_minor
+        return self.mandate
 
     async def fail_charge(
         self,
@@ -333,7 +352,7 @@ class MemoryMandateStore:
         result: MerchantCheckoutResult,
     ) -> MandateResponse:
         del user_id, occasion_id
-        assert result.amount_minor == self.mandate.approved_amount_minor
+        assert result.amount_minor == self.charge_amounts[charge_id]
         self.recorded_checkouts.append(charge_id)
         self.mandate = self.mandate.model_copy(
             update={
@@ -502,9 +521,9 @@ class FakeMerchantCheckout:
         if self.quote_error is not None:
             raise self.quote_error
         return MerchantQuote(
-            item_minor=500,
+            item_minor=request.expected_item_minor,
             shipping_minor=0,
-            tax_minor=self.quote_total_minor - 500,
+            tax_minor=self.quote_total_minor - request.expected_item_minor,
             total_minor=self.quote_total_minor,
             currency="USD",
             delivery_summary="Jackbox shop only",
@@ -540,10 +559,10 @@ def _service(
     checkout: FakeMerchantCheckout | None,
 ) -> MandateService:
     return MandateService(
-        store=store,  # type: ignore[arg-type]
-        prava=prava,  # type: ignore[arg-type]
+        store=store,
+        prava=prava,
         public_base_url="https://api.wishtrace.example",
-        merchant_checkout=checkout,  # type: ignore[arg-type]
+        merchant_checkout=checkout,
         idempotency_pepper="pepper-value-for-tests",
     )
 
@@ -752,7 +771,40 @@ async def test_execute_requires_valid_idempotency_key() -> None:
     assert checkout.checkout_calls == 0
 
 
-async def test_execute_does_not_mint_when_live_total_changed() -> None:
+async def test_execute_refuses_a_second_card_while_prior_charge_is_unknown() -> None:
+    unresolved = MandateChargeView(
+        id=uuid.uuid4(),
+        reference="existing-proof",
+        amount_minor=500,
+        state=MandateChargeState.UNKNOWN,
+        failure_code="MERCHANT_CHECKOUT_OUTCOME_UNKNOWN",
+        merchant_order_id=None,
+        merchant_outcome=MerchantCheckoutOutcome.UNKNOWN,
+        visa_confirmation=None,
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+    store = MemoryMandateStore(
+        _mandate().model_copy(update={"charges": [unresolved]})
+    )
+    prava = FakeMandatePrava()
+    checkout = FakeMerchantCheckout(_ok_checkout())
+    service = _service(store, prava, checkout)
+
+    with pytest.raises(ApiError) as blocked:
+        await service.execute(
+            _user(),
+            store.mandate.occasion_id,
+            MandateExecuteRequest(billing=_billing()),
+            "exec-new-reference",
+        )
+
+    assert blocked.value.code == "MANDATE_CHARGE_UNRESOLVED"
+    assert prava.charge_calls == []
+    assert checkout.quote_requests == []
+
+
+async def test_execute_does_not_mint_when_live_total_exceeds_approved_cap() -> None:
     store = MemoryMandateStore(_mandate())
     prava = FakeMandatePrava()
     checkout = FakeMerchantCheckout(_ok_checkout())
@@ -767,9 +819,41 @@ async def test_execute_does_not_mint_when_live_total_changed() -> None:
             "exec-total-change",
         )
 
-    assert changed.value.code == "MERCHANT_TOTAL_CHANGED"
+    assert changed.value.code == "MERCHANT_TOTAL_EXCEEDS_MANDATE"
     assert prava.charge_calls == []
-    assert store.failed_charges[0][1] == "MERCHANT_TOTAL_CHANGED"
+    assert store.failed_charges[0][1] == "MERCHANT_TOTAL_EXCEEDS_MANDATE"
+    assert store.mandate.state is MandateState.ACTIVE
+    assert next(iter(store.charge_amounts.values())) == 550
+
+
+async def test_execute_charges_tax_inclusive_total_within_approved_cap() -> None:
+    store = MemoryMandateStore(
+        _mandate(approved_amount_minor=550, item_price_minor=500)
+    )
+    prava = FakeMandatePrava()
+    prava.charge_result = _minted_credential()
+    checkout = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=MerchantCheckoutOutcome.DECLINED,
+            order_id=None,
+            amount_minor=525,
+            currency="USD",
+            reason_code="MERCHANT_PAYMENT_DECLINED",
+        )
+    )
+    checkout.quote_total_minor = 525
+    service = _service(store, prava, checkout)
+
+    result = await service.execute(
+        _user(),
+        store.mandate.occasion_id,
+        MandateExecuteRequest(billing=_billing()),
+        "exec-tax-total",
+    )
+
+    assert prava.charge_calls[0][1] == 525
+    assert next(iter(store.charge_amounts.values())) == 525
+    assert result.merchant_outcome is MerchantCheckoutOutcome.DECLINED
 
 
 async def test_execute_merchant_checkout_unknown_returns_current_view() -> None:
@@ -798,6 +882,32 @@ async def test_execute_merchant_checkout_unknown_returns_current_view() -> None:
     assert prava.report_calls == []
     assert result.state is not MandateState.CONSUMED
     assert checkout.checkout_calls == 1
+
+
+async def test_execute_locks_after_post_mint_browser_failure() -> None:
+    store = MemoryMandateStore(_mandate())
+    prava = FakeMandatePrava()
+    prava.charge_result = _minted_credential()
+    checkout = FakeMerchantCheckout(_ok_checkout())
+    checkout.checkout_error = MerchantBrowserError(
+        "MERCHANT_PAYMENT_FORM_INVALID",
+        "The merchant payment form is not ready.",
+        recoverable=True,
+        outcome_unknown=False,
+    )
+    service = _service(store, prava, checkout)
+
+    with pytest.raises(ApiError) as failed:
+        await service.execute(
+            _user(),
+            store.mandate.occasion_id,
+            MandateExecuteRequest(billing=_billing()),
+            "exec-post-mint",
+        )
+
+    assert failed.value.code == "MERCHANT_PAYMENT_FORM_INVALID"
+    assert store.failed_charges[0][2] is True
+    assert store.mandate.state is MandateState.UNKNOWN
 
 
 async def test_execute_report_mismatch_marks_charge_unknown() -> None:
@@ -1091,6 +1201,55 @@ async def test_refresh_rejects_ambiguous_current_customer_mandates() -> None:
         await service.refresh(_user(), store.mandate.occasion_id)
 
     assert ambiguous.value.code == "PRAVA_RESPONSE_AMBIGUOUS"
+
+
+async def test_refresh_ignores_older_identical_mandate_from_previous_retry() -> None:
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.AWAITING_APPROVAL,
+            provider_mandate_id=None,
+        )
+    )
+    base = PravaMandateInfo(
+        mandate_id=_MANDATE_ID,
+        status=PravaMandateStatus.ACTIVE,
+        recurring_frequency=PravaMandateFrequency.ONE_TIME,
+        merchant_scope=PravaMandateScope.LISTED,
+        approved_amount="5.00",
+        currency="USD",
+        created_at=_NOW,
+        valid_until=datetime(2099, 8, 1, tzinfo=UTC),
+        merchant_name="Jackbox Games",
+    )
+    prava = FakeMandatePrava()
+    prava.listed_mandates = [
+        base.model_copy(
+            update={
+                "mandate_id": "mandate-older",
+                "created_at": datetime(2026, 8, 1, 14, 59, 0, tzinfo=UTC),
+            }
+        ),
+        base.model_copy(
+            update={
+                "mandate_id": "mandate-current",
+                "created_at": datetime(2026, 8, 1, 15, 0, 30, tzinfo=UTC),
+            }
+        ),
+    ]
+    service = _service(store, prava, checkout=None)
+
+    result = await service.refresh(_user(), store.mandate.occasion_id)
+
+    assert result.provider_mandate_id == "mandate-current"
+    assert result.state is MandateState.ACTIVE
+
+
+def test_active_provider_cannot_erase_unknown_merchant_charge() -> None:
+    assert _state_from_mandate_status(
+        PravaMandateStatus.ACTIVE,
+        MandateState.ACTIVE,
+        MandateChargeState.UNKNOWN,
+    ) is MandateState.UNKNOWN
 
 
 async def test_refresh_rejects_mismatched_provider_mandate() -> None:

@@ -525,3 +525,65 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: None. If the user-approved mandate becomes active, run one merchant proof. If
   it does not, preserve the provider result and proceed truthfully to UX/submission work.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 02:55 PKT — One approval, automatic bounded execution
+
+- Context: The user completed hosted approval and Prava minted a one-time credential, but Jackbox's
+  total changed after the initial quote and before Pay. Repeated taps did not submit twice, although
+  the UI made the idempotent conflict look like another action was possible.
+- Evidence: The live ledger has one `$9.99` charge with `MERCHANT_TOTAL_CHANGED`, a provider charge
+  reference, no merchant outcome and no order. Prava lists the approved `$10` mandate as active.
+- Decision: Treat the mandate cap—not sticker price—as the authorization boundary; stabilize and
+  record the tax-inclusive quote before minting. Use a mandate-derived idempotency key across taps
+  and process recreation, reconcile errors immediately, and start the sandbox merchant proof
+  automatically when an approved mandate becomes active.
+- Consequence: The user approves once for this exact bounded purchase. There is no second proof
+  button and no repeated passkey. A different gift, higher cap, expired mandate, or future yearly
+  authorization still requires explicit consent; WishTrace never interprets one approval as forever.
+- Rollback/fallback: Any unknown post-mint state locks for reconciliation. A total above the cap
+  stops before credential minting and shows the exact live total and approved limit.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 02:55 PKT — Keep Prava hosted approval in a secure Custom Tab
+
+- Context: The user asked why approval leaves the Compose surface. Official Prava embedded mode is
+  delivered by the browser-only `@prava-sdk/core` JavaScript package and a secure iframe; Prava does
+  not document a native Android SDK.
+- Decision: Keep hosted approval in an Android Custom Tab. Do not wrap the iframe in an unsupported
+  WebView or collect card/passkey material in Compose.
+- Consequence: Prava retains its secure origin, browser passkey support and PCI boundary. WishTrace
+  makes the transition feel cohesive through its review, return, automatic progress and result UI.
+- Rollback/fallback: Reconsider only if Prava publishes and verifies a native Android SDK or a
+  supported Android embedded contract.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 03:06 PKT — Existing mandate state outranks a new recommendation
+
+- Context: Home only routed an `ACTIVE` mandate to Autopilot. A locally stale approval, processing
+  state, blocked proof or recorded decline could therefore reopen discovery and suggest the gift
+  again even though the occasion already owned an auditable mandate.
+- Decision: Refresh an existing occasion mandate against Prava and route every non-null mandate to
+  its Autopilot state from both Home and recipient detail. Enter discovery only when the occasion has
+  no mandate. Keep the automatic proof keyed by the mandate ID so repeated taps cannot create a new
+  money-adjacent operation.
+- Consequence: The approved gift resumes in place, state recovery is visible, and the user is never
+  asked to choose or approve the same bounded purchase merely because local status was stale.
+- Rollback/fallback: A deliberate “choose another gift” action can be added inside Autopilot later;
+  it must be explicit and preserve the existing audit record.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 03:17 PKT — An unresolved merchant attempt is sticky
+
+- Context: Prava minted a one-time credential and Jackbox Pay was clicked once, but the browser
+  observed neither a verified order nor an explicit decline within 45 seconds. The charge correctly
+  became `UNKNOWN`; a later Prava refresh only knew the authorization was still active and moved the
+  parent mandate back to `ACTIVE`, creating a misleading disabled “Starting…” screen.
+- Decision: Local post-mint charge truth outranks provider authorization availability. An unknown
+  charge forces the parent mandate to `UNKNOWN` across refreshes, blocks every new operation key, and
+  renders an honest recoverable result rather than starting another card or merchant attempt.
+- Consequence: No duplicate money-adjacent action can occur. The submission may claim approval,
+  credential minting and one tokenized merchant submission, but not a decline, Visa confirmation,
+  order or receipt.
+- Rollback/fallback: Reconcile only from new authoritative merchant/Prava evidence. Never clear the
+  unknown state merely because the mandate remains active.
+- Owner: WishTrace team / Codex

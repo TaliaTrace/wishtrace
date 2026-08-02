@@ -139,6 +139,7 @@ class MandateChargeView(BaseModel):
     reference: str
     amount_minor: int
     state: MandateChargeState
+    failure_code: str | None
     merchant_order_id: str | None
     merchant_outcome: MerchantCheckoutOutcome | None
     visa_confirmation: Literal["SUCCESS", "FAILURE"] | None
@@ -301,6 +302,15 @@ class ChargeStore(Protocol):
         reference: str,
         amount_minor: int,
     ) -> ChargeClaim: ...
+
+    async def record_charge_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        charge_id: uuid.UUID,
+        amount_minor: int,
+    ) -> MandateResponse: ...
 
     async def fail_charge(
         self,
@@ -625,6 +635,16 @@ class MandateService:
                 recoverable=True,
             )
         mandate = await self._store.get(user_id=user.id, occasion_id=occasion_id)
+        if any(charge.state is MandateChargeState.UNKNOWN for charge in mandate.charges):
+            raise ApiError(
+                status_code=409,
+                code="MANDATE_CHARGE_UNRESOLVED",
+                message=(
+                    "The prior merchant attempt is still unresolved. "
+                    "WishTrace will not request another one-time card."
+                ),
+                recoverable=False,
+            )
         if mandate.provider_mandate_id is None or mandate.state is not MandateState.ACTIVE:
             raise ApiError(
                 status_code=409,
@@ -669,18 +689,28 @@ class MandateService:
                 message=error.safe_message,
                 recoverable=error.recoverable,
             ) from error
-        if quote.total_minor != mandate.item_price_minor:
+        await self._store.record_charge_quote(
+            user_id=user.id,
+            occasion_id=occasion_id,
+            charge_id=charge.id,
+            amount_minor=quote.total_minor,
+        )
+        if quote.total_minor > mandate.approved_amount_minor:
             await self._store.fail_charge(
                 user_id=user.id,
                 occasion_id=occasion_id,
                 charge_id=charge.id,
-                reason_code="MERCHANT_TOTAL_CHANGED",
+                reason_code="MERCHANT_TOTAL_EXCEEDS_MANDATE",
                 outcome_unknown=False,
             )
             raise ApiError(
                 status_code=409,
-                code="MERCHANT_TOTAL_CHANGED",
-                message="The live merchant total changed. Review the gift before approving it.",
+                code="MERCHANT_TOTAL_EXCEEDS_MANDATE",
+                message=(
+                    f"The live total is {_money_label(quote.total_minor)}, above your "
+                    f"{_money_label(mandate.approved_amount_minor)} autopilot cap. "
+                    "No one-time card was requested."
+                ),
                 recoverable=True,
             )
         try:
@@ -775,7 +805,10 @@ class MandateService:
                 occasion_id=occasion_id,
                 charge_id=charge.id,
                 reason_code=error.code,
-                outcome_unknown=error.outcome_unknown,
+                # A one-time credential already exists. Even when the browser
+                # failed before clicking Pay, the provider-side charge must be
+                # reconciled before another credential may be requested.
+                outcome_unknown=True,
             )
             raise ApiError(
                 status_code=503 if error.recoverable else 502,
@@ -1131,7 +1164,22 @@ class SqlMandateStore:
             mandate.setup_failure_code = None
             if mandate.valid_until is None:
                 mandate.valid_until = info.valid_until
-            target = _state_from_mandate_status(info.status, MandateState(mandate.state))
+            latest_charge_value = await db.scalar(
+                select(MandateChargeModel.state)
+                .where(MandateChargeModel.mandate_id == mandate.id)
+                .order_by(MandateChargeModel.created_at.desc())
+                .limit(1)
+            )
+            latest_charge_state = (
+                MandateChargeState(latest_charge_value)
+                if latest_charge_value is not None
+                else None
+            )
+            target = _state_from_mandate_status(
+                info.status,
+                MandateState(mandate.state),
+                latest_charge_state,
+            )
             if target is not MandateState(mandate.state):
                 _transition(mandate, target)
             return await _flush_mandate_response(db, mandate)
@@ -1201,8 +1249,31 @@ class SqlMandateStore:
             )
             _transition(
                 mandate,
-                MandateState.UNKNOWN if outcome_unknown else MandateState.FAILED,
+                # A known failure before credential minting does not revoke the
+                # owner's approval. Unknown post-mint outcomes remain locked.
+                MandateState.UNKNOWN if outcome_unknown else MandateState.ACTIVE,
             )
+            return await _flush_mandate_response(db, mandate)
+
+    async def record_charge_quote(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        charge_id: uuid.UUID,
+        amount_minor: int,
+    ) -> MandateResponse:
+        async with self._session_factory() as db, db.begin():
+            mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
+            charge = await _owned_charge(db, mandate.id, charge_id, lock=True)
+            if amount_minor <= 0:
+                raise ApiError(
+                    status_code=502,
+                    code="MERCHANT_TOTAL_INVALID",
+                    message="The merchant returned an invalid total.",
+                    recoverable=False,
+                )
+            charge.amount_minor = amount_minor
             return await _flush_mandate_response(db, mandate)
 
     async def record_charge_declined(
@@ -1252,7 +1323,7 @@ class SqlMandateStore:
         async with self._session_factory() as db, db.begin():
             mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
             charge = await _owned_charge(db, mandate.id, charge_id, lock=True)
-            if result.amount_minor != mandate.approved_amount_minor:
+            if result.amount_minor != charge.amount_minor:
                 raise ApiError(
                     status_code=502,
                     code="MERCHANT_RESULT_MISMATCH",
@@ -1269,6 +1340,7 @@ class SqlMandateStore:
                 _set_charge_state(charge, MandateChargeState.REPORTING)
                 _transition(mandate, MandateState.REPORTING)
             else:
+                charge.provider_error_code = result.reason_code
                 _set_charge_state(charge, MandateChargeState.UNKNOWN)
                 _transition(mandate, MandateState.UNKNOWN)
             mandate.merchant_order_id = result.order_id
@@ -1362,7 +1434,10 @@ def _matches_local_mandate(
     except InvalidOperation:
         return False
     expected_amount = Decimal(local.approved_amount_minor) / Decimal(100)
-    created_floor = local.created_at - timedelta(minutes=2)
+    # Provider mandates are created after the local setup row. Keep a small
+    # clock-skew allowance, but never let an older approval from a previous
+    # retry match the new row merely because amount and merchant are equal.
+    created_floor = local.created_at - timedelta(seconds=5)
     return (
         candidate.created_at >= created_floor
         and approved_amount == expected_amount
@@ -1387,6 +1462,10 @@ def _safe_provider_code(value: str) -> str:
     return normalized if re.fullmatch(r"[A-Z0-9_:-]{1,100}", normalized) else "UNKNOWN"
 
 
+def _money_label(minor: int) -> str:
+    return f"${Decimal(minor) / Decimal(100):.2f}"
+
+
 def _preferred_card_id(cards: list[PravaCardInfo]) -> str | None:
     """Reuse one unambiguous active enrollment; never guess between cards."""
 
@@ -1399,6 +1478,7 @@ def _preferred_card_id(cards: list[PravaCardInfo]) -> str | None:
 def _state_from_mandate_status(
     status: PravaMandateStatus,
     current: MandateState,
+    latest_charge: MandateChargeState | None = None,
 ) -> MandateState:
     mapping = {
         PravaMandateStatus.PENDING: MandateState.AWAITING_APPROVAL,
@@ -1409,6 +1489,12 @@ def _state_from_mandate_status(
         PravaMandateStatus.EXPIRED: MandateState.EXPIRED,
     }
     target = mapping[status]
+    # Prava reports whether the mandate authorization remains active; it does
+    # not know whether our merchant browser received a definitive checkout
+    # result. Never let an active provider mandate erase an unresolved local
+    # post-mint attempt.
+    if latest_charge is MandateChargeState.UNKNOWN and target is MandateState.ACTIVE:
+        return MandateState.UNKNOWN
     # Never drag a mandate backwards out of an in-flight charge just because a
     # poll observed ``active`` again.
     if current in {
@@ -1527,6 +1613,7 @@ async def _mandate_response(
                 reference=charge.reference,
                 amount_minor=charge.amount_minor,
                 state=MandateChargeState(charge.state),
+                failure_code=charge.provider_error_code,
                 merchant_order_id=charge.merchant_order_id,
                 merchant_outcome=(
                     MerchantCheckoutOutcome(charge.merchant_outcome)

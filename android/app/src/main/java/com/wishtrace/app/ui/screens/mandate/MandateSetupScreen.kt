@@ -26,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,9 +67,26 @@ fun MandateSetupRoute(
     candidateId: String,
     verifiedEmail: String?,
     onBack: () -> Unit,
+    onChooseAnotherGift: () -> Unit,
     onArmed: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val sandboxTools = booleanResource(R.bool.wishtrace_sandbox_tools)
+
+    LaunchedEffect(
+        sandboxTools,
+        state.step,
+        state.mandate?.id,
+        verifiedEmail,
+    ) {
+        if (
+            sandboxTools &&
+            state.step == MandateSetupStep.ACTIVE &&
+            state.mandate?.lastChargeState == null
+        ) {
+            viewModel.executeSandboxProof(verifiedEmail)
+        }
+    }
 
     MandateSetupScreen(
         state = state,
@@ -76,7 +94,7 @@ fun MandateSetupRoute(
         onArm = { viewModel.arm(candidateId) },
         onRetryApproval = { viewModel.retryApproval(candidateId) },
         onRefresh = viewModel::refresh,
-        onExecuteSandboxProof = { viewModel.executeSandboxProof(verifiedEmail) },
+        onChooseAnotherGift = onChooseAnotherGift,
         onArmed = onArmed,
     )
 }
@@ -88,7 +106,7 @@ fun MandateSetupScreen(
     onArm: () -> Unit,
     onRetryApproval: () -> Unit,
     onRefresh: () -> Unit,
-    onExecuteSandboxProof: () -> Unit,
+    onChooseAnotherGift: () -> Unit,
     onArmed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -111,7 +129,7 @@ fun MandateSetupScreen(
                 onArm = onArm,
                 onRetryApproval = onRetryApproval,
                 onRefresh = onRefresh,
-                onExecuteSandboxProof = onExecuteSandboxProof,
+                onChooseAnotherGift = onChooseAnotherGift,
                 onArmed = onArmed,
                 sandboxTools = sandboxTools,
             )
@@ -144,7 +162,8 @@ fun MandateSetupScreen(
                     MandateSetupStep.AWAITING_APPROVAL,
                     -> AwaitingApproval(state)
                     MandateSetupStep.REFRESHING -> Refreshing(state)
-                    MandateSetupStep.ACTIVE -> Armed(state, onArmed = onArmed)
+                    MandateSetupStep.ACTIVE -> Armed(state)
+                    MandateSetupStep.PROOF_BLOCKED -> ProofBlocked(state)
                     MandateSetupStep.EXECUTING -> ExecutingProof()
                     MandateSetupStep.PROOF_COMPLETE -> ProofComplete(state)
                     MandateSetupStep.PROOF_DECLINED -> ProofDeclined(state)
@@ -202,14 +221,14 @@ private fun ReadyToArm(state: MandateSetupUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(
-                text = "Approve once. Never miss a moment again.",
+                text = "Approve this gift once.",
                 modifier = Modifier.semantics { heading() },
                 color = Ink,
                 style = MaterialTheme.typography.headlineLarge,
             )
             Text(
-                text = "One passkey arms a delegated budget. When the occasion nears, " +
-                    "WishTrace handles the gift within the cap you set.",
+                text = "One passkey authorizes this exact gift within your cap. WishTrace " +
+                    "can then run checkout automatically without asking again for this purchase.",
                 color = InkMuted,
                 style = MaterialTheme.typography.bodyLarge,
             )
@@ -330,7 +349,7 @@ private fun Refreshing(state: MandateSetupUiState) {
 }
 
 @Composable
-private fun Armed(state: MandateSetupUiState, onArmed: () -> Unit) {
+private fun Armed(state: MandateSetupUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Surface(
             color = SuccessSurface,
@@ -411,11 +430,29 @@ private fun ExecutingProof() {
         )
         Text(
             text = "WishTrace is requesting one bounded Prava token and attempting the exact " +
-                "Jackbox checkout. Do not close the app.",
+                "Jackbox checkout automatically. Do not close the app.",
             color = InkMuted,
             style = MaterialTheme.typography.bodyMedium,
         )
     }
+}
+
+@Composable
+private fun ProofBlocked(state: MandateSetupUiState) {
+    val mandate = state.mandate
+    val total = mandate?.lastChargeAmountMinor?.asUsd()
+    val cap = mandate?.approvedAmountMinor?.asUsd()
+    val overCap = mandate?.lastChargeFailureCode == "MERCHANT_TOTAL_EXCEEDS_MANDATE"
+    TerminalState(
+        title = if (overCap) "Live total crossed your cap" else "Checkout stopped safely",
+        message = if (overCap && total != null && cap != null) {
+            "$total is above the $cap limit you approved. No one-time card was requested. " +
+                "Choose another gift or raise the budget before approving a new limit."
+        } else {
+            "The approved mandate is still safe, but WishTrace could not start this merchant " +
+                "attempt. No order was created."
+        },
+    )
 }
 
 @Composable
@@ -483,7 +520,7 @@ private fun MandateActionBar(
     onArm: () -> Unit,
     onRetryApproval: () -> Unit,
     onRefresh: () -> Unit,
-    onExecuteSandboxProof: () -> Unit,
+    onChooseAnotherGift: () -> Unit,
     onArmed: () -> Unit,
     sandboxTools: Boolean,
 ) {
@@ -515,16 +552,11 @@ private fun MandateActionBar(
                 )
 
                 MandateSetupStep.ACTIVE -> if (sandboxTools) {
-                    PrimaryAction(
-                        text = "Run sandbox merchant proof",
-                        onClick = onExecuteSandboxProof,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.busy,
-                    )
                     SecondaryAction(
-                        text = "Do this later",
-                        onClick = onArmed,
+                        text = "Starting merchant proof…",
+                        onClick = {},
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = false,
                     )
                 } else {
                     PrimaryAction(
@@ -539,6 +571,12 @@ private fun MandateActionBar(
                     onClick = {},
                     modifier = Modifier.fillMaxWidth(),
                     enabled = false,
+                )
+
+                MandateSetupStep.PROOF_BLOCKED -> PrimaryAction(
+                    text = "Choose another gift",
+                    onClick = onChooseAnotherGift,
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 MandateSetupStep.PROOF_COMPLETE,

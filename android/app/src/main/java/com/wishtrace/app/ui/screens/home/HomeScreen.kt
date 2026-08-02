@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.wishtrace.app.data.PreviewFixtures
 import com.wishtrace.app.domain.HomeSnapshot
 import com.wishtrace.app.domain.MandateDetails
+import com.wishtrace.app.domain.MandateMerchantOutcome
 import com.wishtrace.app.domain.MandateStatus
 import com.wishtrace.app.ui.HomeUiState
 import com.wishtrace.app.ui.WishTraceTestTags
@@ -233,13 +234,19 @@ private fun HomeContent(
 
                         PrimaryAction(
                             text = when {
-                                mandate?.isArmed == true ->
+                                mandate == null ->
+                                    "Find a gift for ${recipient.displayName}"
+
+                                mandate.status.requiresApproval ->
+                                    "Finish autopilot approval"
+
+                                mandate.lastChargeState != null ->
+                                    "View merchant proof"
+
+                                mandate.isArmed ->
                                     "Open ${recipient.displayName}'s autopilot"
 
-                                mandate?.lastChargeState != null ->
-                                    "Choose another gift"
-
-                                else -> "Find a gift for ${recipient.displayName}"
+                                else -> "Review ${recipient.displayName}'s autopilot"
                             },
                             onClick = onFindGift,
                             modifier = Modifier
@@ -424,21 +431,44 @@ private data class AutopilotStatusPill(
 )
 
 private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (status) {
-    MandateStatus.ACTIVE -> AutopilotStatusPill(
-        label = "Autopilot on",
-        icon = Icons.Rounded.CheckCircle,
-        container = SuccessSurface,
-        content = Success,
-    )
+    MandateStatus.ACTIVE -> if (lastChargeState != null) {
+        AutopilotStatusPill(
+            label = if (lastChargeState == "UNKNOWN") "Result unknown" else "Needs attention",
+            icon = Icons.Rounded.Schedule,
+            container = WarningSurface,
+            content = Warning,
+        )
+    } else {
+        AutopilotStatusPill(
+            label = "Autopilot on",
+            icon = Icons.Rounded.CheckCircle,
+            container = SuccessSurface,
+            content = Success,
+        )
+    }
 
-    MandateStatus.SUCCEEDED,
-    MandateStatus.CONSUMED,
-    -> AutopilotStatusPill(
+    MandateStatus.SUCCEEDED -> AutopilotStatusPill(
         label = "Handled",
         icon = Icons.Rounded.CheckCircle,
         container = SuccessSurface,
         content = Success,
     )
+
+    MandateStatus.CONSUMED -> if (merchantOutcome == MandateMerchantOutcome.ORDER_VERIFIED) {
+        AutopilotStatusPill(
+            label = "Handled",
+            icon = Icons.Rounded.CheckCircle,
+            container = SuccessSurface,
+            content = Success,
+        )
+    } else {
+        AutopilotStatusPill(
+            label = "Attempt recorded",
+            icon = Icons.Rounded.Schedule,
+            container = WarningSurface,
+            content = Warning,
+        )
+    }
 
     MandateStatus.SETUP_CREATING,
     MandateStatus.AWAITING_APPROVAL,

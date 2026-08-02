@@ -8,15 +8,15 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260803_0014` | Codex | 2026-08-03 01:54 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 158 tests; healthy Azure revision `wishtrace-api--reconcile1` serves 100% traffic | Codex | 2026-08-03 03:48 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 160 tests; healthy Azure revision `wishtrace-api--mintretry1` serves 100% traffic | Codex | 2026-08-03 04:21 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | PARTIAL LIVE PASS — approval and one-time credential succeeded; Jackbox Pay was attempted once, but the browser observed no definitive order/decline within 45 seconds, so the result is locked `UNKNOWN` | Codex/user | 2026-08-03 03:17 PKT |
+| Prava transaction path understood | session + authoritative status | PARTIAL LIVE PASS — an earlier tokenized Jackbox attempt is locked `UNKNOWN`; the newest approval and its one explicit retry both failed at Prava credential mint with `FETCH_AGENTIC_CREDS_ERROR` before payment submission | Codex/user | 2026-08-03 04:21 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL LIVE PASS — four exact products have live facts; a tokenized Drawful 2 Pay attempt occurred, with no confirmed order or decline | Codex | 2026-08-03 03:17 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — automatic mandate reconciliation and explicit sandbox replacement built, tested, linted and installed in place | Codex | 2026-08-03 03:48 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — bounded mint recovery and concise failure UI built, tested, linted and installed in place | Codex | 2026-08-03 04:21 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
@@ -29,19 +29,50 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Let the user run one bounded physical-phone recovery: unknown result → choose another live gift →
-   fresh approval → automatic merchant proof. Do not retry or double-tap an unresolved operation.
-2. Capture the exact authoritative result without claiming an order or accepted decline early.
-3. Freeze backend behavior, then move immediately to the red/blue/green/yellow bento-question UX
-   and submission pass.
+1. Freeze backend behavior. The single permitted mint retry returned the same provider failure and
+   the app removed the action; do not create a third charge or imply a merchant decline.
+2. Preserve both response IDs as evidence of the external sandbox blocker and keep the earlier
+   tokenized Jackbox submission labeled `UNKNOWN`.
+3. Move immediately to the red/blue/green/yellow bento-question UX and submission pass.
 
 ## Next
 
-1. Confirm the new run leads with a different verified product when one remains eligible.
-2. Capture the exact Prava/merchant result without claiming an order.
-3. Move immediately to the UX/submission pass after the single bounded payment proof.
+1. Confirm a new discovery run rotates past both prior purchases and prior primary recommendations
+   while another eligible live product remains.
+2. Reduce discovery and Autopilot narration to visual state, exact facts and one primary action.
+3. Treat another merchant as future adapter work; it cannot repair a pre-merchant Prava mint failure.
 
 ## Milestone evidence
+
+### 2026-08-03 — Credential-mint failure isolated; one bounded recovery deployed
+
+- The fresh Quiplash 2 approval is active, but its first charge ended `DECLINED` with Prava code
+  `FETCH_AGENTIC_CREDS_ERROR`. A provider charge reference exists; no transaction reference,
+  one-time credential, merchant payment submission, outcome or order exists. WishTrace refreshed the
+  live Jackbox quote before minting, then stopped before Pay.
+- The backend exposes one explicit retry only when the latest failure occurred before credentials,
+  the same provider mandate is still active, its authoritative charge count is below the approved
+  maximum, no merchant outcome exists, and exactly one retryable mint failure is recorded. It uses a
+  new deterministic idempotency key without creating another approval or passkey prompt. A second
+  mint failure removes the action permanently; post-mint `UNKNOWN` remains locked.
+- Discovery freshness now includes products previously returned as the primary ranked decision as
+  well as products selected into mandates. A back/re-enter cycle therefore cannot lead with the same
+  live product while another eligible verified product remains; catalog exhaustion still permits an
+  honest reuse rather than fabricated variety.
+- Android renders the exact boundary as `Prava couldn't make the card`, offers `Try card again` once,
+  disables duplicate taps, and states that no payment was submitted to the merchant. The matching
+  APK is installed on the physical phone.
+- Evidence: 160 backend tests, Ruff, strict mypy, Android assemble/unit/lint all pass. ACR run `chk`
+  produced digest `sha256:c34d7a774e94bc0be78f13dc04563e6453d5d96f045670e861d0b2705269f49a`;
+  healthy Azure revision `wishtrace-api--mintretry1` serves 100% traffic. Public health reports
+  PostgreSQL 17.6 over TLS, and deployed OpenAPI exposes `mint_retry_available`.
+- Live result: the explicit retry ran once under the same approval and returned the same
+  `FETCH_AGENTIC_CREDS_ERROR` (response `ce11dddc-e591-4196-977a-d718d42de574`). The app restored the
+  terminal screen with only `Done`; no third action is exposed. An earlier Quiplash 2 retry did mint
+  successfully before its merchant result became `UNKNOWN`, proving the recovery path can cross the
+  provider boundary when Prava returns credentials.
+- Truth boundary: recovery behavior is deployed and live-verified, but Prava did not mint for the
+  latest mandate. No merchant decline, Visa result or order exists for this run.
 
 ### 2026-08-03 — Existing-mandate conflict now reconciles automatically
 
@@ -62,9 +93,10 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ### 2026-08-03 — Fresh verified gift recovery deployed
 
-- Discovery now remembers merchant product IDs already selected into a mandate for the same user and
-  occasion. After all commerce constraints pass, a prior selection recedes only when another live,
-  eligible product exists; it is never replaced by random or invented inventory.
+- Discovery now remembers merchant product IDs previously returned as the primary recommendation or
+  selected into a mandate for the same user and occasion. After all commerce constraints pass, a
+  prior selection recedes only when another live, eligible product exists; it is never replaced by
+  random or invented inventory.
 - If no fresh eligible product remains, WishTrace keeps the valid prior product rather than creating
   a false empty state. The Android client recognizes the factual `RECENTLY_ATTEMPTED` rejection and
   the locked-unknown screen offers one explicit `Choose another gift` recovery.

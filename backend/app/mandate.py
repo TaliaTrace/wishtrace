@@ -68,6 +68,7 @@ IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,255}$")
 _ONE_TIME_VALID_DAYS = 7
 _RECURRING_VALID_DAYS = 400
 _RECURRING_MAX_CHARGES = 5
+_RETRYABLE_MINT_FAILURES = frozenset({"FETCH_AGENTIC_CREDS_ERROR", "NO_TOKEN"})
 logger = logging.getLogger("wishtrace")
 
 
@@ -187,6 +188,7 @@ class MandateResponse(BaseModel):
     visa_confirmation: Literal["SUCCESS", "FAILURE"] | None
     approval_session: MandateApprovalSession | None
     charges: list[MandateChargeView]
+    mint_retry_available: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -303,6 +305,7 @@ class ChargeStore(Protocol):
         occasion_id: uuid.UUID,
         reference: str,
         amount_minor: int,
+        retrying_failed_mint: bool,
     ) -> ChargeClaim: ...
 
     async def record_charge_quote(
@@ -648,7 +651,34 @@ class MandateService:
                 ),
                 recoverable=False,
             )
-        if mandate.provider_mandate_id is None or mandate.state is not MandateState.ACTIVE:
+        retrying_failed_mint = mandate.mint_retry_available
+        if retrying_failed_mint:
+            assert mandate.provider_mandate_id is not None
+            try:
+                provider_mandate = await self._prava.get_mandate(
+                    mandate.provider_mandate_id
+                )
+            except PravaGatewayError as error:
+                raise ApiError(
+                    status_code=503 if error.recoverable else 502,
+                    code=error.code,
+                    message=error.safe_message,
+                    recoverable=error.recoverable,
+                ) from error
+            if (
+                provider_mandate.mandate_id != mandate.provider_mandate_id
+                or provider_mandate.status is not PravaMandateStatus.ACTIVE
+                or provider_mandate.total_charges >= mandate.max_charges
+            ):
+                raise ApiError(
+                    status_code=409,
+                    code="MANDATE_MINT_RETRY_UNAVAILABLE",
+                    message="Prava no longer permits another card attempt for this approval.",
+                    recoverable=False,
+                )
+        if mandate.provider_mandate_id is None or (
+            mandate.state is not MandateState.ACTIVE and not retrying_failed_mint
+        ):
             raise ApiError(
                 status_code=409,
                 code="MANDATE_NOT_ACTIVE",
@@ -661,6 +691,7 @@ class MandateService:
             occasion_id=occasion_id,
             reference=reference,
             amount_minor=mandate.item_price_minor,
+            retrying_failed_mint=retrying_failed_mint,
         )
         if charge.replayed:
             return await self._store.get(user_id=user.id, occasion_id=occasion_id)
@@ -1231,6 +1262,7 @@ class SqlMandateStore:
         occasion_id: uuid.UUID,
         reference: str,
         amount_minor: int,
+        retrying_failed_mint: bool,
     ) -> ChargeClaim:
         async with self._session_factory() as db, db.begin():
             mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
@@ -1245,7 +1277,27 @@ class SqlMandateStore:
             if existing is not None:
                 # Idempotent replay: the same execute request already ran.
                 return ChargeClaim(id=existing.id, replayed=True)
-            if MandateState(mandate.state) is not MandateState.ACTIVE:
+            latest_charge = await db.scalar(
+                select(MandateChargeModel)
+                .where(MandateChargeModel.mandate_id == mandate.id)
+                .order_by(
+                    MandateChargeModel.created_at.desc(),
+                    MandateChargeModel.id.desc(),
+                )
+                .limit(1)
+                .with_for_update()
+            )
+            valid_failed_mint_retry = (
+                retrying_failed_mint
+                and MandateState(mandate.state) is MandateState.DECLINED
+                and latest_charge is not None
+                and _is_retryable_mint_failure(latest_charge)
+                and await _retryable_mint_failure_count(db, mandate.id) == 1
+            )
+            if (
+                MandateState(mandate.state) is not MandateState.ACTIVE
+                and not valid_failed_mint_retry
+            ):
                 raise ApiError(
                     status_code=409,
                     code="MANDATE_NOT_ACTIVE",
@@ -1594,6 +1646,37 @@ async def _owned_charge(
     return charge
 
 
+def _is_retryable_mint_failure(charge: MandateChargeModel) -> bool:
+    return (
+        MandateChargeState(charge.state) is MandateChargeState.DECLINED
+        and charge.provider_error_code in _RETRYABLE_MINT_FAILURES
+        and charge.provider_charge_id is not None
+        and charge.provider_txn_ref_id is None
+        and charge.merchant_outcome is None
+        and charge.merchant_order_id is None
+    )
+
+
+async def _retryable_mint_failure_count(
+    session: AsyncSession,
+    mandate_id: uuid.UUID,
+) -> int:
+    rows = (
+        await session.scalars(
+            select(MandateChargeModel).where(
+                MandateChargeModel.mandate_id == mandate_id,
+                MandateChargeModel.state == MandateChargeState.DECLINED.value,
+                MandateChargeModel.provider_error_code.in_(_RETRYABLE_MINT_FAILURES),
+                MandateChargeModel.provider_charge_id.is_not(None),
+                MandateChargeModel.provider_txn_ref_id.is_(None),
+                MandateChargeModel.merchant_outcome.is_(None),
+                MandateChargeModel.merchant_order_id.is_(None),
+            )
+        )
+    ).all()
+    return len(rows)
+
+
 async def _mandate_response(
     session: AsyncSession,
     mandate: MandateModel,
@@ -1617,6 +1700,17 @@ async def _mandate_response(
             hosted_url=mandate.setup_hosted_url,
             expires_at=mandate.setup_expires_at,
         )
+    mint_failures = [charge for charge in charges if _is_retryable_mint_failure(charge)]
+    mint_retry_available = (
+        MandateState(mandate.state) is MandateState.DECLINED
+        and mandate.provider_status == PravaMandateStatus.ACTIVE.value
+        and mandate.provider_mandate_id is not None
+        and mandate.merchant_outcome is None
+        and mandate.merchant_order_id is None
+        and mandate.charges_used < mandate.max_charges
+        and len(mint_failures) == 1
+        and charges[-1] is mint_failures[0]
+    )
     return MandateResponse(
         id=mandate.id,
         recipient_id=mandate.recipient_id,
@@ -1666,6 +1760,7 @@ async def _mandate_response(
             )
             for charge in charges
         ],
+        mint_retry_available=mint_retry_available,
         created_at=mandate.created_at,
         updated_at=mandate.updated_at,
     )

@@ -113,8 +113,7 @@ the organizer-required Prava sandbox attempt. This does not assert production st
 ```powershell
 cd backend
 uv sync --all-groups
-$env:PYTHONPATH = (Get-Location).Path
-uv run pytest
+uv run python -m pytest
 uv run ruff check app tests migrations scripts
 uv run mypy app scripts
 uv run alembic upgrade head

@@ -85,6 +85,7 @@ data class MandateDetails(
     val lastChargeState: String?,
     val lastChargeAmountMinor: Int?,
     val lastChargeFailureCode: String?,
+    val mintRetryAvailable: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

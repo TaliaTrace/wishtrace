@@ -311,7 +311,7 @@ async def test_discovery_maps_merchant_failure_to_safe_api_error() -> None:
         raise AssertionError("merchant failure should be mapped")
 
 
-async def test_discovery_prefers_fresh_live_product_after_prior_attempt() -> None:
+async def test_discovery_prefers_fresh_live_product_after_prior_recommendation() -> None:
     context = _context()
     context = DiscoveryContext(
         recipient_id=context.recipient_id,

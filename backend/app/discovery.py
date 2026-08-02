@@ -26,6 +26,7 @@ from app.models import (
     DiscoveryRunModel,
     MandateModel,
     OccasionModel,
+    RankingItemModel,
     RecipientModel,
     RecipientPreferenceModel,
 )
@@ -265,15 +266,34 @@ class SqlDiscoveryStore:
             # relationship and occasion carry the first-pass ranking, so an empty
             # interest list is a valid partial profile rather than an error.
             interests = [item.value for item in preferences if item.kind == "INTEREST"]
-            previous_product_ids = frozenset(
-                (
-                    await session.scalars(
-                        select(MandateModel.merchant_product_id).where(
-                            MandateModel.user_id == user_id,
-                            MandateModel.occasion_id == occasion_id,
-                        )
+            mandated_product_ids = (
+                await session.scalars(
+                    select(MandateModel.merchant_product_id).where(
+                        MandateModel.user_id == user_id,
+                        MandateModel.occasion_id == occasion_id,
                     )
-                ).all()
+                )
+            ).all()
+            recommended_product_ids = (
+                await session.scalars(
+                    select(CandidateSnapshotModel.merchant_product_id)
+                    .join(
+                        DiscoveryRunModel,
+                        DiscoveryRunModel.id == CandidateSnapshotModel.discovery_run_id,
+                    )
+                    .join(
+                        RankingItemModel,
+                        RankingItemModel.candidate_snapshot_id == CandidateSnapshotModel.id,
+                    )
+                    .where(
+                        DiscoveryRunModel.user_id == user_id,
+                        DiscoveryRunModel.occasion_id == occasion_id,
+                        RankingItemModel.role == "SELECTED",
+                    )
+                )
+            ).all()
+            previous_product_ids = frozenset(
+                (*mandated_product_ids, *recommended_product_ids)
             )
             return DiscoveryContext(
                 recipient_id=recipient.id,
@@ -457,7 +477,7 @@ def _prefer_fresh_candidates(
 ) -> list[CandidateEvaluation]:
     """Prefer a new verified gift without manufacturing variety.
 
-    Previously selected products recede only when at least one other candidate already
+    Previously recommended or selected products recede only when another candidate already
     passed every hard commerce constraint. If live availability leaves no alternative,
     the prior product stays eligible rather than turning a valid search into a fake empty state.
     """

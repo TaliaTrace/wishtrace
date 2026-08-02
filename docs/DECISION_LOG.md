@@ -620,3 +620,41 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: Disable the sandbox replacement flag and retain automatic refresh. Never widen
   the rule to production or allow the same product through it.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 04:08 PKT — One explicit pre-merchant mint retry, never automatic
+
+- Context: The user completed a new Quiplash 2 approval, but Prava returned
+  `FETCH_AGENTIC_CREDS_ERROR` before issuing a one-time credential. The provider mandate remains
+  active, reports zero completed charges, and no transaction reference, merchant outcome or order
+  exists. WishTrace refreshed Jackbox's live quote but stopped before payment submission.
+- Decision: Permit exactly one explicit retry under the same approval only when the latest charge is
+  the sole recorded pre-credential mint failure, the provider mandate is still active,
+  `total_charges` is below the approved maximum, and no transaction or merchant evidence exists.
+  Use a distinct deterministic idempotency key; create no new approval and trigger no passkey. Never
+  apply this recovery to a minted credential, merchant attempt or `UNKNOWN` result.
+- Consequence: A transient Prava mint failure can recover without asking the owner to repeat card and
+  passkey setup, while duplicate or ambiguous money-adjacent actions stay impossible. If the second
+  invocation fails before credentials, the action disappears permanently and the provider blocker
+  is reported truthfully. This immediate action is limited to the explicit sandbox proof; an armed
+  production mandate remains permission for later scheduled revalidation and purchase, not a charge.
+- Evidence: 160 backend tests, Ruff, strict mypy and the Android assemble/unit/lint gates pass. Azure
+  revision `wishtrace-api--mintretry1` is healthy at 100% traffic; its OpenAPI contract exposes the
+  retry flag. The matching APK is installed. The user-triggered retry returned the same
+  `FETCH_AGENTIC_CREDS_ERROR`, and the phone now renders only the terminal `Done` action.
+- Rollback/fallback: Disable the retry flag without changing the immutable ledger. Do not add a
+  third retry or a new approval for the same failed mint.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 04:08 PKT — Freshness includes recommendations, not only purchase attempts
+
+- Context: Two consecutive discovery runs could choose the same primary product when the first
+  recommendation never advanced into a mandate. Mandate history alone therefore could not prevent a
+  back/re-enter loop from feeling repetitive.
+- Decision: Treat prior persisted rank-position primary selections and prior mandate products as the
+  same freshness evidence. Apply all factual constraints first and recede seen products only when a
+  different eligible live candidate exists.
+- Consequence: Re-entering discovery leads with a fresh verified gift while catalog breadth remains,
+  without random ranking, fabricated products or a false empty state after exhaustion.
+- Rollback/fallback: Remove the ranking-history input if merchant product identity proves unstable;
+  retain deterministic hard constraints and honest reuse after catalog exhaustion.
+- Owner: WishTrace team / Codex

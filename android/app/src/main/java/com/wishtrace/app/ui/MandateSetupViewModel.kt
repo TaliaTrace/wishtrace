@@ -67,7 +67,6 @@ class MandateSetupViewModel(
     val state: StateFlow<MandateSetupUiState> = mutableState.asStateFlow()
 
     private var setupKey: String? = null
-    private var executeKey: String? = null
     private var openedApprovalSessionId: String? = null
     private var replaceUnknownMandateId: String? = null
 
@@ -103,7 +102,6 @@ class MandateSetupViewModel(
         if (mutableState.value.busy) return
         if (mutableState.value.occasionId != occasionId) replaceUnknownMandateId = null
         setupKey = null
-        executeKey = null
         openedApprovalSessionId = null
         mutableState.value = MandateSetupUiState(
             step = MandateSetupStep.READY_TO_ARM,
@@ -215,17 +213,40 @@ class MandateSetupViewModel(
      */
     fun executeSandboxProof(verifiedEmail: String?) {
         val current = mutableState.value
-        val occasionId = current.occasionId ?: return
-        val email = verifiedEmail?.trim()?.takeIf(String::isNotEmpty)
         if (current.busy || current.mandate?.status != MandateStatus.ACTIVE) return
+        executeApprovedMandate(
+            verifiedEmail = verifiedEmail,
+            idempotencyKey = "mandate-proof-${current.mandate.id}",
+        )
+    }
+
+    /** One owner-triggered retry when Prava failed before issuing any credential. */
+    fun retryCardIssue(verifiedEmail: String?) {
+        val current = mutableState.value
+        val mandate = current.mandate ?: return
+        if (
+            current.busy ||
+            current.step != MandateSetupStep.PROOF_DECLINED ||
+            !mandate.mintRetryAvailable
+        ) return
+        executeApprovedMandate(
+            verifiedEmail = verifiedEmail,
+            idempotencyKey = "mandate-proof-${mandate.id}-mint-retry-1",
+        )
+    }
+
+    private fun executeApprovedMandate(
+        verifiedEmail: String?,
+        idempotencyKey: String,
+    ) {
+        val occasionId = mutableState.value.occasionId ?: return
+        val email = verifiedEmail?.trim()?.takeIf(String::isNotEmpty)
         if (email == null) {
             mutableState.update {
                 it.copy(error = "Sign in again before running the sandbox merchant proof.")
             }
             return
         }
-        val stableKey = executeKey
-            ?: "mandate-proof-${current.mandate.id}".also { executeKey = it }
         mutableState.update {
             it.copy(step = MandateSetupStep.EXECUTING, error = null)
         }
@@ -234,7 +255,7 @@ class MandateSetupViewModel(
                 gateway.execute(
                     occasionId = occasionId,
                     billing = sandboxBilling(email),
-                    idempotencyKey = stableKey,
+                    idempotencyKey = idempotencyKey,
                 )
             }
             result.onSuccess(::applyMandate)

@@ -375,6 +375,7 @@ private fun JSONObject.toMandateDetails(): MandateDetails {
         lastChargeState = lastCharge?.requiredString("state"),
         lastChargeAmountMinor = lastCharge?.getInt("amount_minor"),
         lastChargeFailureCode = lastCharge?.optionalString("failure_code"),
+        mintRetryAvailable = optBoolean("mint_retry_available", false),
         createdAt = requiredInstant("created_at"),
         updatedAt = requiredInstant("updated_at"),
     )

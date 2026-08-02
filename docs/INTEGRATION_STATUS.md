@@ -79,25 +79,35 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   retire `7789`. WishTrace now preselects a card only when exactly one active enrollment exists;
   with these two cards it omits `card_id` and requires the owner to choose in Prava's hosted UI.
   Card metadata is used only to distinguish enrollments and no PAN/CVV is stored.
-- Latest approval evidence: LIVE SANDBOX PARTIAL PASS — the phone completed hosted approval for a
-  `$10` Drawful 2 mandate and returned through the app. A later mandate charge returned a one-time
-  credential, and the Jackbox actor submitted Pay once at `$9.99`. WishTrace did not expose or
-  persist the credential. No merchant order or accepted decline is claimed.
+- Latest approval evidence: LIVE SANDBOX PROVIDER FAILURE — after preserving the earlier Drawful 2
+  post-mint `UNKNOWN`, the phone completed a separate `$10` Quiplash 2 approval. Prava lists that
+  mandate as active with zero counted charges, but the first invocation returned
+  `FETCH_AGENTIC_CREDS_ERROR` before credentials. A provider charge reference exists; there is no
+  transaction reference, merchant outcome or order. WishTrace refreshed the live Jackbox quote but
+  stopped before submitting payment.
 - Sandbox browser-automation contract: ORGANIZER-CONFIRMED — Prava's hosted Browser Harness is not
   available in sandbox. Teams must build their own automation and call report-status themselves.
   WishTrace's exact-product Playwright actor is therefore the correct post-mint implementation.
-- Known blocker: the observed post-mint merchant result is unknown and must remain locked. A
-  separate different-product approval is allowed only by an explicit user action in the sandbox
-  environment; production cannot replace an unknown charge.
+- Known blocker: the older Drawful 2 and Quiplash 2 post-mint merchant results remain locked
+  `UNKNOWN`; the latest Quiplash run is blocked by Prava credential minting before payment
+  submission. Its one explicit retry returned the same failure, so WishTrace has stopped permanently
+  and recorded the provider boundary.
 - Conflict recovery: DEPLOYED — Android automatically refreshes an existing mandate after a setup
   conflict. An explicit different-gift sandbox recovery must name the exact latest locked mandate,
   prove its post-mint charge is `UNKNOWN`, and select a different live product. The old mandate is
   preserved and never retried or silently deleted.
-- Last verified: 2026-08-03 03:48 PKT
-- Evidence location: migration `20260803_0014`; ACR build `chj`, image digest
-  `sha256:f2655f58ab9e46cea25050bf9f1bfea6165ea0aa8f94623a8f2774d935ca1a8e`, and healthy deployed
-  revision `wishtrace-api--reconcile1` at 100% traffic. Public health reports PostgreSQL 17.6 over
-  TLS; the UCP profile returns 200 with `public, max-age=300`; 158 backend tests plus Android
+- Mint recovery: DEPLOYED AND LIVE-VERIFIED — one new idempotency key is permitted only when the
+  exact latest charge is a single pre-credential mint failure, the provider mandate remains active,
+  authoritative `total_charges` is below the local maximum, and no transaction/merchant result
+  exists. No retry is automatic and no new approval is created. The Quiplash retry returned the same
+  `FETCH_AGENTIC_CREDS_ERROR`; the second immutable charge now makes the action permanently
+  unavailable. Safe response IDs: `3282c85d-cb92-4b4b-8a0d-6a4381be7272` and
+  `ce11dddc-e591-4196-977a-d718d42de574`.
+- Last verified: 2026-08-03 04:21 PKT
+- Evidence location: migration `20260803_0014`; ACR build `chk`, image digest
+  `sha256:c34d7a774e94bc0be78f13dc04563e6453d5d96f045670e861d0b2705269f49a`, and healthy deployed
+  revision `wishtrace-api--mintretry1` at 100% traffic. Public health reports PostgreSQL 17.6 over
+  TLS; the UCP profile returns 200 with `public, max-age=300`; 160 backend tests plus Android
   build/unit/lint pass; the matching APK installed in place. No credential, card data or provider
   payload is retained.
 
@@ -112,10 +122,10 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Backup merchant/path: none enabled; HyperX physical was retired because the user has no US
   shipping address, and Turtle Beach's digital card starts at $50
 - Mode: live only; no controlled/runtime fixture fallback
-- Repeat-discovery rule: product IDs already selected into a mandate for the same occasion recede
-  only when another candidate has independently passed every live commerce constraint. If live
-  inventory has no fresh eligible alternative, the prior product remains available; WishTrace does
-  not fabricate variety.
+- Repeat-discovery rule: product IDs previously returned as the primary ranked decision or selected
+  into a mandate for the same occasion recede only when another candidate has independently passed
+  every live commerce constraint. If live inventory has no fresh eligible alternative, the prior
+  product remains available; WishTrace does not fabricate variety.
 - UCP profile verified: YES — `checkout.jackboxgames.com/.well-known/ucp` advertises UCP
   `2026-04-08`, Shopify catalog/cart/checkout/order, and card payment handlers. An app UCP search
   still requires the permanent public WishTrace profile URL after deployment.
@@ -221,7 +231,7 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   The user then created one real runtime recipient/occasion context and a force-stop/relaunch restored
   it from the backend.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
-  Apps behind managed HTTPS; healthy revision `wishtrace-api--reconcile1` receives 100% traffic
+  Apps behind managed HTTPS; healthy revision `wishtrace-api--mintretry1` receives 100% traffic
 - Custom tab/hosted approval verified: LIVE SANDBOX PASS — AndroidX Browser `1.10.0` opened the real
   Prava sandbox collection host, the user completed approval, the app return reconciled an active
   `$10` mandate, and Prava later issued one one-time credential to the backend-only merchant path.
@@ -246,11 +256,13 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   restarting discovery. Home distinguishes active, handled, awaiting-approval and failed-attempt
   states. The updated APK assembled, passed unit/lint checks and installed in place.
 - Current recovery UX: passkey start/authentication/cancellation failures name the exact pre-mandate
-  boundary and expose one explicit `Retry Prava approval` action. Provisioning and mint failures stay
-  terminal. Debug assembly, unit tests and lint pass; the updated APK is installed in place.
-- Known blockers: no further payment attempt is safe for this mandate. Prava report, Visa
-  confirmation and merchant order remain unproven; the installed recovery build must show the
-  sticky unknown state without a looping action.
+  boundary and expose one explicit `Retry Prava approval` action. The latest pre-credential mint
+  failure instead exposes one `Try card again` action under the same active approval; it never opens
+  another card/passkey ceremony and disappears after a second failure. Debug assembly, unit tests
+  and lint pass; the updated APK is installed in place.
+- Known blockers: the latest provider credential retry is exhausted after the same mint failure. The
+  older post-mint `UNKNOWN` remains non-retryable. Prava report, Visa confirmation and merchant order
+  remain unproven; the app shows `Done` and exposes no further money-adjacent action.
 
 ## Demo
 

@@ -93,6 +93,7 @@ fun MandateSetupRoute(
         onBack = onBack,
         onArm = { viewModel.arm(candidateId) },
         onRetryApproval = { viewModel.retryApproval(candidateId) },
+        onRetryCardIssue = { viewModel.retryCardIssue(verifiedEmail) },
         onRefresh = viewModel::refresh,
         onChooseAnotherGift = onChooseAnotherGift,
         onArmed = onArmed,
@@ -105,6 +106,7 @@ fun MandateSetupScreen(
     onBack: () -> Unit,
     onArm: () -> Unit,
     onRetryApproval: () -> Unit,
+    onRetryCardIssue: () -> Unit,
     onRefresh: () -> Unit,
     onChooseAnotherGift: () -> Unit,
     onArmed: () -> Unit,
@@ -128,6 +130,7 @@ fun MandateSetupScreen(
                 state = state,
                 onArm = onArm,
                 onRetryApproval = onRetryApproval,
+                onRetryCardIssue = onRetryCardIssue,
                 onRefresh = onRefresh,
                 onChooseAnotherGift = onChooseAnotherGift,
                 onArmed = onArmed,
@@ -473,18 +476,20 @@ private fun ProofComplete(state: MandateSetupUiState) {
 @Composable
 private fun ProofDeclined(state: MandateSetupUiState) {
     val merchantAttempted = state.mandate?.merchantOutcome == MandateMerchantOutcome.DECLINED
+    val canRetryCard = state.mandate?.mintRetryAvailable == true
     TerminalState(
         title = if (merchantAttempted) {
             "Sandbox merchant attempt recorded"
         } else {
-            "One-time card unavailable"
+            "Prava couldn't make the card"
         },
         message = if (merchantAttempted) {
             "The real merchant declined the tokenized sandbox card, as expected. No order was created."
+        } else if (canRetryCard) {
+            "Your approval is still active. No payment was submitted to Jackbox. You can try " +
+                "issuing the sandbox card once more without another passkey."
         } else {
-            "Prava did not issue a bounded sandbox card for this attempt, so the merchant was " +
-                "not contacted and no purchase occurred. Other gifts remain available, but a " +
-                "new approval may fail until Prava can issue the card."
+            "No card was issued, no payment was submitted to Jackbox, and nothing was purchased."
         },
     )
 }
@@ -521,6 +526,7 @@ private fun MandateActionBar(
     state: MandateSetupUiState,
     onArm: () -> Unit,
     onRetryApproval: () -> Unit,
+    onRetryCardIssue: () -> Unit,
     onRefresh: () -> Unit,
     onChooseAnotherGift: () -> Unit,
     onArmed: () -> Unit,
@@ -581,13 +587,32 @@ private fun MandateActionBar(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                MandateSetupStep.PROOF_COMPLETE,
-                MandateSetupStep.PROOF_DECLINED,
-                -> PrimaryAction(
+                MandateSetupStep.PROOF_COMPLETE -> PrimaryAction(
                     text = "Done",
                     onClick = onArmed,
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                MandateSetupStep.PROOF_DECLINED -> if (
+                    state.mandate?.mintRetryAvailable == true
+                ) {
+                    PrimaryAction(
+                        text = "Try card again",
+                        onClick = onRetryCardIssue,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    SecondaryAction(
+                        text = "Not now",
+                        onClick = onArmed,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    PrimaryAction(
+                        text = "Done",
+                        onClick = onArmed,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
 
                 MandateSetupStep.FAILED -> if (state.canRetryApproval) {
                     PrimaryAction(

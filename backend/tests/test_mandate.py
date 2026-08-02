@@ -94,6 +94,8 @@ def _mandate(
     charges_used: int = 0,
     approved_amount_minor: int = 500,
     item_price_minor: int = 500,
+    provider_status: str | None = None,
+    mint_retry_available: bool = False,
 ) -> MandateResponse:
     return MandateResponse(
         id=uuid.uuid4(),
@@ -115,13 +117,18 @@ def _mandate(
         product_title="Jackbox Games Gift Card - $5 USD",
         item_price_minor=item_price_minor,
         provider_mandate_id=provider_mandate_id,
-        provider_status="active" if state is MandateState.ACTIVE else None,
+        provider_status=(
+            provider_status
+            if provider_status is not None
+            else "active" if state is MandateState.ACTIVE else None
+        ),
         setup_failure_code=None,
         merchant_order_id=None,
         merchant_outcome=None,
         visa_confirmation=None,
         approval_session=None,
         charges=[],
+        mint_retry_available=mint_retry_available,
         created_at=_NOW,
         updated_at=_NOW,
     )
@@ -271,8 +278,9 @@ class MemoryMandateStore:
         occasion_id: uuid.UUID,
         reference: str,
         amount_minor: int,
+        retrying_failed_mint: bool,
     ) -> ChargeClaim:
-        del user_id, occasion_id
+        del user_id, occasion_id, retrying_failed_mint
         if reference in self.charges_by_reference:
             return ChargeClaim(id=self.charges_by_reference[reference], replayed=True)
         charge_id = uuid.uuid4()
@@ -707,6 +715,81 @@ async def test_execute_prava_decline_records_and_never_checks_out() -> None:
     assert len(store.declined_charges) == 1
     assert checkout.checkout_calls == 0
     assert prava.report_calls == []
+
+
+async def test_explicit_failed_mint_retry_reuses_active_approval_without_new_session() -> None:
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.DECLINED,
+            provider_status="active",
+            mint_retry_available=True,
+        )
+    )
+    prava = FakeMandatePrava()
+    prava.mandate_info = PravaMandateInfo(
+        mandate_id=_MANDATE_ID,
+        status=PravaMandateStatus.ACTIVE,
+        recurring_frequency=PravaMandateFrequency.ONE_TIME,
+        merchant_scope=PravaMandateScope.LISTED,
+        approved_amount="5.00",
+        currency="USD",
+        created_at=_NOW,
+        valid_until=datetime(2099, 8, 1, tzinfo=UTC),
+        total_charges=0,
+        remaining_charges=1,
+    )
+    prava.charge_result = _minted_credential()
+    checkout = FakeMerchantCheckout(_ok_checkout())
+    service = _service(store, prava, checkout)
+
+    result = await service.execute(
+        _user(),
+        store.mandate.occasion_id,
+        MandateExecuteRequest(billing=_billing()),
+        "mint-retry-key-0001",
+    )
+
+    assert result.state is MandateState.CONSUMED
+    assert len(prava.charge_calls) == 1
+    assert prava.session_requests == []
+    assert checkout.checkout_calls == 1
+
+
+async def test_failed_mint_retry_stops_when_provider_charge_limit_is_used() -> None:
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.DECLINED,
+            provider_status="active",
+            mint_retry_available=True,
+        )
+    )
+    prava = FakeMandatePrava()
+    prava.mandate_info = PravaMandateInfo(
+        mandate_id=_MANDATE_ID,
+        status=PravaMandateStatus.ACTIVE,
+        recurring_frequency=PravaMandateFrequency.ONE_TIME,
+        merchant_scope=PravaMandateScope.LISTED,
+        approved_amount="5.00",
+        currency="USD",
+        created_at=_NOW,
+        valid_until=datetime(2099, 8, 1, tzinfo=UTC),
+        total_charges=1,
+        remaining_charges=0,
+    )
+    checkout = FakeMerchantCheckout(_ok_checkout())
+    service = _service(store, prava, checkout)
+
+    with pytest.raises(ApiError) as unavailable:
+        await service.execute(
+            _user(),
+            store.mandate.occasion_id,
+            MandateExecuteRequest(billing=_billing()),
+            "mint-retry-key-0002",
+        )
+
+    assert unavailable.value.code == "MANDATE_MINT_RETRY_UNAVAILABLE"
+    assert prava.charge_calls == []
+    assert checkout.checkout_calls == 0
 
 
 async def test_execute_rejects_unverified_or_mismatched_email() -> None:

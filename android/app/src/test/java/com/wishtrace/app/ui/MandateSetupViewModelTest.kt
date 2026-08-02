@@ -159,6 +159,29 @@ class MandateSetupViewModelTest {
     }
 
     @Test
+    fun failedCardIssueOffersOneExplicitRetryWithoutNewApproval() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            current = details(
+                status = MandateStatus.DECLINED,
+                lastChargeState = "DECLINED",
+                lastChargeFailureCode = "FETCH_AGENTIC_CREDS_ERROR",
+                mintRetryAvailable = true,
+            )
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+        viewModel.retryCardIssue("owner@example.com")
+        viewModel.retryCardIssue("owner@example.com")
+        advanceUntilIdle()
+
+        assertEquals(1, gateway.executeCalls)
+        assertEquals(0, gateway.setupCalls)
+        assertEquals("mandate-proof-mandate-mint-retry-1", gateway.executeKeys.single())
+    }
+
+    @Test
     fun activeProviderCannotHideUnknownMerchantAttempt() = runTest(dispatcher) {
         val gateway = FakeMandateGateway().apply {
             current = details(
@@ -335,6 +358,7 @@ class MandateSetupViewModelTest {
             lastChargeAmountMinor: Int? = null,
             lastChargeFailureCode: String? = null,
             setupFailureCode: String? = null,
+            mintRetryAvailable: Boolean = false,
         ) = MandateDetails(
             id = "mandate",
             recipientId = "recipient",
@@ -364,6 +388,7 @@ class MandateSetupViewModelTest {
             lastChargeState = lastChargeState,
             lastChargeAmountMinor = lastChargeAmountMinor,
             lastChargeFailureCode = lastChargeFailureCode,
+            mintRetryAvailable = mintRetryAvailable,
             createdAt = Instant.parse("2026-08-02T00:00:00Z"),
             updatedAt = Instant.parse("2026-08-02T00:01:00Z"),
         )

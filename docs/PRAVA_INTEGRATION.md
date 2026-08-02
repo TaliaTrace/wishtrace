@@ -147,6 +147,20 @@ order or an explicit recognized decline within the observation window, so WishTr
 `UNKNOWN`, sent no Prava report and authorized no retry. Provider `active` describes the remaining
 authorization, not the merchant outcome; refresh can no longer overwrite that unresolved charge.
 
+A later user-authorized Quiplash 2 mandate returned `FETCH_AGENTIC_CREDS_ERROR` before credentials.
+The mandate remains active with zero authoritative charges. WishTrace refreshed Jackbox's live quote
+before minting, but no payment credential or Pay submission reached the merchant. WishTrace permits
+one explicit invocation retry under that same approval only after a read-only provider check confirms
+the mandate is still active and `total_charges` is below its approved maximum. This creates no new
+session or passkey prompt and never runs automatically. A second pre-credential failure is terminal;
+any post-mint uncertainty remains permanently ineligible for this recovery.
+
+The explicit Quiplash retry returned the same `FETCH_AGENTIC_CREDS_ERROR`. The immutable ledger now
+contains two pre-credential failures, zero successful charges, no provider transaction reference and
+no merchant payment submission. Android therefore exposes only `Done`. The request matches Prava's
+documented `POST /v1/mandates/{id}/charge` body (`amount` plus `reference`); another merchant cannot
+repair this pre-merchant provider failure, and a third invocation is not authorized.
+
 Hosted mode remains intentional for native Android. Prava's embedded SDK is a browser JavaScript
 package that mounts a secure iframe; it is not a native Android SDK. WishTrace therefore uses a
 Custom Tab so Prava and the browser retain the secure origin and WebAuthn/passkey ceremony. The app

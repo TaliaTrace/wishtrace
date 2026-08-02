@@ -41,6 +41,7 @@
 - stale price;
 - unsupported merchant;
 - prior product recedes when a different live eligible candidate exists;
+- prior primary recommendation recedes even when it was never selected into a mandate;
 - prior product remains eligible when live inventory has no valid alternative.
 
 ## Model cases
@@ -71,6 +72,10 @@
 - setup conflict automatically refreshes the existing mandate;
 - sandbox-only replacement requires the exact post-mint unknown mandate and a different product;
 - production cannot replace an unknown charge;
+- one explicit pre-credential mint retry reuses the active approval without a new session;
+- mint retry is refused when the provider charge count reached the mandate limit;
+- a second pre-credential mint failure permanently removes the retry;
+- post-mint unknown never qualifies as a mint retry;
 - changed price requires new approval.
 
 ## Android UX cases

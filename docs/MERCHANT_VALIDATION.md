@@ -108,6 +108,12 @@ checkout advertising is not treated as product-level proof. Amazon Incentives re
 partner onboarding and a prefunded account; Steam and Microsoft digital gifts remain account/region
 dependent and have no verified WishTrace checkout adapter. They are not runtime options.
 
+For repeat discovery, a product that was either the prior primary ranked recommendation or selected
+into a mandate recedes only when another independently eligible live product exists. This prevents
+back/re-enter loops from repeatedly leading with the same gift without randomizing rankings or
+inventing catalog breadth. When all verified products have been seen, the best valid product may
+reappear honestly.
+
 ## Fallback ladder
 
 1. One fixed Jackbox $5 live SKU with refreshed price and no-shipping checkout.

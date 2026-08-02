@@ -237,7 +237,7 @@ private fun HomeContent(
                                     "Open ${recipient.displayName}'s autopilot"
 
                                 mandate?.lastChargeState != null ->
-                                    "Try one-time approval"
+                                    "Review payment status"
 
                                 else -> "Find a gift for ${recipient.displayName}"
                             },
@@ -452,7 +452,18 @@ private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (statu
         content = Warning,
     )
 
-    // DECLINED, CANCELLED, EXPIRED, FAILED, PAUSED, UNKNOWN — muted; no pill.
+    MandateStatus.DECLINED -> if (lastChargeState != null) {
+        AutopilotStatusPill(
+            label = "Payment blocked",
+            icon = Icons.Rounded.Schedule,
+            container = WarningSurface,
+            content = Warning,
+        )
+    } else {
+        null
+    }
+
+    // CANCELLED, EXPIRED, FAILED, PAUSED, UNKNOWN — muted; no pill.
     else -> null
 }
 

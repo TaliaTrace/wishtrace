@@ -320,3 +320,14 @@ For every primary screen:
 - The personal note screen uses the message-heart focal asset, visible recipient/date context, a large editable field and a stable save/skip region. Empty Save is disabled.
 - Final rendered evidence is in `artifacts/screenshots/milestone-4/`.
 - Actual sourced recommendation visuals remain unverified until a real or recorded product fixture exists. The model-driven components are implemented but are not claimed as rendered commerce evidence.
+
+## 2026-08-03 terminal payment trust correction
+
+- A real hosted Prava session ended after identity approval but before a one-time credential or
+  merchant attempt. The terminal Android state now names the failed provider boundary, says that the
+  merchant was not contacted and that nothing was charged, and offers `Done` rather than retry.
+- Home labels the state `Payment blocked` and opens the recorded status. It no longer routes this
+  recipient through Discovery to another approval session.
+- Current screenshots were deliberately not inspected in this slice at the user's request; the
+  user will verify the installed screen directly on the physical phone. No visual-device evidence
+  is claimed until that check occurs.

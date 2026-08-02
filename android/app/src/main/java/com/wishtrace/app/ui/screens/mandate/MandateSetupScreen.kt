@@ -537,14 +537,13 @@ private fun MandateActionBar(
                 MandateSetupStep.CANCELLED,
                 MandateSetupStep.EXPIRED,
                 MandateSetupStep.FAILED,
+                MandateSetupStep.DECLINED,
                 -> PrimaryAction(
-                    text = "Try again",
-                    onClick = onArm,
+                    text = "Done",
+                    onClick = onArmed,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.busy,
                 )
 
-                MandateSetupStep.DECLINED,
                 MandateSetupStep.UNKNOWN,
                 -> SecondaryAction(
                     text = "Refresh result",

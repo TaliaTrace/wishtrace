@@ -2023,7 +2023,10 @@ def transaction_status(intent: PurchaseIntentResponse) -> PublicTransactionStatu
         TransactionState.DECLINED: ("The merchant checkout was declined.", False),
         TransactionState.CANCELLED: ("Approval was cancelled.", False),
         TransactionState.EXPIRED: ("The approval session expired.", True),
-        TransactionState.FAILED: ("The transaction failed safely.", True),
+        TransactionState.FAILED: (
+            "The transaction failed safely. No successful order exists.",
+            False,
+        ),
         TransactionState.UNKNOWN: (
             "The result is uncertain. Do not retry the purchase; refresh first.",
             True,

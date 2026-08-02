@@ -109,6 +109,14 @@ Do not claim an order if only a payment/session was completed. A sandbox tokeniz
 against a real merchant is valid organizer evidence even when the merchant checkout fails, but the
 result must say authorization/attempt rather than “Gift secured.”
 
+## Observed sandbox boundary — 2026-08-03
+
+The active-mandate charge and one standard hosted session both failed inside Prava before a usable
+one-time credential was returned. The standard purchase intent is terminal `FAILED`, with no
+merchant outcome or order. Reopening its existing hosted URL did not create another session. All
+further payment retries are frozen; WishTrace shows this as a provider-stage failure, not a merchant
+decline or completed sandbox transaction.
+
 ## Production access
 
 Do not apply prematurely. The organizer's 2026-08-01 announcement requires an end-to-end sandbox

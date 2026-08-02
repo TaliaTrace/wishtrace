@@ -108,6 +108,24 @@ class CheckoutViewModelTest {
         assertEquals(1, gateway.receiptCalls)
     }
 
+    @Test
+    fun providerFailureNeverReopensApprovalOrCreatesAnotherSession() = runTest(dispatcher) {
+        val gateway = FakeGateway().apply {
+            current = details(TransactionState.AWAITING_USER, withSession = true)
+            reconcileState = TransactionState.FAILED
+        }
+        val viewModel = CheckoutViewModel(gateway)
+
+        viewModel.resumeFromReturn("intent")
+        advanceUntilIdle()
+        viewModel.createApprovalSession()
+        advanceUntilIdle()
+
+        assertEquals(CheckoutStep.FAILED, viewModel.state.value.step)
+        assertNull(viewModel.state.value.approvalUrl)
+        assertEquals(0, gateway.approvalCalls)
+    }
+
     private fun CheckoutViewModel.requestQuoteAfterReadyForTest() {
         val billing = BillingForm(
             firstName = "Test",
@@ -127,6 +145,8 @@ class CheckoutViewModelTest {
         var quoteCalls = 0
         var reconcileCalls = 0
         var receiptCalls = 0
+        var approvalCalls = 0
+        var reconcileState = TransactionState.DECLINED
         val quoteKeys = mutableListOf<String>()
 
         override suspend fun createIntent(candidateId: String): PurchaseIntentDetails {
@@ -154,13 +174,14 @@ class CheckoutViewModelTest {
             purchaseIntentId: String,
             idempotencyKey: String,
         ): PurchaseIntentDetails {
+            approvalCalls += 1
             current = details(TransactionState.AWAITING_USER, withSession = true)
             return current
         }
 
         override suspend fun reconcile(purchaseIntentId: String): PurchaseIntentDetails {
             reconcileCalls += 1
-            current = details(TransactionState.DECLINED, withSession = true)
+            current = details(reconcileState, withSession = true)
             return current
         }
 
@@ -207,7 +228,14 @@ class CheckoutViewModelTest {
             } else {
                 null
             },
-            providerStatus = if (state == TransactionState.DECLINED) "failed" else null,
+            providerStatus = if (
+                state == TransactionState.DECLINED || state == TransactionState.FAILED
+            ) {
+                "failed"
+            } else {
+                null
+            },
+            merchantOutcome = null,
             merchantOrderId = null,
             updatedAt = Instant.parse("2026-08-01T00:00:00Z"),
         )

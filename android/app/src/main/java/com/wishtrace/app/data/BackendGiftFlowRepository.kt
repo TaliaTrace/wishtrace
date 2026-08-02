@@ -326,6 +326,7 @@ private fun JSONObject.toPurchaseIntent(): PurchaseIntentDetails {
         quoteExpiresAt = optionalInstant("quote_expires_at"),
         approvalSession = approval,
         providerStatus = optionalString("provider_status"),
+        merchantOutcome = optionalString("merchant_outcome"),
         merchantOrderId = optionalString("merchant_order_id"),
         updatedAt = requiredInstant("updated_at"),
     )

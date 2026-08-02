@@ -8,15 +8,15 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260802_0012` | Codex | 2026-08-02 23:39 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS — 144 tests; exact merchant URL/state-code fixes deployed as `merchantfix1`; database TLS true | Codex | 2026-08-03 00:57 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS — 145 tests; exact merchant URL/state-code fixes deployed as `merchantfix1`; local terminal-failure contract hardened; database TLS true | Codex | 2026-08-03 01:25 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | LIVE PROVIDER MINT BLOCKER — public card approval created an active mandate; first documented charge returned `FETCH_AGENTIC_CREDS_ERROR` before credentials or merchant submission | Codex/user | 2026-08-03 00:44 PKT |
+| Prava transaction path understood | session + authoritative status | LIVE PROVIDER MINT BLOCKER — both the active-mandate charge and standard hosted session failed inside Prava before credentials or merchant submission | Codex/user | 2026-08-03 01:22 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — fresh live Jackbox quote is exactly $5; checkout actor is ready, but Prava issued no credential | Codex | 2026-08-03 00:44 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — sandbox-proof APK built, tested, linted and installed on the connected phone | Codex | 2026-08-03 00:57 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — terminal no-retry APK built, tested, linted and installed in place on the connected phone | Codex | 2026-08-03 01:25 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
@@ -29,17 +29,38 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Run the documented one-time hosted session fallback from the installed Android app.
-2. If Prava issues a credential, let the existing backend make exactly one Jackbox attempt and report it.
-3. Preserve the active mandate and its two failed credential-mint transactions as separate evidence.
+1. Freeze all Prava charge/session retries and preserve the failed provider evidence.
+2. Ship the terminal no-retry Android state and keep the existing failed purchase intent immutable.
+3. Finish the strongest truthful UX/demo/submission package; do not claim a merchant attempt.
 
 ## Next
 
-1. Run hosted Prava approval and the organizer-required real-merchant browser attempt.
-2. Repeat the physical-phone path once after the first evidence run without a duplicate action.
-3. Apply for production access only with the captured sandbox evidence.
+1. Verify the revised payment-status copy and non-transactional `Done` action on the phone.
+2. Complete the UX and submission pass around the proven live auth/context/catalog/ranking flow.
+3. Keep production access gated; the required tokenized merchant attempt was not reached.
 
 ## Milestone evidence
+
+### 2026-08-03 — Standard-session fallback failed before merchant; retries frozen
+
+- The existing failed mandate remained preserved. WishTrace then used the documented standard
+  hosted-session path once for the same immutable `$5.00` live Jackbox quote and purchase intent
+  `36e40790-751f-451d-9b45-6f3e7b59338c`.
+- Prava verified the user-facing approval/identity step but returned authoritative `failed` before
+  issuing a usable one-time credential. The purchase intent reconciled to `FAILED`, with no merchant
+  outcome and no order. Provider transaction `txn_01KZ21VFY5C91EFYKBCGYB0DFC` carried safe category
+  `FETCH_AGENTIC_CREDS_ERROR`.
+- Reopening the already-existing hosted URL did not create another WishTrace or Prava session. It
+  produced a second provider-page transaction, `txn_01KZ21X8G8RRP5CNYM535W5NMK`, categorized
+  `FIDO_START_FAILED`. No credential reached WishTrace and Jackbox was not contacted in either case.
+- Decision: no more charge or session retries. Home now opens the recorded payment status rather
+  than Discovery, terminal checkout uses `Done` rather than retry/refresh, and the backend reports
+  `FAILED` as non-recoverable for that purchase intent.
+- Quality: 145 backend tests, Ruff, strict mypy, Android debug assembly, unit tests and lint pass.
+  The updated APK installed successfully over the existing physical-phone app without clearing data.
+- Truth boundary: Google auth, recipient persistence, live Jackbox facts/quote, grounded Azure
+  ranking, hosted Prava approval, and active mandate are proven. One-time credential minting,
+  tokenized merchant attempt, Prava report, Visa confirmation, order, and receipt are not proven.
 
 ### 2026-08-03 — Active mandate proven; credential minting escalated
 

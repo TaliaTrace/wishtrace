@@ -471,3 +471,22 @@ Record only decisions that change product, architecture, truth boundary, schedul
   hosted approval; success is claimed only if a real credential reaches the merchant actor.
 - Rollback: Remove the conditional fallback once Prava mandate credential minting is healthy.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 01:22 PKT — Freeze retries after both Prava credential routes fail
+
+- Context: The one-time mandate charge failed twice before credentials, so WishTrace tried the
+  organizer-accepted standard hosted-session alternative once. The hosted page verified identity
+  but reported that payment could not complete.
+- Evidence: Purchase intent `36e40790-751f-451d-9b45-6f3e7b59338c` reconciled to terminal `FAILED`
+  with provider status `failed`, no merchant outcome and no order. Its first provider transaction
+  reported `FETCH_AGENTIC_CREDS_ERROR`. Reopening the same existing session did not create a second
+  session and produced `FIDO_START_FAILED`. Neither route supplied a credential or contacted Jackbox.
+- Decision: Stop all Prava charge/session attempts. Keep the purchase intent immutable, treat
+  `FAILED` as non-recoverable, route Home to the existing status, and expose only `Done` on terminal
+  payment states. Do not turn the provider failure into the organizer's accepted merchant decline.
+- Consequence: The app remains truthful and duplicate-safe, but it cannot claim tokenized merchant
+  checkout, Visa confirmation, an order or a receipt. UX/submission work proceeds around the
+  strongest proven boundary.
+- Rollback/fallback: Re-enable a payment action only after Prava supplies a verified credential-mint
+  fix and the existing audit facts have been reviewed. Never create speculative retries.
+- Owner: WishTrace team / Codex

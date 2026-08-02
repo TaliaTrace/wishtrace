@@ -96,6 +96,7 @@ fun CheckoutScreen(
                 onApprove = onApprove,
                 onRefresh = onRefresh,
                 onSaveMessage = onSaveMessage,
+                onDone = onBack,
             )
         },
     ) { innerPadding ->
@@ -171,10 +172,24 @@ fun CheckoutScreen(
                         message = "WishTrace will not retry the merchant payment. Refresh to reconcile it.",
                     )
 
-                    CheckoutStep.FAILED -> RecoveryState(
-                        title = "Checkout did not complete",
-                        message = "No successful order is being claimed. Refresh for the authoritative state.",
-                    )
+                    CheckoutStep.FAILED -> {
+                        val stoppedBeforeMerchant = state.intent?.let { intent ->
+                            intent.providerStatus == "failed" && intent.merchantOutcome == null
+                        } == true
+                        RecoveryState(
+                            title = if (stoppedBeforeMerchant) {
+                                "Prava couldn't issue the payment card"
+                            } else {
+                                "Checkout did not complete"
+                            },
+                            message = if (stoppedBeforeMerchant) {
+                                "Your approval was verified, but no usable one-time sandbox card " +
+                                    "was issued. The merchant was not contacted and nothing was charged."
+                            } else {
+                                "No successful order exists, and WishTrace will not retry it automatically."
+                            },
+                        )
+                    }
 
                 }
             }
@@ -516,6 +531,7 @@ private fun CheckoutActionBar(
     onApprove: () -> Unit,
     onRefresh: () -> Unit,
     onSaveMessage: () -> Unit,
+    onDone: () -> Unit,
 ) {
     Surface(color = SurfaceWhite, shadowElevation = 8.dp) {
         Column(
@@ -548,15 +564,21 @@ private fun CheckoutActionBar(
 
                 CheckoutStep.AWAITING_APPROVAL,
                 CheckoutStep.RECONCILING,
-                CheckoutStep.CANCELLED,
-                CheckoutStep.EXPIRED,
-                CheckoutStep.FAILED,
                 CheckoutStep.UNKNOWN,
                 -> SecondaryAction(
                     text = if (state.busy) "Verifying…" else "Refresh result",
                     onClick = onRefresh,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !state.busy,
+                )
+
+                CheckoutStep.CANCELLED,
+                CheckoutStep.EXPIRED,
+                CheckoutStep.FAILED,
+                -> PrimaryAction(
+                    text = "Done",
+                    onClick = onDone,
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 CheckoutStep.AUTHORIZATION_DECLINED,

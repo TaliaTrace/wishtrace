@@ -41,7 +41,16 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   `67174297-c74e-4f54-beb3-e5ac17f08660`, again before credentials or merchant submission.
 - Mandate report verified: CURRENT CONTRACT + MOCK TRANSPORT — current completed/failed result,
   mandate/transaction identity and Visa confirmation are checked; no live charge has been reported.
-- Real-merchant browser attempt verified:
+- Standard hosted-session fallback: LIVE PROVIDER FAILURE — one real hosted session was created for
+  purchase intent `36e40790-751f-451d-9b45-6f3e7b59338c` and the same exact `$5.00` Jackbox quote.
+  Prava displayed that identity was verified but payment could not complete. Authoritative
+  reconciliation returned `FAILED`, provider status `failed`, no merchant outcome and no order.
+  Provider transaction `txn_01KZ21VFY5C91EFYKBCGYB0DFC` reported
+  `FETCH_AGENTIC_CREDS_ERROR`. Reopening the same existing hosted URL created no new session; the
+  provider page recorded transaction `txn_01KZ21X8G8RRP5CNYM535W5NMK` with
+  `FIDO_START_FAILED`. No usable credential was issued in either attempt.
+- Real-merchant browser attempt verified: NO — both Prava routes stopped before a credential, so
+  the allowlisted Jackbox actor was not called with payment data.
 - Authoritative success verified:
 - Decline/cancel/unknown tested: create timeout, server error, unsafe redirect and malformed success
   freeze as `UNKNOWN`; replay refusal and invalid provider facts pass automated tests. A live hosted
@@ -65,15 +74,15 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   enrollment and mandate approval. Card metadata is used only to distinguish enrollments. The
   organizer card ending `2218` did not survive its failed provisioning attempt and is not claimed
   as enrolled.
-- Known blocker: Prava must repair or explain `FETCH_AGENTIC_CREDS_ERROR` for the active sandbox
-  mandate. WishTrace will not retry that endpoint again. The Android flow now falls back to Prava's
-  documented standard hosted session, which shares the same exact $5 live quote and Jackbox actor;
-  merchant proof still requires that session to issue a one-use credential.
-- Last verified: 2026-08-03 00:57 PKT
+- Known blocker: Prava failed to mint a usable one-time credential through both the active mandate
+  charge and the standard hosted session. WishTrace will not create or reopen another payment
+  attempt. Merchant proof remains externally blocked and is not claimed.
+- Last verified: 2026-08-03 01:22 PKT
 - Evidence location: safe response ID above; migration `20260802_0012`; deployed revision
-  `wishtrace-api--merchantfix1`; 144 backend tests plus Android build/unit/lint. The installed
-  hackathon APK exposes the explicit proof control and reopens an existing mandate/proof attempt
-  from Home. No credential, card data or provider payload retained.
+  `wishtrace-api--merchantfix1`; 145 backend tests plus Android build/unit/lint. The installed
+  hackathon APK routes the failed payment to its recorded status and exposes no retry action.
+  No credential, card data or provider payload retained. The terminal-status backend wording is
+  locally verified and not claimed as a newer Azure revision.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -186,8 +195,9 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   it from the backend.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
   Apps behind managed HTTPS; one healthy revision receives 100% traffic
-- Custom tab/hosted approval verified: LIVE OPEN — AndroidX Browser `1.10.0` opened the real Prava
-  sandbox collection host from an app-created session; user approval and actual return remain pending
+- Custom tab/hosted approval verified: LIVE FAILURE — AndroidX Browser `1.10.0` opened the real Prava
+  sandbox collection host. The user completed the visible identity/approval step, but Prava failed
+  before issuing a credential; the backend reconciled the purchase intent to terminal `FAILED`.
 - App link verified: DEVICE RECOVERY PASS — a synthetic return carrying only a random, nonexistent
   UUID reached the singleTop activity, called the authenticated public backend and rendered its safe
   `PURCHASE_INTENT_NOT_FOUND` recovery instead of trusting browser state. An actual Prava return
@@ -202,9 +212,9 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   user-authorized editable 2026-08-09 sandbox occasion, restored it after restart, retrieved the
   real Jackbox $5 candidate and rendered the grounded Azure ranking. The date is not claimed as the
   recipient's verified birthday.
-- Known blockers: the app is in the real Prava hosted mandate flow. Card/passkey completion, actual
-  deep-link return, tokenized merchant attempt, authoritative reconciliation and persisted message
-  remain unproven until the user completes the private hosted step.
+- Known blockers: Prava credential minting failed through both documented approval routes. The app
+  now keeps that state terminal, prevents another payment action, and routes Home to the recorded
+  status. Tokenized merchant attempt, Prava report, Visa confirmation and order remain unproven.
 
 ## Demo
 

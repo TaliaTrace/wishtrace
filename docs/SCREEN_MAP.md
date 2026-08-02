@@ -157,6 +157,10 @@ The hosted Prava experience may own the approval UI. WishTrace must provide:
 - reconciliation;
 - cancel/decline/expired/unknown UI.
 
+An authoritative terminal provider failure has no retry CTA. It explains whether the merchant was
+contacted and returns through a non-transactional `Done` action. Home links back to that recorded
+status instead of starting discovery or another hosted approval.
+
 ## 10. Personal message
 
 This can occur before approval or after selection. Pick one sequence and keep it stable.

@@ -334,6 +334,7 @@ data class PurchaseIntentDetails(
     val quoteExpiresAt: Instant?,
     val approvalSession: ApprovalSession?,
     val providerStatus: String?,
+    val merchantOutcome: String?,
     val merchantOrderId: String?,
     val updatedAt: Instant,
 )

@@ -49,6 +49,7 @@ from app.purchase import (
     TransactionState,
     _require_transition,
     receipt,
+    transaction_status,
 )
 
 
@@ -1030,6 +1031,17 @@ def test_receipt_requires_both_prava_and_merchant_evidence() -> None:
     )
     assert decline.kind == "AUTHORIZATION_RESULT"
     assert "decline" in decline.message.casefold()
+
+
+def test_terminal_provider_failure_is_not_presented_as_retryable() -> None:
+    status = transaction_status(
+        _intent(state=TransactionState.FAILED).model_copy(
+            update={"provider_status": "failed"},
+        )
+    )
+
+    assert status.recoverable is False
+    assert "no successful order" in status.message.casefold()
 
 
 async def test_purchase_routes_require_auth_idempotency_and_safe_return() -> None:

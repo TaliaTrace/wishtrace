@@ -13,12 +13,19 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Session creation verified: LIVE SANDBOX — a real authorize-only mandate setup session was created
   by the deployed backend and its allowlisted hosted URL opened in an Android Custom Tab. Exact
   decimal money, response-ID handling and session-token discard also pass transport tests.
-- Hosted approval verified: IN PROGRESS — the real hosted page is open for the user's private
-  organizer-issued sandbox card and passkey step; no card-page screenshot or dump was taken
-- App return verified:
+- Hosted approval verified: PROVIDER SETUP BLOCKED — an exact-contract hosted attempt returned
+  authoritative `failed` with safe categories `PROVISION_ERROR` and `DEVICE_BINDING_FAILED` before
+  creating a mandate or credential. A later session remains `pending` with zero transactions and
+  zero credentials. Prava support has been given the safe session/response evidence; no hosted
+  card-page screenshot or dump was retained.
+- App return verified: PARTIAL — the hosted failure remained in the Custom Tab, so no automatic
+  Prava redirect was observed. A validated physical-phone app-link opened WishTrace and reconciled
+  the exact backend failure into its terminal recovery UI.
 - Mandate association verified: LIVE LIST + CONTRACT — the real sandbox list endpoint parsed through
   the production adapter; it returned zero before approval. Post-return association matches customer,
-  time, merchant, amount, currency, frequency and scope and refuses ambiguity.
+  time, merchant, amount, currency, frequency and scope and refuses ambiguity. After the failed
+  hosted attempt, the live list still returned zero and payment-result confirmed failure; the
+  backend stored `FAILED/failed` without binding a provider mandate.
 - Mandate charge verified: CURRENT CONTRACT + MOCK TRANSPORT — current `mandateId`, `transactionId`,
   nested credentials and `awaiting_result` shape pass; credentials remain masked and memory-only.
 - Mandate report verified: CURRENT CONTRACT + MOCK TRANSPORT — current completed/failed result,
@@ -26,8 +33,8 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Real-merchant browser attempt verified:
 - Authoritative success verified:
 - Decline/cancel/unknown tested: create timeout, server error, unsafe redirect and malformed success
-  freeze as `UNKNOWN`; replay refusal and invalid provider facts pass automated tests; live decline
-  and cancel remain pending
+  freeze as `UNKNOWN`; replay refusal and invalid provider facts pass automated tests. A live hosted
+  provisioning failure now becomes retryable `FAILED`; live merchant decline and cancel remain pending.
 - Production access requested: NO — intentionally gated behind organizer-required sandbox evidence
 - Backend boundary: purchase ledger, peppered quote/session idempotency, exact state transitions,
   fixed app return, authoritative polling, one-attempt Shopify automation and report-status are
@@ -36,14 +43,19 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   checkout becomes `UNKNOWN` and is not blindly retried. If the merchant result was persisted before
   report-status was interrupted, reconciliation re-reports that result and never checks out again.
   Prava facts must match the approved merchant origin and total.
-- Known blockers: the live hosted session still needs the user's private card/passkey completion,
-  deep-link return, one mandate charge, merchant attempt and authoritative report. Staging permits
-  the exact $5 stored-value path solely for the organizer-required sandbox expected-failure proof;
-  production compatibility still requires Prava approval/evidence.
-- Last verified: 2026-08-02 22:11 PKT
-- Evidence location: safe response ID above; deployed revision
-  `wishtrace-api--pravafcf597f`; `backend/app/prava.py`, `backend/app/mandate.py` and isolated
-  transport/state tests. No credential, card data or provider payload retained.
+- Request sanitation: PASS — explicit mandate `intent` and `integration_type`, routable-email
+  enforcement, delegated bare HTTPS merchant origin, exact decimal money, actual item price,
+  single user-triggered retry boundary, Custom Tab handoff, and safe provider failure categories.
+  The observed sandbox create response omitted documented `authorizeOnly`; omission is accepted only
+  with explicit request intent, while an explicit `false` fails closed.
+- Known blockers: Prava must verify/reset the organizer card/device binding, then the user must
+  complete the existing hosted setup manually. Only after a live mandate and one-use credential
+  exist can WishTrace run the organizer-required merchant attempt and report its result. Staging
+  permits the exact $5 stored-value path solely for that proof.
+- Last verified: 2026-08-02 23:46 PKT
+- Evidence location: safe response ID above; migration `20260802_0012`; deployed revision
+  `wishtrace-api--pravaaudit1`; 140 backend tests plus Android build/unit/lint. No credential, card
+  data or provider payload retained.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -124,19 +136,20 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Path: session pooler on port 5432 with SQLAlchemy async psycopg 3 and `NullPool`
 - Client TLS verified: YES via libpq `ssl_in_use`
 - Server version observed: PostgreSQL 17.6
-- Migration status: `20260801_0011 (head)`; Alembic model/schema drift check passes
+- Migration status: `20260802_0012 (head)`; Alembic model/schema drift check passes
 - Migration content: foundation; Google users/challenges/sessions; owned recipients, preferences,
   hints and occasions; one-recipient Gold uniqueness; owned immutable discovery runs, live candidate
   snapshots and deterministic rejection records; exact purchase snapshots, public Prava session
   identifiers, hashed idempotency operations and immutable transaction transitions; owned ranking
   runs, immutable evidence snapshots and ordered evidence-linked decisions; idempotent merchant
   quotes, merchant/Prava outcome evidence, one owned editable personal message per purchase, owned
-  mandate/charge audit rows, Gift-DNA personality/age evidence and explicit occasion recurrence
+  mandate/charge audit rows, Gift-DNA personality/age evidence, explicit occasion recurrence and
+  normalized mandate-setup failure categories
 - Permanent ignored local `.env` contains `sslmode=require`: YES; a fresh settings load and read-only
   connection probe used that value directly and reported client TLS true
 - Stable local `SESSION_TOKEN_PEPPER`: YES; presence and minimum length were checked without printing
   the value
-- Last verified: 2026-08-02 22:11 PKT during official window
+- Last verified: 2026-08-02 23:39 PKT during official window
 
 ## Android
 

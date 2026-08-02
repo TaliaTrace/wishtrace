@@ -359,6 +359,7 @@ private fun JSONObject.toMandateDetails(): MandateDetails {
         itemPriceMinor = getInt("item_price_minor"),
         approvalUrl = approvalUrl,
         lastProviderStatus = optionalString("provider_status"),
+        setupFailureCode = optionalString("setup_failure_code"),
         merchantOrderId = optionalString("merchant_order_id"),
         merchantOutcome = optionalString("merchant_outcome")
             ?.let(MandateMerchantOutcome::fromWire),

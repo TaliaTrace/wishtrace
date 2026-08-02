@@ -159,11 +159,19 @@ fun MandateSetupScreen(
                     )
                     MandateSetupStep.FAILED -> TerminalState(
                         title = "Autopilot did not arm",
-                        message = if (state.mandate?.lastProviderStatus == "failed") {
-                            "Prava returned a failed sandbox setup before any mandate or merchant " +
-                                "charge was created. Nothing was charged. You can try again."
-                        } else {
-                            "Prava could not complete setup. Nothing was charged. You can try again."
+                        message = when (state.mandate?.setupFailureCode) {
+                            "PROVISION_ERROR" ->
+                                "Prava could not provision this sandbox card. No mandate or " +
+                                    "merchant charge was created."
+                            "DEVICE_BINDING_FAILED" ->
+                                "Prava could not bind this device or passkey. No mandate or " +
+                                    "merchant charge was created."
+                            else -> if (state.mandate?.lastProviderStatus == "failed") {
+                                "Prava returned a failed sandbox setup. No mandate or merchant " +
+                                    "charge was created."
+                            } else {
+                                "Prava could not complete setup. Nothing was charged."
+                            }
                         },
                     )
                     MandateSetupStep.UNKNOWN -> TerminalState(

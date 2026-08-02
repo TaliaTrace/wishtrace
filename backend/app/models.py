@@ -840,6 +840,7 @@ class MandateModel(Base):
     setup_response_id: Mapped[str | None] = mapped_column(String(255))
     provider_mandate_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     provider_status: Mapped[str | None] = mapped_column(String(32))
+    setup_failure_code: Mapped[str | None] = mapped_column(String(100))
     charges_used: Mapped[int] = mapped_column(Integer, server_default="0")
     merchant_order_id: Mapped[str | None] = mapped_column(String(255))
     merchant_outcome: Mapped[str | None] = mapped_column(String(32))

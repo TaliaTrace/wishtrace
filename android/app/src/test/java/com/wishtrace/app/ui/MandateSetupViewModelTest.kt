@@ -142,6 +142,7 @@ class MandateSetupViewModelTest {
             itemPriceMinor = 500,
             approvalUrl = null,
             lastProviderStatus = status.wire.lowercase(),
+            setupFailureCode = null,
             merchantOrderId = orderId,
             merchantOutcome = merchantOutcome,
             visaConfirmation = merchantOutcome?.let {

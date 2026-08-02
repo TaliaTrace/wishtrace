@@ -78,6 +78,7 @@ data class MandateDetails(
     val itemPriceMinor: Int,
     val approvalUrl: String?,
     val lastProviderStatus: String?,
+    val setupFailureCode: String?,
     val merchantOrderId: String?,
     val merchantOutcome: MandateMerchantOutcome?,
     val visaConfirmation: MandateVisaConfirmation?,

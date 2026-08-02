@@ -351,3 +351,42 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: If Prava's list response cannot uniquely identify the current setup, leave the
   mandate awaiting approval and require support/recovery; never select the newest mandate by guess.
 - Owner: WishTrace team / Codex
+
+### 2026-08-02 22:34 PKT — A failed hosted setup is not the expected merchant decline
+
+- Context: The first physical-phone hosted mandate attempt displayed card-processing failure.
+- Evidence: Prava's official sandbox guide says a valid test-card flow should reach
+  `awaiting_result` with one-use credentials. The live payment-result instead returned `failed` with
+  `PROVISION_ERROR`; the customer mandate list remained empty and WishTrace had zero charge rows or
+  merchant order. `PROVISION_ERROR` is not documented in Prava's current public error table.
+- Decision: Reconcile a missing mandate against the hosted session result. Persist `FAILED` for an
+  authoritative failed session, use `UNKNOWN` for a success-like session with no unique mandate,
+  and permit a fresh failed-session retry. Never count provisioning failure as the organizer's
+  accepted tokenized merchant decline.
+- Consequence: The app no longer waits forever or implies approval. Revision
+  `wishtrace-api--prava6a57af7` renders an honest failure and a clean retry while retaining safe
+  provider response evidence.
+- Rollback/fallback: If another current documented sandbox card produces the same category, stop
+  retrying and contact Prava support; do not broaden the merchant or fake the required proof.
+- Owner: WishTrace team / Codex
+
+### 2026-08-02 23:46 PKT — Enforce the organizer request audit and retain safe failure codes
+
+- Context: The organizer supplied a negative-request audit after participants sent invalid session
+  parameters. The live sandbox also omitted the documented `authorizeOnly` field and failed card
+  provisioning/device binding before producing a mandate or one-use credential.
+- Evidence: The exact setup payload is accepted with explicit `integration_type=full_checkout` and
+  `mandate_setup.intent=mandate_setup`. A live response omitted `authorizeOnly`; a later official
+  payment-result read returned only safe provider categories. The current untouched session remains
+  `pending` with zero transactions and credentials.
+- Decision: Enforce routable verified email and a bare HTTPS merchant origin at the request model,
+  use the real candidate price in the line item, accept only omission/true for `authorizeOnly`, and
+  persist a normalized provider failure code for recovery UI. Never persist card data, arbitrary
+  provider messages or one-use credentials, and never auto-retry setup.
+- Consequence: Revision `wishtrace-api--pravaaudit1` is healthy at 100% traffic, Supabase migration
+  `20260802_0012` is live over TLS, and Android can distinguish provisioning from device-binding
+  failure without claiming approval. The external Prava setup blocker remains truthful.
+- Rollback/fallback: If support cannot reset/verify the organizer card, retain the pending/failed
+  state and submit no production-access claim; do not substitute a shared card or fabricate the
+  organizer-required merchant attempt.
+- Owner: WishTrace team / Codex

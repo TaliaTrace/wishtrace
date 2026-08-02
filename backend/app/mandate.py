@@ -171,6 +171,7 @@ class MandateResponse(BaseModel):
     item_price_minor: int
     provider_mandate_id: str | None
     provider_status: str | None
+    setup_failure_code: str | None
     merchant_order_id: str | None
     merchant_outcome: MerchantCheckoutOutcome | None
     visa_confirmation: Literal["SUCCESS", "FAILURE"] | None
@@ -205,6 +206,7 @@ class MandateStore(Protocol):
         unknown: bool,
         response_id: str | None,
         provider_status: str | None = None,
+        failure_code: str | None = None,
     ) -> MandateResponse: ...
 
     async def get(
@@ -260,6 +262,7 @@ class MandateSetupFacts(BaseModel):
     max_charges: int
     approved_amount_minor: int
     product_title: str
+    item_price_minor: int
 
 
 class ChargeClaim(BaseModel):
@@ -432,6 +435,7 @@ class MandateService:
                 occasion_id=occasion_id,
                 unknown=error.outcome_unknown,
                 response_id=error.response_id,
+                failure_code=_safe_provider_code(error.provider_code or error.code),
             )
             raise ApiError(
                 status_code=503 if error.recoverable else 502,
@@ -492,6 +496,7 @@ class MandateService:
                             unknown=False,
                             response_id=result.response_id,
                             provider_status=result.status.value,
+                            failure_code=_safe_provider_code(provider_code),
                         )
                     if result.status in {
                         PravaPaymentStatus.AWAITING_RESULT,
@@ -507,6 +512,7 @@ class MandateService:
                             unknown=True,
                             response_id=result.response_id,
                             provider_status=result.status.value,
+                            failure_code="MANDATE_NOT_FOUND_AFTER_APPROVAL",
                         )
                     return mandate
                 if len(matches) > 1:
@@ -837,7 +843,7 @@ class MandateService:
             merchant_url="https://checkout.jackboxgames.com",
             merchant_country="US",
             product_description=facts.product_title,
-            product_unit_minor=facts.approved_amount_minor,
+            product_unit_minor=facts.item_price_minor,
             external_product_id=str(occasion_id),
             quantity=1,
             callback_url=callback_url,
@@ -977,6 +983,7 @@ class SqlMandateStore:
                 max_charges=max_charges,
                 approved_amount_minor=occasion.budget_minor,
                 product_title=candidate.title,
+                item_price_minor=candidate.price_minor,
             )
 
     async def complete_setup(
@@ -996,6 +1003,7 @@ class SqlMandateStore:
             mandate.setup_response_id = session.response_id
             mandate.provider_mandate_id = session.mandate_id
             mandate.provider_status = PravaMandateStatus.PENDING.value
+            mandate.setup_failure_code = None
             mandate.last_response_id = session.response_id
             _transition(mandate, MandateState.AWAITING_APPROVAL)
             return await _flush_mandate_response(db, mandate)
@@ -1008,12 +1016,14 @@ class SqlMandateStore:
         unknown: bool,
         response_id: str | None,
         provider_status: str | None = None,
+        failure_code: str | None = None,
     ) -> MandateResponse:
         async with self._session_factory() as db, db.begin():
             mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
             mandate.last_response_id = response_id
             if provider_status is not None:
                 mandate.provider_status = provider_status
+            mandate.setup_failure_code = failure_code
             _transition(
                 mandate,
                 MandateState.UNKNOWN if unknown else MandateState.FAILED,
@@ -1051,6 +1061,7 @@ class SqlMandateStore:
                 )
             mandate.provider_mandate_id = info.mandate_id
             mandate.provider_status = info.status.value
+            mandate.setup_failure_code = None
             if mandate.valid_until is None:
                 mandate.valid_until = info.valid_until
             target = _state_from_mandate_status(info.status, MandateState(mandate.state))
@@ -1431,6 +1442,7 @@ async def _mandate_response(
         item_price_minor=mandate.item_price_minor,
         provider_mandate_id=mandate.provider_mandate_id,
         provider_status=mandate.provider_status,
+        setup_failure_code=mandate.setup_failure_code,
         merchant_order_id=mandate.merchant_order_id,
         merchant_outcome=(
             MerchantCheckoutOutcome(mandate.merchant_outcome)

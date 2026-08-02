@@ -109,6 +109,7 @@ def _mandate(
         item_price_minor=500,
         provider_mandate_id=provider_mandate_id,
         provider_status="active" if state is MandateState.ACTIVE else None,
+        setup_failure_code=None,
         merchant_order_id=None,
         merchant_outcome=None,
         visa_confirmation=None,
@@ -152,6 +153,7 @@ class MemoryMandateStore:
             max_charges=self.mandate.max_charges,
             approved_amount_minor=self.mandate.approved_amount_minor,
             product_title=self.mandate.product_title,
+            item_price_minor=self.mandate.item_price_minor,
         )
         self.setup_facts = facts
         self.mandate = self.mandate.model_copy(
@@ -189,12 +191,14 @@ class MemoryMandateStore:
         unknown: bool,
         response_id: str | None,
         provider_status: str | None = None,
+        failure_code: str | None = None,
     ) -> MandateResponse:
         del user_id, occasion_id, response_id
         self.mandate = self.mandate.model_copy(
             update={
                 "state": MandateState.UNKNOWN if unknown else MandateState.FAILED,
                 "provider_status": provider_status,
+                "setup_failure_code": failure_code,
             }
         )
         return self.mandate
@@ -800,6 +804,7 @@ async def test_setup_creates_session_with_frequency_and_records_awaiting() -> No
     assert request.merchant_scope is PravaMandateScope.LISTED
     assert request.max_charges == 1
     assert request.total_minor == 500
+    assert request.product_unit_minor == store.mandate.item_price_minor
     assert request.external_order_ref == f"mandate-{store.mandate.id.hex}"
     # The callback routes Prava's approval redirect back through our return path.
     assert "/v1/prava/mandate-return" in request.callback_url
@@ -814,6 +819,7 @@ async def test_setup_prava_error_fails_mandate_and_raises() -> None:
         message="Prava approval is not configured yet.",
         recoverable=True,
         outcome_unknown=True,
+        provider_code="DEVICE_BINDING_FAILED",
     )
     service = _service(store, prava, checkout=None)
 
@@ -825,6 +831,7 @@ async def test_setup_prava_error_fails_mandate_and_raises() -> None:
         )
     assert error.value.code == "PRAVA_UNAVAILABLE"
     assert store.mandate.state is MandateState.UNKNOWN
+    assert store.mandate.setup_failure_code == "DEVICE_BINDING_FAILED"
 
 
 async def test_refresh_activates_pending_mandate_from_provider() -> None:
@@ -926,6 +933,7 @@ async def test_refresh_records_failed_hosted_setup_when_no_mandate_was_created()
     assert prava.payment_result_calls == [approval.session_id]
     assert result.state is MandateState.FAILED
     assert result.provider_status == "failed"
+    assert result.setup_failure_code == "PROVISION_ERROR"
     assert result.provider_mandate_id is None
 
 

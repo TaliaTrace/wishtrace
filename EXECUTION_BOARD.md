@@ -7,21 +7,21 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260801_0011` | Codex | 2026-08-02 22:11 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 124 tests; Azure HTTPS health/UCP; database TLS true | Codex | 2026-08-02 22:11 PKT |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260802_0012` | Codex | 2026-08-02 23:39 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 140 tests; healthy Azure revision `pravaaudit1`; database TLS true | Codex | 2026-08-02 23:45 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | LIVE SETUP OPEN — real hosted mandate session opened on phone; approval, charge and result pending | Codex/user | 2026-08-02 22:11 PKT |
+| Prava transaction path understood | session + authoritative status | LIVE PROVIDER BLOCKER — exact setup contract accepted; prior setup failed before credential issuance; current session is pending with zero transactions/credentials | Codex/user | 2026-08-02 23:46 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; previews/tests isolated | Codex | 2026-08-01 |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; latest APK installed without crash | Codex | 2026-08-02 23:46 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
 | Android device UX evidence | API 31 route tests + screenshots + text scale + contrast | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
-| Android return flow works | approval → app → reconciled state | LIVE CUSTOM TAB PASS — physical hosted page opened; actual approval return pending | Codex/user | 2026-08-02 22:11 PKT |
+| Android return flow works | approval → app → reconciled state | PARTIAL — physical app-link reconciliation rendered the authoritative hosted failure; automatic Prava redirect still pending | Codex/user | 2026-08-02 22:34 PKT |
 | Bronze flow repeats twice | full device demo | NOT STARTED | | |
 | Five-second UX understood | fresh viewer explanation | NOT STARTED | | |
 | Clean build works | fresh checkout command log | NOT STARTED | | |
@@ -29,9 +29,9 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Complete the private card/passkey step in the open Prava hosted page.
-2. Verify the deep-link return associates the active mandate, then run the one tokenized real-merchant browser attempt.
-3. Capture the expected sandbox merchant result, reconcile it, and persist the personal note.
+1. Wait for Prava support to verify/reset the organizer card's provisioning/device binding.
+2. User completes the already-pending hosted setup manually; Codex performs no Chrome automation.
+3. On mandate activation, execute exactly one tokenized merchant attempt and capture its expected sandbox decline.
 
 ## Next
 
@@ -40,6 +40,43 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Apply for production access only with the captured sandbox evidence.
 
 ## Milestone evidence
+
+### 2026-08-02 — Exact Prava request audit and deployed failure diagnostics
+
+- Applied the organizer-supplied request audit: mandate setup sends explicit `integration_type` and
+  `intent`, uses a routable verified email, and restricts merchant URLs to a bare HTTPS origin on a
+  delegated-domain-shaped host. No card number or card fragment exists in runtime source.
+- The live sandbox accepted the exact request but omitted the documented `authorizeOnly` response
+  marker. WishTrace accepts omission only because request intent is explicit and rejects an explicit
+  `false`. The line item now carries the observed $5 candidate price rather than the mandate cap.
+- Safe setup failure categories are persisted and shown to the user; credentials, provider payloads,
+  card data and arbitrary provider messages remain excluded. Migration `20260802_0012` is live over
+  verified PostgreSQL TLS.
+- Quality: 140 backend tests, Ruff and strict mypy pass. Android assembly, unit tests and lint pass;
+  the APK installed on the physical phone without a WishTrace fatal exception.
+- Deployment: ACR run `chb` succeeded and healthy Azure revision
+  `wishtrace-api--pravaaudit1` serves 100% traffic. `/health` reports PostgreSQL 17.6/TLS true and
+  `/.well-known/ucp` remains a direct cacheable 200.
+- A single server-side read found the current setup still `pending`, with zero transactions, zero
+  one-use credentials and no safe error code. No retry, browser submission or merchant attempt was
+  made during this audit.
+
+### 2026-08-02 — Live hosted provisioning failure and recovery
+
+- The first physical-phone card attempt produced authoritative Prava session status `failed` with
+  safe provider category `PROVISION_ERROR`. Prava created no mandate, issued no one-use credential,
+  and no merchant charge/order occurred. This is not the organizer-accepted merchant decline yet.
+- The backend now reconciles a zero-result mandate list against the hosted session's official
+  payment-result endpoint. A failed session becomes a retryable `FAILED` mandate; a success-like
+  session without a uniquely matching mandate becomes `UNKNOWN`, never armed.
+- Android rendered “Autopilot did not arm” and explicitly stated that no mandate or merchant charge
+  was created. The hosted Prava page was never dumped or screenshotted.
+- Quality: backend pytest 126/126, Ruff and strict mypy pass. Android debug assembly, unit tests and
+  lint pass. Commit `6a57af7` is deployed as healthy Azure revision
+  `wishtrace-api--prava6a57af7`; public health reports PostgreSQL 17.6 and client TLS true.
+- A fresh hosted retry was opened at this checkpoint. Its latest server-side status is recorded in
+  the newer request-audit milestone above; approval, mandate activation, one-use credential,
+  merchant attempt, Prava charge report, Visa confirmation and order remain unclaimed.
 
 ### 2026-08-02 — Gift DNA mandate path and live hosted-session gate
 

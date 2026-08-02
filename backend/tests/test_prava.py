@@ -28,13 +28,13 @@ def _request() -> PravaSessionRequest:
         total_minor=6999,
         currency="USD",
         merchant_name="Observed Merchant",
-        merchant_url="https://merchant.example",
+        merchant_url="https://www.example.com",
         merchant_country="US",
         product_description="Observed headset — Black",
         product_unit_minor=6499,
         external_product_id="variant-123",
         quantity=1,
-        callback_url="https://api.wishtrace.example/v1/prava/return",
+        callback_url="https://api.wishtrace.example.com/v1/prava/return",
         external_order_ref="purchase-intent-123",
     )
 
@@ -77,13 +77,13 @@ async def test_create_session_sends_exact_money_and_discards_session_token() -> 
         "total_amount": "69.99",
         "currency": "USD",
         "integration_type": "full_checkout",
-        "callback_url": "https://api.wishtrace.example/v1/prava/return",
+        "callback_url": "https://api.wishtrace.example.com/v1/prava/return",
         "external_order_ref": "purchase-intent-123",
         "purchase_context": [
             {
                 "merchant_details": {
                     "name": "Observed Merchant",
-                    "url": "https://merchant.example",
+                    "url": "https://www.example.com",
                     "country_code_iso2": "US",
                 },
                 "product_details": [
@@ -180,7 +180,7 @@ async def test_payment_result_keeps_credentials_secret_and_memory_only() -> None
                             {
                                 "txn_ref_id": "line-1",
                                 "merchant_name": "Observed Merchant",
-                                "merchant_url": "https://merchant.example",
+                                "merchant_url": "https://www.example.com",
                                 "total_amount": "69.99",
                                 "status": "awaiting_result",
                                 "token": "test-token-redacted",
@@ -309,14 +309,54 @@ async def test_provider_errors_are_safe_and_keep_only_machine_code() -> None:
 
 def test_session_request_rejects_non_https_and_invalid_email() -> None:
     values = _request().model_dump()
-    values["callback_url"] = "http://api.wishtrace.example/return"
+    values["callback_url"] = "http://api.wishtrace.example.com/return"
     values["user_email"] = "not-an-email"
 
     with pytest.raises(ValidationError) as captured:
         PravaSessionRequest.model_validate(values)
 
     assert "URL must use HTTPS" in str(captured.value)
-    assert "valid email" in str(captured.value)
+    assert "routable domain" in str(captured.value)
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "owner@wishtrace.local",
+        "owner@wishtrace.test",
+        "owner@wishtrace.example",
+        "owner@wishtrace.demo",
+        "owner@wishtrace.invalid",
+        "owner@wishtrace.internal",
+        "owner@wishtrace.nep",
+    ],
+)
+def test_session_request_rejects_reserved_email_domains(email: str) -> None:
+    values = _request().model_dump()
+    values["user_email"] = email
+
+    with pytest.raises(ValidationError, match="routable domain"):
+        PravaSessionRequest.model_validate(values)
+
+
+@pytest.mark.parametrize(
+    "merchant_url",
+    [
+        "htttps://www.example.com",
+        "https://merchant.example",
+        "https://www.example.com/products/gift-card",
+        "https://www.example.com?variant=1",
+        "www.example.com",
+    ],
+)
+def test_session_request_requires_bare_delegated_merchant_origin(
+    merchant_url: str,
+) -> None:
+    values = _request().model_dump()
+    values["merchant_url"] = merchant_url
+
+    with pytest.raises(ValidationError, match="bare HTTPS origin"):
+        PravaSessionRequest.model_validate(values)
 
 
 async def test_provider_path_identifier_rejects_path_injection() -> None:
@@ -339,13 +379,25 @@ def _mandate_request() -> PravaMandateSessionRequest:
         product_unit_minor=500,
         external_product_id="variant-abc",
         quantity=1,
-        callback_url="https://api.wishtrace.example/v1/prava/return",
+        callback_url="https://api.wishtrace.example.com/v1/prava/return",
         external_order_ref="occasion-123",
         recurring_frequency=PravaMandateFrequency.YEARLY,
         merchant_scope=PravaMandateScope.LISTED,
         max_charges=5,
         valid_until="2031-08-01T00:00:00Z",
     )
+
+
+def test_mandate_request_rejects_reserved_email_and_product_path_origin() -> None:
+    values = _mandate_request().model_dump()
+    values["user_email"] = "owner@wishtrace.local"
+    values["merchant_url"] = "https://www.example.com/products/gift-card"
+
+    with pytest.raises(ValidationError) as captured:
+        PravaMandateSessionRequest.model_validate(values)
+
+    assert "routable domain" in str(captured.value)
+    assert "bare HTTPS origin" in str(captured.value)
 
 
 async def test_create_mandate_session_sends_setup_block_and_discards_token() -> None:
@@ -375,15 +427,49 @@ async def test_create_mandate_session_sends_setup_block_and_discards_token() -> 
     )
 
     assert observed["mandate_setup"] == {
+        "intent": "mandate_setup",
         "recurring_frequency": "yearly",
         "merchant_scope": "listed",
         "max_charges": 5,
         "valid_until": "2031-08-01T00:00:00Z",
     }
+    assert observed["integration_type"] == "full_checkout"
     assert "authorize_only" not in observed
     assert session.session_id == "session-m1"
     assert session.hosted_url == "https://sandbox.collect.prava.space/checkout?session=m1"
     assert "provider-session-token-must-not-escape" not in session.model_dump_json()
+
+
+async def test_create_mandate_session_rejects_checkout_contradiction() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            201,
+            headers={
+                "Content-Type": "application/json",
+                "X-Response-ID": "response-mandate-create-without-authorization",
+            },
+            json={
+                "session_id": "session-m1",
+                "session_token": "token",
+                "iframe_url": "https://sandbox.collect.prava.space/checkout?session=m1",
+                "order_id": "order-m1",
+                "expires_at": "2026-08-01T16:00:00Z",
+                "authorizeOnly": False,
+            },
+        )
+
+    with pytest.raises(PravaGatewayError) as captured:
+        await _gateway(httpx.MockTransport(handler)).create_mandate_session(
+            _mandate_request()
+        )
+
+    assert captured.value.code == "PRAVA_OUTCOME_UNKNOWN"
+    assert captured.value.outcome_unknown is True
+    assert (
+        captured.value.response_id
+        == "response-mandate-create-without-authorization"
+    )
 
 
 async def test_create_mandate_session_rejects_untrusted_hosted_url() -> None:
@@ -398,6 +484,7 @@ async def test_create_mandate_session_rejects_untrusted_hosted_url() -> None:
                 "iframe_url": "https://evil.example/checkout",
                 "order_id": "order-m1",
                 "expires_at": "2026-08-01T16:00:00Z",
+                "authorizeOnly": True,
             },
         )
 

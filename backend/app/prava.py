@@ -18,6 +18,20 @@ from pydantic import (
 MAX_RESPONSE_BYTES = 1_000_000
 PROVIDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,255}$")
 PROVIDER_ID_REGEX = r"^[A-Za-z0-9._:-]{1,255}$"
+DOMAIN_LABEL_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+BANNED_NETWORK_TLDS = frozenset(
+    {
+        "demo",
+        "devices",
+        "example",
+        "internal",
+        "invalid",
+        "local",
+        "localhost",
+        "nep",
+        "test",
+    }
+)
 
 
 class PravaPaymentStatus(StrEnum):
@@ -93,14 +107,21 @@ class PravaSessionRequest(BaseModel):
     @field_validator("user_email")
     @classmethod
     def validate_email_shape(cls, value: str) -> str:
-        local, separator, domain = value.rpartition("@")
-        if separator != "@" or not local or "." not in domain:
-            raise ValueError("user_email must be a valid email address")
+        _require_routable_email(value)
         return value
 
-    @field_validator("merchant_url", "callback_url")
+    @field_validator("merchant_url")
     @classmethod
-    def require_https(cls, value: str) -> str:
+    def require_merchant_origin(cls, value: str) -> str:
+        if not _is_https_merchant_origin(value):
+            raise ValueError(
+                "merchant_url must be a bare HTTPS origin on a delegated domain"
+            )
+        return value
+
+    @field_validator("callback_url")
+    @classmethod
+    def require_https_callback(cls, value: str) -> str:
         if not _is_https_url(value):
             raise ValueError("URL must use HTTPS without embedded credentials or fragments")
         return value
@@ -161,14 +182,21 @@ class PravaMandateSessionRequest(BaseModel):
     @field_validator("user_email")
     @classmethod
     def validate_email_shape(cls, value: str) -> str:
-        local, separator, domain = value.rpartition("@")
-        if separator != "@" or not local or "." not in domain:
-            raise ValueError("user_email must be a valid email address")
+        _require_routable_email(value)
         return value
 
-    @field_validator("merchant_url", "callback_url")
+    @field_validator("merchant_url")
     @classmethod
-    def require_https(cls, value: str) -> str:
+    def require_merchant_origin(cls, value: str) -> str:
+        if not _is_https_merchant_origin(value):
+            raise ValueError(
+                "merchant_url must be a bare HTTPS origin on a delegated domain"
+            )
+        return value
+
+    @field_validator("callback_url")
+    @classmethod
+    def require_https_callback(cls, value: str) -> str:
         if not _is_https_url(value):
             raise ValueError("URL must use HTTPS without embedded credentials or fragments")
         return value
@@ -179,6 +207,7 @@ class PravaMandateSessionRequest(BaseModel):
             "user_email": self.user_email,
             "total_amount": _minor_to_decimal(self.total_minor),
             "currency": self.currency,
+            "integration_type": "full_checkout",
             "callback_url": self.callback_url,
             "external_order_ref": self.external_order_ref,
             "purchase_context": [
@@ -199,6 +228,7 @@ class PravaMandateSessionRequest(BaseModel):
                 }
             ],
             "mandate_setup": {
+                "intent": "mandate_setup",
                 "recurring_frequency": self.recurring_frequency.value,
                 "merchant_scope": self.merchant_scope.value,
                 "max_charges": self.max_charges,
@@ -333,6 +363,10 @@ class _RawSession(BaseModel):
     order_id: str = Field(pattern=PROVIDER_ID_REGEX)
     expires_at: datetime
     mandate_id: str | None = Field(default=None, pattern=PROVIDER_ID_REGEX)
+    authorize_only: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("authorizeOnly", "authorize_only"),
+    )
 
     @field_validator("expires_at")
     @classmethod
@@ -636,6 +670,17 @@ class PravaHttpGateway:
             raw = _RawSession.model_validate(response.json())
         except (ValueError, ValidationError) as error:
             raise _invalid_response(response, outcome_unknown=True) from error
+        # The current sandbox may omit the documented authorizeOnly marker.
+        # The request is explicitly mandate_setup; reject only an affirmative
+        # contradiction so an observed legacy response remains compatible.
+        if raw.authorize_only is False:
+            raise PravaGatewayError(
+                "PRAVA_OUTCOME_UNKNOWN",
+                "Prava returned a checkout session instead of mandate approval.",
+                recoverable=True,
+                outcome_unknown=True,
+                response_id=_response_id(response),
+            )
         if not _allowed_https_url(raw.iframe_url, self._allowed_hosted_hosts):
             raise PravaGatewayError(
                 "PRAVA_OUTCOME_UNKNOWN",
@@ -976,13 +1021,56 @@ def _decimal_to_minor(value: str) -> int:
 
 
 def _is_https_url(value: str) -> bool:
-    parsed = urlsplit(value)
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return False
     return (
         parsed.scheme == "https"
         and parsed.hostname is not None
         and parsed.username is None
         and parsed.password is None
+        and port in (None, 443)
         and not parsed.fragment
+    )
+
+
+def _is_https_merchant_origin(value: str) -> bool:
+    if not _is_https_url(value):
+        return False
+    parsed = urlsplit(value)
+    return (
+        parsed.hostname is not None
+        and _has_delegated_domain_shape(parsed.hostname)
+        and parsed.path in ("", "/")
+        and not parsed.query
+    )
+
+
+def _require_routable_email(value: str) -> None:
+    local, separator, domain = value.rpartition("@")
+    if (
+        separator != "@"
+        or value.count("@") != 1
+        or not local
+        or not _has_delegated_domain_shape(domain)
+    ):
+        raise ValueError("user_email must use a routable domain")
+
+
+def _has_delegated_domain_shape(value: str) -> bool:
+    domain = value.casefold()
+    if not domain or domain.startswith(".") or domain.endswith("."):
+        return False
+    labels = domain.split(".")
+    if len(labels) < 2 or any(DOMAIN_LABEL_PATTERN.fullmatch(label) is None for label in labels):
+        return False
+    tld = labels[-1]
+    return (
+        tld not in BANNED_NETWORK_TLDS
+        and (tld.isalpha() or tld.startswith("xn--"))
+        and len(tld) >= 2
     )
 
 

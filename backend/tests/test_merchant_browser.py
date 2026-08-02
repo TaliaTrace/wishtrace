@@ -20,6 +20,7 @@ from app.merchant_browser import (
     _normalize_checkout_text,
     _numeric_variant_id,
     _PlaywrightLoopThread,
+    _shopify_completion_payload_signal,
 )
 
 QUIPLASH_2_URL = (
@@ -215,6 +216,67 @@ def test_checkout_text_normalization_handles_smart_punctuation() -> None:
         _normalize_checkout_text("Your payment couldn\u2019t be processed")
         == "your payment couldn t be processed"
     )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"data": {"submitForCompletion": {"__typename": "SubmitFailed"}}},
+        {
+            "data": {
+                "submitForCompletion": {
+                    "__typename": "SubmitRejected",
+                    "errors": [{"code": "CARD_DECLINED"}],
+                }
+            }
+        },
+        {
+            "data": {
+                "receipt": {
+                    "__typename": "ProcessedReceipt",
+                    "status": "failed",
+                    "failure": {"type": "payment", "code": "INSUFFICIENT_FUNDS"},
+                }
+            }
+        },
+    ],
+)
+def test_shopify_completion_payload_accepts_definitive_failures(
+    payload: object,
+) -> None:
+    assert _shopify_completion_payload_signal(payload) == "DECLINED"
+
+
+def test_shopify_completion_payload_tracks_processing_without_calling_it_failure() -> None:
+    payload = {
+        "data": {
+            "submitForCompletion": {
+                "__typename": "SubmittedForCompletion",
+                "receipt": {"status": "processing"},
+            }
+        }
+    }
+
+    assert _shopify_completion_payload_signal(payload) == "PROCESSING"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"errors": [{"message": "network unavailable"}]},
+        {
+            "data": {
+                "submitForCompletion": {
+                    "__typename": "SubmitRejected",
+                    "errors": [{"code": "INVALID_SHIPPING_ADDRESS"}],
+                }
+            }
+        },
+        {"data": {"paymentLines": [{"status": "ready"}]}},
+    ],
+)
+def test_shopify_completion_payload_rejects_ambiguous_results(payload: object) -> None:
+    assert _shopify_completion_payload_signal(payload) is None
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows event-loop boundary")

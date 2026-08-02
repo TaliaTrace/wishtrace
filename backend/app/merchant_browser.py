@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 import uuid
@@ -21,6 +22,7 @@ from playwright.async_api import (
     Frame,
     Page,
     Playwright,
+    Response,
     async_playwright,
 )
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -72,6 +74,47 @@ TRUSTED_PAYMENT_FRAME_HOSTS = frozenset(
         "checkout.shopify.com",
     }
 )
+TRUSTED_CHECKOUT_RESPONSE_HOSTS = frozenset(
+    {
+        JACKBOX_CHECKOUT_HOST,
+        "checkout.shopify.com",
+    }
+)
+SHOPIFY_PAYMENT_FAILURE_CODES = frozenset(
+    {
+        "AUTHENTICATION_ERROR",
+        "AUTHENTICATION_REQUIRED",
+        "AUTHORIZATION_ERROR",
+        "CALL_ISSUER",
+        "CANCELLED_PAYMENT",
+        "CARD_DECLINED",
+        "EXPIRED_CARD",
+        "FUNDING_ERROR",
+        "GENERIC_ERROR",
+        "INCORRECT_CVC",
+        "INCORRECT_NUMBER",
+        "INCORRECT_ZIP",
+        "INSUFFICIENT_FUNDS",
+        "INVALID_CVC",
+        "INVALID_EXPIRY_DATE",
+        "INVALID_NUMBER",
+        "INVALID_PAYMENT_METHOD",
+        "INVALID_TOKEN",
+        "NAME_MISMATCH",
+        "PAYMENTS_UNACCEPTABLE_PAYMENT_AMOUNT",
+        "PRE_CHARGE_ERROR",
+        "PROCESSING_ERROR",
+        "THREE_D_SECURE_FAILED",
+        "TOKEN_EXPIRED",
+        "UNPROCESSABLE_TRANSACTION",
+    }
+)
+SHOPIFY_FAILURE_TYPENAMES = frozenset(
+    {
+        "SubmitFailed",
+    }
+)
+MAX_CHECKOUT_RESPONSE_BYTES = 2_000_000
 SAFE_TEXT_PATTERN = re.compile(r"^[^\x00-\x1f\x7f]{1,200}$")
 PHONE_PATTERN = re.compile(r"^[0-9+(). -]{7,32}$")
 POSTAL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 -]{1,19}$")
@@ -587,9 +630,26 @@ class JackboxPlaywrightCheckoutGateway:
                     "The merchant payment form is not ready.",
                     recoverable=True,
                 )
+            completion_responses: asyncio.Queue[Response] = asyncio.Queue(maxsize=100)
+
+            def capture_completion_response(response: Response) -> None:
+                parsed = urlsplit(response.url)
+                if (
+                    parsed.scheme == "https"
+                    and (parsed.hostname or "").casefold()
+                    in TRUSTED_CHECKOUT_RESPONSE_HOSTS
+                    and response.request.resource_type in {"fetch", "xhr"}
+                    and not completion_responses.full()
+                ):
+                    completion_responses.put_nowait(response)
+
+            active.page.on("response", capture_completion_response)
             # This is the single money-moving action. Never retry it automatically.
             await pay_button.click(timeout=15_000)
-            outcome, order_id, reason_code = await _observe_checkout_outcome(active.page)
+            outcome, order_id, reason_code = await _observe_checkout_outcome(
+                active.page,
+                completion_responses=completion_responses,
+            )
         except MerchantBrowserError:
             raise
         except PlaywrightTimeoutError as error:
@@ -899,12 +959,35 @@ async def _fill_optional_frame_field(
 
 async def _observe_checkout_outcome(
     page: Page,
+    *,
+    completion_responses: asyncio.Queue[Response] | None = None,
 ) -> tuple[MerchantCheckoutOutcome, str | None, str]:
-    for _ in range(60):
+    saw_processing = False
+    for _ in range(120):
         await page.wait_for_timeout(1000)
+        if completion_responses is not None:
+            completion_signal = await _drain_shopify_completion_responses(
+                completion_responses
+            )
+            if completion_signal == "DECLINED":
+                return (
+                    MerchantCheckoutOutcome.DECLINED,
+                    None,
+                    "MERCHANT_PAYMENT_DECLINED",
+                )
+            if completion_signal == "PROCESSING":
+                saw_processing = True
         body = await _visible_frame_text(page.main_frame)
         folded = body.casefold()
         parsed = urlsplit(page.url)
+        if "offsite-payment-failed" in parsed.path:
+            return (
+                MerchantCheckoutOutcome.DECLINED,
+                None,
+                "MERCHANT_PAYMENT_DECLINED",
+            )
+        if "processing" in parsed.path:
+            saw_processing = True
         if "thank_you" in parsed.path or any(
             marker in folded
             for marker in ("your order is confirmed", "thank you for your purchase")
@@ -933,10 +1016,24 @@ async def _observe_checkout_outcome(
                 None,
                 "MERCHANT_PAYMENT_DECLINED",
             )
+    if completion_responses is not None:
+        completion_signal = await _drain_shopify_completion_responses(completion_responses)
+        if completion_signal == "DECLINED":
+            return (
+                MerchantCheckoutOutcome.DECLINED,
+                None,
+                "MERCHANT_PAYMENT_DECLINED",
+            )
+        if completion_signal == "PROCESSING":
+            saw_processing = True
     return (
         MerchantCheckoutOutcome.UNKNOWN,
         None,
-        "MERCHANT_CHECKOUT_OUTCOME_UNKNOWN",
+        (
+            "MERCHANT_CHECKOUT_PROCESSING_TIMEOUT"
+            if saw_processing
+            else "MERCHANT_CHECKOUT_OUTCOME_UNKNOWN"
+        ),
     )
 
 
@@ -953,6 +1050,84 @@ def _has_explicit_payment_failure(values: list[str]) -> bool:
 
 def _normalize_checkout_text(value: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()).split())
+
+
+async def _drain_shopify_completion_responses(
+    responses: asyncio.Queue[Response],
+) -> Literal["DECLINED", "PROCESSING"] | None:
+    saw_processing = False
+    while True:
+        try:
+            response = responses.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+        signal = await _shopify_completion_response_signal(response)
+        if signal == "DECLINED":
+            return signal
+        if signal == "PROCESSING":
+            saw_processing = True
+    return "PROCESSING" if saw_processing else None
+
+
+async def _shopify_completion_response_signal(
+    response: Response,
+) -> Literal["DECLINED", "PROCESSING"] | None:
+    if response.status != 200:
+        return None
+    with suppress(Exception):
+        headers = await response.all_headers()
+        if "json" not in headers.get("content-type", "").casefold():
+            return None
+        body = await response.body()
+        if len(body) > MAX_CHECKOUT_RESPONSE_BYTES:
+            return None
+        return _shopify_completion_payload_signal(json.loads(body))
+    return None
+
+
+def _shopify_completion_payload_signal(
+    payload: Any,
+) -> Literal["DECLINED", "PROCESSING"] | None:
+    saw_processing = False
+    for node in _walk_json_objects(payload):
+        typename = node.get("__typename")
+        if typename in SHOPIFY_FAILURE_TYPENAMES:
+            return "DECLINED"
+        failure = node.get("failure")
+        if (
+            node.get("status") == "failed"
+            and isinstance(failure, dict)
+            and failure.get("type") == "payment"
+        ):
+            return "DECLINED"
+        code = node.get("code")
+        if isinstance(code, str) and code.upper() in SHOPIFY_PAYMENT_FAILURE_CODES:
+            return "DECLINED"
+        if typename == "SubmittedForCompletion":
+            saw_processing = True
+        status = node.get("status")
+        if isinstance(status, str) and status.casefold() in {
+            "action_required",
+            "processing",
+            "processing_remote_checkouts",
+            "pending",
+            "polling_for_order",
+        }:
+            saw_processing = True
+    return "PROCESSING" if saw_processing else None
+
+
+def _walk_json_objects(value: Any) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    pending = [value]
+    while pending:
+        current = pending.pop()
+        if isinstance(current, dict):
+            found.append(current)
+            pending.extend(current.values())
+        elif isinstance(current, list):
+            pending.extend(current)
+    return found
 
 
 def _extract_order_id(value: str) -> str | None:

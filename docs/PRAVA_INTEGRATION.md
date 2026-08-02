@@ -15,10 +15,10 @@ Current official SDK/API contract verified on 2026-08-01:
   only;
 - `POST /v1/sessions/{sessionId}/report-status` must receive `APPROVED` or `DECLINED` after
   the merchant attempt;
-- the documented Browser Harness is a checkout executor after credentials exist; it does not mint
-  the one-time card. The public SDK/API reference currently exposes no callable Browser Harness
-  endpoint or method, so WishTrace uses its own exact-product Playwright actor for the organizer's
-  required browser-automation attempt.
+- the Browser Harness is a checkout executor after credentials exist; it does not mint the one-time
+  card. Organizer support confirmed on 2026-08-03 that Prava's Browser Harness is unavailable in
+  sandbox and teams must build their own automation. WishTrace therefore uses its own exact-product
+  Playwright actor and calls report-status itself.
 
 Do not invent that missing invocation. A support request is pending for the exact hackathon sandbox
 contract; implement only the documented session/poll/report boundary until it is answered.
@@ -123,6 +123,12 @@ WishTrace previously selected that stale default automatically. The recovery now
 whenever multiple active cards exist, forcing an explicit hosted choice without exposing card data.
 One fresh user-authorized setup selecting `7912` is permitted; if its charge still fails before
 credentials, retries stop and the result remains a provider-stage failure—not a merchant decline.
+
+That phone setup reached the hosted security step but returned `FIDO_START_FAILED`, before mandate
+creation. A bounded operator diagnostic reached Visa OTP and its Secure Payment Confirmation popup
+but returned `AUTH_FAILED`; no credential, charge or merchant request occurred. Operator-driven
+hosted verification is now stopped. Android exposes a fresh approval only after an explicit user tap,
+and the user performs the real phone/passkey ceremony.
 
 ## Production access
 

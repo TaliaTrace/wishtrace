@@ -508,3 +508,20 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: If a fresh `7912` mandate still returns `NO_TOKEN`, stop. The blocker is inside
   Prava/card-network provisioning and requires the recorded X-Response-ID; do not generate retries.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 02:33 PKT — User owns hosted passkey verification
+
+- Context: A real phone setup reached Prava's security step but returned `FIDO_START_FAILED`. A
+  bounded Playwright diagnostic reached Visa OTP and its Secure Payment Confirmation popup, then
+  returned `AUTH_FAILED` without creating a mandate, credential, charge or merchant request.
+- Evidence: Organizer support confirmed that the hosted Browser Harness is unavailable in sandbox;
+  teams build the post-mint browser automation themselves. WishTrace already owns that exact-product
+  Playwright and report-status boundary. Hosted passkey approval remains a real user ceremony.
+- Decision: Stop agent-driven hosted verification. Keep the backend transaction path unchanged and
+  let the user perform phone approval. Android may offer a fresh session only after an explicit tap
+  for passkey start/authentication failures; provisioning and mint failures remain terminal.
+- Consequence: Testing returns to the intended division of responsibility, with exact failure copy
+  and no automatic approval, credential, charge or merchant retries.
+- Rollback/fallback: None. If the user-approved mandate becomes active, run one merchant proof. If
+  it does not, preserve the provider result and proceed truthfully to UX/submission work.
+- Owner: WishTrace team / Codex

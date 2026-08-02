@@ -76,18 +76,24 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   retire `7789`. WishTrace now preselects a card only when exactly one active enrollment exists;
   with these two cards it omits `card_id` and requires the owner to choose in Prava's hosted UI.
   Card metadata is used only to distinguish enrollments and no PAN/CVV is stored.
-- Known blocker: the existing mandate and hosted-session attempts both failed before credential
-  minting. The remaining code-side recovery is one fresh, user-authorized mandate that explicitly
-  selects the known enrolled card ending `7912`; the fix is deployed but the phone run is not yet
-  proven. If this returns
-  `NO_TOKEN`/`FETCH_AGENTIC_CREDS_ERROR`, stop and treat minting as a provider blocker.
-- Last verified: 2026-08-03 02:04 PKT
+- Latest approval evidence: LIVE SANDBOX FAILURE — the phone explicitly selected `7912`, reached
+  Prava's security step and returned `FIDO_START_FAILED`. A bounded operator diagnostic then reached
+  Visa OTP and its Secure Payment Confirmation popup but returned `AUTH_FAILED`. Both results were
+  reconciled as terminal setup failures with zero mandates, credentials, charges or merchant calls.
+  Agent-driven hosted verification is stopped; the user owns the next phone attempt.
+- Sandbox browser-automation contract: ORGANIZER-CONFIRMED — Prava's hosted Browser Harness is not
+  available in sandbox. Teams must build their own automation and call report-status themselves.
+  WishTrace's exact-product Playwright actor is therefore the correct post-mint implementation.
+- Known blocker: a user-controlled phone approval must create an authoritative active mandate. Only
+  then may the one-shot execution request mint a credential and invoke the merchant actor. If minting
+  again returns `NO_TOKEN`/`FETCH_AGENTIC_CREDS_ERROR`, stop and treat it as a provider blocker.
+- Last verified: 2026-08-03 02:33 PKT
 - Evidence location: safe response ID above; migration `20260803_0014`; ACR build `che`, image
   digest `sha256:f3e7cb7ddd3272109b6200f180d374f690e625511d132e2e41da78c9bc8e3081`, and healthy deployed
   revision `wishtrace-api--cardchoice1` at 100% traffic. Public health reports PostgreSQL TLS true;
   149 backend tests plus Android build/unit/lint pass. The updated APK is installed without clearing
   the authenticated user. No credential, card data or provider payload is retained; the explicit-card
-  phone recovery is not yet claimed as live.
+  phone recovery reached security verification but did not arm a mandate.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -227,9 +233,11 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   route back to discovery, and a newly selected product starts a fresh mandate while preserving all
   earlier audit rows. Home distinguishes active autopilot, handled, awaiting approval and failed
   attempt states. The updated APK assembled, passed unit/lint checks and installed in place.
-- Known blockers: the healthy Azure revision is deployed; the explicit-card recovery still needs one
-  fresh phone run selecting saved card `7912`. Tokenized merchant attempt, Prava report, Visa
-  confirmation and order remain unproven.
+- Current recovery UX: passkey start/authentication/cancellation failures name the exact pre-mandate
+  boundary and expose one explicit `Retry Prava approval` action. Provisioning and mint failures stay
+  terminal. Debug assembly, unit tests and lint pass; the updated APK is installed in place.
+- Known blockers: one user-controlled phone approval selecting saved card `7912` must reach active.
+  Tokenized merchant attempt, Prava report, Visa confirmation and order remain unproven.
 
 ## Demo
 

@@ -87,8 +87,53 @@ class MandateSetupViewModelTest {
         assertTrue(viewModel.state.value.mandate?.merchantOrderId == "order-safe-id")
     }
 
+    @Test
+    fun passkeyFailureAllowsOneExplicitFreshApproval() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            current = details(
+                status = MandateStatus.FAILED,
+                setupFailureCode = "AUTH_FAILED",
+            )
+            setupResult = details(MandateStatus.AWAITING_APPROVAL)
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.canRetryApproval)
+
+        viewModel.retryApproval("candidate-drawful")
+        advanceUntilIdle()
+
+        assertEquals(1, gateway.setupCalls)
+        assertEquals("candidate-drawful", gateway.lastCandidateId)
+        assertEquals(MandateSetupStep.AWAITING_APPROVAL, viewModel.state.value.step)
+    }
+
+    @Test
+    fun provisioningFailureDoesNotOfferAutomaticRecovery() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            current = details(
+                status = MandateStatus.FAILED,
+                setupFailureCode = "PROVISION_ERROR",
+            )
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+        viewModel.retryApproval("candidate-drawful")
+        advanceUntilIdle()
+
+        assertTrue(!viewModel.state.value.canRetryApproval)
+        assertEquals(0, gateway.setupCalls)
+    }
+
     private class FakeMandateGateway : MandateGateway {
         var current = details(MandateStatus.ACTIVE)
+        var setupResult: MandateDetails? = null
+        var setupCalls = 0
+        var lastCandidateId: String? = null
         var executeCalls = 0
         var lastBilling: BillingContact? = null
         val executeKeys = mutableListOf<String>()
@@ -98,7 +143,11 @@ class MandateSetupViewModelTest {
         override suspend fun setup(
             occasionId: String,
             candidateId: String,
-        ): MandateDetails = current
+        ): MandateDetails {
+            setupCalls += 1
+            lastCandidateId = candidateId
+            return setupResult ?: current
+        }
 
         override suspend fun refresh(occasionId: String): MandateDetails = current
 
@@ -126,6 +175,7 @@ class MandateSetupViewModelTest {
             merchantOutcome: MandateMerchantOutcome? = null,
             orderId: String? = null,
             lastChargeState: String? = null,
+            setupFailureCode: String? = null,
         ) = MandateDetails(
             id = "mandate",
             recipientId = "recipient",
@@ -142,7 +192,7 @@ class MandateSetupViewModelTest {
             itemPriceMinor = 500,
             approvalUrl = null,
             lastProviderStatus = status.wire.lowercase(),
-            setupFailureCode = null,
+            setupFailureCode = setupFailureCode,
             merchantOrderId = orderId,
             merchantOutcome = merchantOutcome,
             visaConfirmation = merchantOutcome?.let {

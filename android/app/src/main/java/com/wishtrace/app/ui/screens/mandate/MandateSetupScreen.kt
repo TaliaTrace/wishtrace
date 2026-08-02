@@ -74,6 +74,7 @@ fun MandateSetupRoute(
         state = state,
         onBack = onBack,
         onArm = { viewModel.arm(candidateId) },
+        onRetryApproval = { viewModel.retryApproval(candidateId) },
         onRefresh = viewModel::refresh,
         onExecuteSandboxProof = { viewModel.executeSandboxProof(verifiedEmail) },
         onArmed = onArmed,
@@ -85,6 +86,7 @@ fun MandateSetupScreen(
     state: MandateSetupUiState,
     onBack: () -> Unit,
     onArm: () -> Unit,
+    onRetryApproval: () -> Unit,
     onRefresh: () -> Unit,
     onExecuteSandboxProof: () -> Unit,
     onArmed: () -> Unit,
@@ -107,6 +109,7 @@ fun MandateSetupScreen(
             MandateActionBar(
                 state = state,
                 onArm = onArm,
+                onRetryApproval = onRetryApproval,
                 onRefresh = onRefresh,
                 onExecuteSandboxProof = onExecuteSandboxProof,
                 onArmed = onArmed,
@@ -166,6 +169,16 @@ fun MandateSetupScreen(
                             "DEVICE_BINDING_FAILED" ->
                                 "Prava could not bind this device or passkey. No mandate or " +
                                     "merchant charge was created."
+                            "FIDO_START_FAILED" ->
+                                "Prava could not start the passkey check. No mandate, one-time " +
+                                    "card or merchant attempt was created. Check this phone's " +
+                                    "screen lock and Chrome, then retry approval."
+                            "AUTH_FAILED" ->
+                                "Visa and Prava could not finish the passkey check. No mandate, " +
+                                    "one-time card or merchant attempt was created."
+                            "AUTH_CANCELLED" ->
+                                "The passkey window closed before approval. No mandate, one-time " +
+                                    "card or merchant attempt was created."
                             else -> if (state.mandate?.lastProviderStatus == "failed") {
                                 "Prava returned a failed sandbox setup. No mandate or merchant " +
                                     "charge was created."
@@ -468,6 +481,7 @@ private fun FactRow(label: String, value: String) {
 private fun MandateActionBar(
     state: MandateSetupUiState,
     onArm: () -> Unit,
+    onRetryApproval: () -> Unit,
     onRefresh: () -> Unit,
     onExecuteSandboxProof: () -> Unit,
     onArmed: () -> Unit,
@@ -535,9 +549,28 @@ private fun MandateActionBar(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
+                MandateSetupStep.FAILED -> if (state.canRetryApproval) {
+                    PrimaryAction(
+                        text = "Retry Prava approval",
+                        onClick = onRetryApproval,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.busy,
+                    )
+                    SecondaryAction(
+                        text = "Choose another gift",
+                        onClick = onArmed,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    PrimaryAction(
+                        text = "Done",
+                        onClick = onArmed,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
                 MandateSetupStep.CANCELLED,
                 MandateSetupStep.EXPIRED,
-                MandateSetupStep.FAILED,
                 MandateSetupStep.DECLINED,
                 -> PrimaryAction(
                     text = "Done",

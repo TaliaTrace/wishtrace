@@ -12,7 +12,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | LIVE RECOVERY FOUND — active mandate is valid, but live card list exposes two active enrollments and the broken `7789` default displaced working `7912`; new setup no longer guesses | Codex/user | 2026-08-03 01:54 PKT |
+| Prava transaction path understood | session + authoritative status | PASS CONTRACT / BLOCKED AT PASSKEY — explicit `7912` selection reached Visa verification; phone returned `FIDO_START_FAILED`, controlled automation returned `AUTH_FAILED`; no mandate/card/merchant attempt | Codex/user | 2026-08-03 02:33 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — $5 card plus three distinct $9.99 digital games have exact live product/variant/cart evidence; Prava credential still required | Codex | 2026-08-03 01:54 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
@@ -29,9 +29,10 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Run one fresh mandate setup, explicitly choosing saved card `7912` in Prava.
-2. If credential minting succeeds, let the one-shot merchant harness record the expected sandbox decline.
-3. Preserve the exact result and move immediately to the UI/submission pass.
+1. User runs one fresh hosted approval from the installed APK, explicitly choosing saved card `7912`.
+2. If the mandate becomes active, user taps the one-shot merchant proof once; WishTrace handles mint,
+   Playwright checkout and report-status automatically.
+3. Preserve the exact result and move immediately to the bento-grid UI/submission pass.
 
 ## Next
 
@@ -40,6 +41,24 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Move immediately to the UX/submission pass after the single bounded payment proof.
 
 ## Milestone evidence
+
+### 2026-08-03 — Passkey boundary isolated; verification returned to the user
+
+- A real phone attempt selected Drawful 2 at `$9.99` and created a fresh Prava setup session, but
+  the hosted security step returned `FIDO_START_FAILED`. No provider mandate, credential, charge or
+  merchant attempt existed.
+- A bounded Playwright diagnostic proved that Prava's Visa surface uses a separate Secure Payment
+  Confirmation popup. Default headless WebAuthn could reach OTP and the passkey surface but returned
+  `AUTH_FAILED`; no credential or merchant attempt occurred. Agent-driven hosted verification is
+  now stopped at the user's request.
+- Organizer support clarified that Prava's Browser Harness is unavailable in sandbox and teams must
+  build their own browser automation. WishTrace's exact-product Playwright actor remains the correct
+  post-mint path and calls report-status itself.
+- Android now distinguishes passkey start, authentication cancellation/failure, provisioning,
+  credential-mint and merchant-decline boundaries. Only passkey/authentication failures expose an
+  explicit `Retry Prava approval`; provisioning and money-adjacent failures do not loop.
+- Evidence: debug assembly, unit tests and lint pass in 2m35s; the APK installed in place on the
+  physical phone. The next hosted verification is user-controlled.
 
 ### 2026-08-03 — Distinct digital gifts and saved-card recovery
 

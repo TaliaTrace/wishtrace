@@ -47,6 +47,16 @@ data class MandateSetupUiState(
             MandateSetupStep.REFRESHING,
             MandateSetupStep.EXECUTING,
         )
+
+    val canRetryApproval: Boolean
+        get() = step == MandateSetupStep.FAILED && mandate?.let {
+            it.lastChargeState == null && it.setupFailureCode in setOf(
+                    "FIDO_START_FAILED",
+                    "AUTH_FAILED",
+                    "AUTH_CANCELLED",
+                    "SESSION_EXPIRED",
+                )
+        } == true
 }
 
 class MandateSetupViewModel(
@@ -125,6 +135,14 @@ class MandateSetupViewModel(
                 error = "Prava could not open securely. Try again.",
             )
         }
+    }
+
+    /** Starts one fresh hosted approval only after an explicit user action. */
+    fun retryApproval(candidateId: String) {
+        val occasionId = mutableState.value.occasionId ?: return
+        if (mutableState.value.busy || !mutableState.value.canRetryApproval) return
+        prepareSelection(occasionId)
+        arm(candidateId)
     }
 
     /** The deep link came back — poll /refresh until ACTIVE or a terminal state. */

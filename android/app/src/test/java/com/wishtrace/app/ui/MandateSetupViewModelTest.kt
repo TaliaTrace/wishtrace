@@ -176,6 +176,58 @@ class MandateSetupViewModelTest {
     }
 
     @Test
+    fun setupConflictAutomaticallyRefreshesExistingMandate() = runTest(dispatcher) {
+        val unknown = details(
+            status = MandateStatus.UNKNOWN,
+            merchantOutcome = MandateMerchantOutcome.UNKNOWN,
+            lastChargeState = "UNKNOWN",
+        )
+        val gateway = FakeMandateGateway().apply {
+            current = unknown
+            refreshResult = unknown
+            setupError = WishTraceApiException(
+                message = "WishTrace found an existing approval.",
+                code = "MANDATE_ALREADY_EXISTS",
+                recoverable = true,
+            )
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+        viewModel.prepareSelection("occasion")
+        viewModel.arm("candidate-new")
+        advanceUntilIdle()
+
+        assertEquals(1, gateway.refreshCalls)
+        assertEquals(MandateSetupStep.UNKNOWN, viewModel.state.value.step)
+        assertEquals(null, viewModel.state.value.error)
+    }
+
+    @Test
+    fun explicitUnknownRecoverySendsExactMandateBeingReplaced() = runTest(dispatcher) {
+        val gateway = FakeMandateGateway().apply {
+            current = details(
+                status = MandateStatus.UNKNOWN,
+                merchantOutcome = MandateMerchantOutcome.UNKNOWN,
+                lastChargeState = "UNKNOWN",
+            )
+            setupResult = details(MandateStatus.AWAITING_APPROVAL)
+        }
+        val viewModel = MandateSetupViewModel(gateway)
+
+        viewModel.start("occasion")
+        advanceUntilIdle()
+        viewModel.prepareUnknownReplacement()
+        viewModel.prepareSelection("occasion")
+        viewModel.arm("candidate-new")
+        advanceUntilIdle()
+
+        assertEquals("mandate", gateway.lastReplacementMandateId)
+        assertEquals(MandateSetupStep.AWAITING_APPROVAL, viewModel.state.value.step)
+    }
+
+    @Test
     fun passkeyFailureAllowsOneExplicitFreshApproval() = runTest(dispatcher) {
         val gateway = FakeMandateGateway().apply {
             current = details(
@@ -220,10 +272,12 @@ class MandateSetupViewModelTest {
     private class FakeMandateGateway : MandateGateway {
         var current = details(MandateStatus.ACTIVE)
         var setupResult: MandateDetails? = null
+        var setupError: WishTraceApiException? = null
         var setupCalls = 0
         var refreshCalls = 0
         var refreshResult: MandateDetails? = null
         var lastCandidateId: String? = null
+        var lastReplacementMandateId: String? = null
         var executeCalls = 0
         var executeError: WishTraceApiException? = null
         var executeFailureState: MandateDetails? = null
@@ -235,9 +289,12 @@ class MandateSetupViewModelTest {
         override suspend fun setup(
             occasionId: String,
             candidateId: String,
+            replaceUnknownMandateId: String?,
         ): MandateDetails {
             setupCalls += 1
             lastCandidateId = candidateId
+            lastReplacementMandateId = replaceUnknownMandateId
+            setupError?.let { throw it }
             return setupResult ?: current
         }
 

@@ -86,13 +86,18 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Sandbox browser-automation contract: ORGANIZER-CONFIRMED — Prava's hosted Browser Harness is not
   available in sandbox. Teams must build their own automation and call report-status themselves.
   WishTrace's exact-product Playwright actor is therefore the correct post-mint implementation.
-- Known blocker: none that justifies another payment attempt. The observed post-mint merchant result
-  is unknown and must remain locked; UX/submission work proceeds without claiming a decline/order.
-- Last verified: 2026-08-03 03:34 PKT
-- Evidence location: migration `20260803_0014`; ACR build `chh`, image digest
-  `sha256:af67d20f4dbd7449083cb9d1ab17ef735a0bd58134c1d9ad82b8c08ecda3ef29`, and healthy deployed
-  revision `wishtrace-api--freshgifts1` at 100% traffic. Public health reports PostgreSQL 17.6 over
-  TLS; the UCP profile returns 200 with `public, max-age=300`; 156 backend tests plus Android
+- Known blocker: the observed post-mint merchant result is unknown and must remain locked. A
+  separate different-product approval is allowed only by an explicit user action in the sandbox
+  environment; production cannot replace an unknown charge.
+- Conflict recovery: DEPLOYED — Android automatically refreshes an existing mandate after a setup
+  conflict. An explicit different-gift sandbox recovery must name the exact latest locked mandate,
+  prove its post-mint charge is `UNKNOWN`, and select a different live product. The old mandate is
+  preserved and never retried or silently deleted.
+- Last verified: 2026-08-03 03:48 PKT
+- Evidence location: migration `20260803_0014`; ACR build `chj`, image digest
+  `sha256:f2655f58ab9e46cea25050bf9f1bfea6165ea0aa8f94623a8f2774d935ca1a8e`, and healthy deployed
+  revision `wishtrace-api--reconcile1` at 100% traffic. Public health reports PostgreSQL 17.6 over
+  TLS; the UCP profile returns 200 with `public, max-age=300`; 158 backend tests plus Android
   build/unit/lint pass; the matching APK installed in place. No credential, card data or provider
   payload is retained.
 
@@ -216,7 +221,7 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   The user then created one real runtime recipient/occasion context and a force-stop/relaunch restored
   it from the backend.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
-  Apps behind managed HTTPS; healthy revision `wishtrace-api--freshgifts1` receives 100% traffic
+  Apps behind managed HTTPS; healthy revision `wishtrace-api--reconcile1` receives 100% traffic
 - Custom tab/hosted approval verified: LIVE SANDBOX PASS — AndroidX Browser `1.10.0` opened the real
   Prava sandbox collection host, the user completed approval, the app return reconciled an active
   `$10` mandate, and Prava later issued one one-time credential to the backend-only merchant path.

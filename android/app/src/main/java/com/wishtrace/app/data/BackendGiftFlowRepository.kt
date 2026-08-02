@@ -202,11 +202,19 @@ class BackendGiftFlowRepository(
         }
     }
 
-    override suspend fun setup(occasionId: String, candidateId: String): MandateDetails =
+    override suspend fun setup(
+        occasionId: String,
+        candidateId: String,
+        replaceUnknownMandateId: String?,
+    ): MandateDetails =
         authenticated { token ->
+            val body = JSONObject().put("candidate_id", candidateId)
+            replaceUnknownMandateId?.let {
+                body.put("replace_unknown_mandate_id", it)
+            }
             api.post(
                 path = "/v1/occasions/$occasionId/mandate/setup",
-                json = JSONObject().put("candidate_id", candidateId),
+                json = body,
                 accessToken = token,
                 readTimeoutMillis = 30_000,
             ).toMandateDetails()

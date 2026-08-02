@@ -68,6 +68,9 @@
 - duplicate status/report request;
 - unknown status;
 - refresh resolves unknown;
+- setup conflict automatically refreshes the existing mandate;
+- sandbox-only replacement requires the exact post-mint unknown mandate and a different product;
+- production cannot replace an unknown charge;
 - changed price requires new approval.
 
 ## Android UX cases

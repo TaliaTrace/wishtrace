@@ -68,7 +68,11 @@ interface PurchaseFlowGateway {
 interface MandateGateway {
     suspend fun fetch(occasionId: String): MandateDetails?
 
-    suspend fun setup(occasionId: String, candidateId: String): MandateDetails
+    suspend fun setup(
+        occasionId: String,
+        candidateId: String,
+        replaceUnknownMandateId: String? = null,
+    ): MandateDetails
 
     suspend fun refresh(occasionId: String): MandateDetails
 

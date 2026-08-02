@@ -17,6 +17,7 @@ from app.mandate import (
     MandateSetupFacts,
     MandateSetupRequest,
     MandateState,
+    _is_sandbox_unknown_replacement,
     _state_from_mandate_status,
 )
 from app.merchant_browser import (
@@ -143,6 +144,7 @@ class MemoryMandateStore:
         self.failed_charges: list[tuple[uuid.UUID, str, bool]] = []
         self.checkout_started: list[uuid.UUID] = []
         self.recorded_checkouts: list[uuid.UUID] = []
+        self.replace_unknown_mandate_id: uuid.UUID | None = None
 
     # -- setup surface ------------------------------------------------------
     async def create_setup(
@@ -151,8 +153,10 @@ class MemoryMandateStore:
         user_id: uuid.UUID,
         occasion_id: uuid.UUID,
         candidate_id: uuid.UUID,
+        replace_unknown_mandate_id: uuid.UUID | None,
     ) -> MandateSetupFacts:
         del user_id, occasion_id, candidate_id
+        self.replace_unknown_mandate_id = replace_unknown_mandate_id
         facts = MandateSetupFacts(
             setup_id=self.mandate.id,
             recurring_frequency=self.mandate.recurring_frequency,
@@ -972,6 +976,62 @@ async def test_setup_creates_session_with_frequency_and_records_awaiting() -> No
     # The callback routes Prava's approval redirect back through our return path.
     assert "/v1/prava/mandate-return" in request.callback_url
     assert f"occasion_id={store.mandate.occasion_id}" in request.callback_url
+
+
+async def test_setup_forwards_explicit_unknown_replacement_identity() -> None:
+    store = MemoryMandateStore(_mandate(state=MandateState.UNKNOWN))
+    prava = FakeMandatePrava()
+    service = _service(store, prava, checkout=None)
+    replaced_id = uuid.uuid4()
+
+    await service.setup(
+        _user(),
+        store.mandate.occasion_id,
+        MandateSetupRequest(
+            candidate_id=uuid.uuid4(),
+            replace_unknown_mandate_id=replaced_id,
+        ),
+    )
+
+    assert store.replace_unknown_mandate_id == replaced_id
+
+
+def test_sandbox_unknown_replacement_requires_exact_locked_attempt_and_new_product() -> None:
+    mandate_id = uuid.uuid4()
+    allowed = _is_sandbox_unknown_replacement(
+        enabled=True,
+        requested_mandate_id=mandate_id,
+        existing_mandate_id=mandate_id,
+        existing_state=MandateState.UNKNOWN,
+        existing_product_id="product-old",
+        replacement_product_id="product-new",
+        latest_charge_state=MandateChargeState.UNKNOWN,
+        latest_provider_charge_id="charge-live",
+    )
+    production = _is_sandbox_unknown_replacement(
+        enabled=False,
+        requested_mandate_id=mandate_id,
+        existing_mandate_id=mandate_id,
+        existing_state=MandateState.UNKNOWN,
+        existing_product_id="product-old",
+        replacement_product_id="product-new",
+        latest_charge_state=MandateChargeState.UNKNOWN,
+        latest_provider_charge_id="charge-live",
+    )
+    same_product = _is_sandbox_unknown_replacement(
+        enabled=True,
+        requested_mandate_id=mandate_id,
+        existing_mandate_id=mandate_id,
+        existing_state=MandateState.UNKNOWN,
+        existing_product_id="product-old",
+        replacement_product_id="product-old",
+        latest_charge_state=MandateChargeState.UNKNOWN,
+        latest_provider_charge_id="charge-live",
+    )
+
+    assert allowed is True
+    assert production is False
+    assert same_product is False
 
 
 async def test_setup_does_not_guess_when_multiple_active_cards_exist() -> None:

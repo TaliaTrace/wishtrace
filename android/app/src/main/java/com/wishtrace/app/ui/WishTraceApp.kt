@@ -449,6 +449,7 @@ fun WishTraceApp(
                         verifiedEmail = session?.user?.email,
                         onBack = navController::popBackStack,
                         onChooseAnotherGift = {
+                            mandateViewModel.prepareUnknownReplacement()
                             navController.navigate(Destination.Discovery) {
                                 popUpTo(Destination.MandateSetup) { inclusive = true }
                             }

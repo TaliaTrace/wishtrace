@@ -184,6 +184,10 @@ def create_app(
                     idempotency_pepper=(
                         resolved_settings.session_token_pepper.get_secret_value()
                     ),
+                    allow_sandbox_unknown_replacement=(
+                        resolved_settings.prava_base_url.host
+                        == "sandbox.api.prava.space"
+                    ),
                 )
             except ValueError:
                 resolved_mandate_operations = UnavailableMandateService()

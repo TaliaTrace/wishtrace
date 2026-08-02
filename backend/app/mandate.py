@@ -122,6 +122,7 @@ class MandateSetupRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     candidate_id: uuid.UUID
+    replace_unknown_mandate_id: uuid.UUID | None = None
 
 
 class MandateExecuteRequest(BaseModel):
@@ -197,6 +198,7 @@ class MandateStore(Protocol):
         user_id: uuid.UUID,
         occasion_id: uuid.UUID,
         candidate_id: uuid.UUID,
+        replace_unknown_mandate_id: uuid.UUID | None,
     ) -> "MandateSetupFacts": ...
 
     async def complete_setup(
@@ -446,6 +448,7 @@ class MandateService:
             user_id=user.id,
             occasion_id=occasion_id,
             candidate_id=body.candidate_id,
+            replace_unknown_mandate_id=body.replace_unknown_mandate_id,
         )
         try:
             cards = await self._prava.list_cards(str(user.id))
@@ -953,8 +956,14 @@ class MandateService:
 
 
 class SqlMandateStore:
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        *,
+        allow_sandbox_unknown_replacement: bool = False,
+    ) -> None:
         self._session_factory = session_factory
+        self._allow_sandbox_unknown_replacement = allow_sandbox_unknown_replacement
 
     async def create_setup(
         self,
@@ -962,6 +971,7 @@ class SqlMandateStore:
         user_id: uuid.UUID,
         occasion_id: uuid.UUID,
         candidate_id: uuid.UUID,
+        replace_unknown_mandate_id: uuid.UUID | None,
     ) -> MandateSetupFacts:
         async with self._session_factory() as session, session.begin():
             occasion = await session.scalar(
@@ -981,16 +991,6 @@ class SqlMandateStore:
                 .limit(1)
                 .with_for_update()
             )
-            if (
-                existing is not None
-                and MandateState(existing.state) not in _REPLACEABLE_MANDATE_STATES
-            ):
-                raise ApiError(
-                    status_code=409,
-                    code="MANDATE_ALREADY_EXISTS",
-                    message="This occasion already has a mandate. Refresh its status.",
-                    recoverable=True,
-                )
             row = (
                 await session.execute(
                     select(CandidateSnapshotModel, DiscoveryRunModel)
@@ -1008,6 +1008,46 @@ class SqlMandateStore:
             if row is None:
                 raise _not_found("CANDIDATE_NOT_FOUND", "That gift option was not found.")
             candidate, discovery = row
+            if existing is not None:
+                existing_state = MandateState(existing.state)
+                latest_charge = await session.scalar(
+                    select(MandateChargeModel)
+                    .where(MandateChargeModel.mandate_id == existing.id)
+                    .order_by(
+                        MandateChargeModel.created_at.desc(),
+                        MandateChargeModel.id.desc(),
+                    )
+                    .limit(1)
+                    .with_for_update()
+                )
+                replacing_locked_unknown = _is_sandbox_unknown_replacement(
+                    enabled=self._allow_sandbox_unknown_replacement,
+                    requested_mandate_id=replace_unknown_mandate_id,
+                    existing_mandate_id=existing.id,
+                    existing_state=existing_state,
+                    existing_product_id=existing.merchant_product_id,
+                    replacement_product_id=candidate.merchant_product_id,
+                    latest_charge_state=(
+                        MandateChargeState(latest_charge.state)
+                        if latest_charge is not None
+                        else None
+                    ),
+                    latest_provider_charge_id=(
+                        latest_charge.provider_charge_id
+                        if latest_charge is not None
+                        else None
+                    ),
+                )
+                if (
+                    existing_state not in _REPLACEABLE_MANDATE_STATES
+                    and not replacing_locked_unknown
+                ):
+                    raise ApiError(
+                        status_code=409,
+                        code="MANDATE_ALREADY_EXISTS",
+                        message="WishTrace found an existing approval and is reconciling it.",
+                        recoverable=True,
+                    )
             if (
                 not candidate.eligible
                 or not candidate.checkout_supported
@@ -1711,11 +1751,43 @@ def build_mandate_service(
     public_base_url: str,
     merchant_checkout: MerchantCheckoutGateway | None = None,
     idempotency_pepper: str | None = None,
+    allow_sandbox_unknown_replacement: bool = False,
 ) -> MandateOperations:
     return MandateService(
-        store=SqlMandateStore(session_factory),
+        store=SqlMandateStore(
+            session_factory,
+            allow_sandbox_unknown_replacement=allow_sandbox_unknown_replacement,
+        ),
         prava=prava,
         public_base_url=public_base_url,
         merchant_checkout=merchant_checkout,
         idempotency_pepper=idempotency_pepper,
+    )
+
+
+def _is_sandbox_unknown_replacement(
+    *,
+    enabled: bool,
+    requested_mandate_id: uuid.UUID | None,
+    existing_mandate_id: uuid.UUID,
+    existing_state: MandateState,
+    existing_product_id: str,
+    replacement_product_id: str,
+    latest_charge_state: MandateChargeState | None,
+    latest_provider_charge_id: str | None,
+) -> bool:
+    """Permit one explicit different-gift recovery only in the test-card environment.
+
+    A post-mint unknown may represent a successful real merchant charge, so production must
+    reconcile or revoke it instead of starting another purchase. The hackathon sandbox moves no
+    money and needs a separate fresh intent to complete the organizer's expected decline proof.
+    """
+
+    return (
+        enabled
+        and requested_mandate_id == existing_mandate_id
+        and existing_state is MandateState.UNKNOWN
+        and latest_charge_state is MandateChargeState.UNKNOWN
+        and latest_provider_charge_id is not None
+        and replacement_product_id != existing_product_id
     )

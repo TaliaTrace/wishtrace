@@ -602,3 +602,21 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: Remove only the freshness preference if merchant product identity proves
   unstable; keep the immutable mandate audit and all hard commerce filters.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 03:48 PKT — Reconcile conflicts automatically; replace unknown only in sandbox
+
+- Context: After choosing a fresh product, setup returned `MANDATE_ALREADY_EXISTS` with an
+  instruction for the user to refresh manually. The old post-mint attempt was correctly locked
+  `UNKNOWN`, but the explicit recovery had not carried its identity into the new setup.
+- Decision: On an ordinary setup conflict, Android immediately refreshes the existing mandate and
+  renders the authoritative state. For the organizer's no-money sandbox only, an explicit
+  `Choose another gift` may create a separate approval when it names the exact latest mandate, its
+  latest minted provider charge is `UNKNOWN`, and the replacement has a different verified product
+  ID. Keep this path disabled against Prava production.
+- Consequence: The user never performs a mechanical refresh, stale state cannot create a second
+  action, and the sandbox proof can continue without overwriting or retrying the unknown credential.
+  The earlier mandate remains immutable evidence. A production unknown must reconcile or be revoked
+  with explicit Prava authentication before another purchase is allowed.
+- Rollback/fallback: Disable the sandbox replacement flag and retain automatic refresh. Never widen
+  the rule to production or allow the same product through it.
+- Owner: WishTrace team / Codex

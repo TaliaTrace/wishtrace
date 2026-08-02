@@ -69,12 +69,14 @@ class MandateSetupViewModel(
     private var setupKey: String? = null
     private var executeKey: String? = null
     private var openedApprovalSessionId: String? = null
+    private var replaceUnknownMandateId: String? = null
 
     /** Loads the occasion's current mandate, if any, and reconciles into a UI step. */
     fun start(occasionId: String) {
         val current = mutableState.value
         if (current.busy) return
         if (current.occasionId == occasionId && current.step != MandateSetupStep.IDLE) return
+        if (current.occasionId != occasionId) replaceUnknownMandateId = null
         mutableState.update { it.copy(step = MandateSetupStep.LOADING, occasionId = occasionId, error = null) }
         viewModelScope.launch {
             runCatching { gateway.fetch(occasionId) }
@@ -85,12 +87,21 @@ class MandateSetupViewModel(
 
     /** Opens an existing occasion mandate and reconciles Prava before showing its state. */
     fun openExisting(occasionId: String) {
+        replaceUnknownMandateId = null
         reconcile(occasionId)
+    }
+
+    /** Records the exact locked sandbox attempt before the user deliberately picks a new gift. */
+    fun prepareUnknownReplacement() {
+        val current = mutableState.value
+        replaceUnknownMandateId = current.mandate?.id
+            ?.takeIf { current.step == MandateSetupStep.UNKNOWN }
     }
 
     /** Begins an explicit new gift selection without replaying the prior attempt. */
     fun prepareSelection(occasionId: String) {
         if (mutableState.value.busy) return
+        if (mutableState.value.occasionId != occasionId) replaceUnknownMandateId = null
         setupKey = null
         executeKey = null
         openedApprovalSessionId = null
@@ -122,9 +133,27 @@ class MandateSetupViewModel(
         val stableKey = setupKey ?: "mandate-${UUID.randomUUID()}".also { setupKey = it }
         mutableState.update { it.copy(step = MandateSetupStep.SETTING_UP, error = null) }
         viewModelScope.launch {
-            runCatching { gateway.setup(occasionId, candidateId) }
-                .onSuccess(::applyMandate)
-                .onFailure(::showError)
+            try {
+                val mandate = gateway.setup(
+                    occasionId = occasionId,
+                    candidateId = candidateId,
+                    replaceUnknownMandateId = replaceUnknownMandateId,
+                )
+                replaceUnknownMandateId = null
+                applyMandate(mandate)
+            } catch (error: Throwable) {
+                if ((error as? WishTraceApiException)?.code == "MANDATE_ALREADY_EXISTS") {
+                    replaceUnknownMandateId = null
+                    mutableState.update {
+                        it.copy(step = MandateSetupStep.REFRESHING, error = null)
+                    }
+                    runCatching { gateway.refresh(occasionId) }
+                        .onSuccess(::applyMandate)
+                        .onFailure(::showError)
+                } else {
+                    showError(error)
+                }
+            }
         }
     }
 

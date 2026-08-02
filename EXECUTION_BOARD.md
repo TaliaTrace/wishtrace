@@ -8,7 +8,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260803_0014` | Codex | 2026-08-03 01:54 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 156 tests; healthy Azure revision `wishtrace-api--freshgifts1` serves 100% traffic | Codex | 2026-08-03 03:34 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 158 tests; healthy Azure revision `wishtrace-api--reconcile1` serves 100% traffic | Codex | 2026-08-03 03:48 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
@@ -16,7 +16,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL LIVE PASS — four exact products have live facts; a tokenized Drawful 2 Pay attempt occurred, with no confirmed order or decline | Codex | 2026-08-03 03:17 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — fresh-gift recovery, sticky-unknown state and secure Prava handoff built, tested, linted and installed in place | Codex | 2026-08-03 03:34 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — automatic mandate reconciliation and explicit sandbox replacement built, tested, linted and installed in place | Codex | 2026-08-03 03:48 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
@@ -42,6 +42,23 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Move immediately to the UX/submission pass after the single bounded payment proof.
 
 ## Milestone evidence
+
+### 2026-08-03 — Existing-mandate conflict now reconciles automatically
+
+- Android no longer exposes the backend's stale “refresh status” instruction. If setup races an
+  existing mandate, it automatically calls authoritative refresh and renders the reconciled state.
+- The explicit `Choose another gift` action carries the exact locked mandate ID through discovery
+  and setup. The backend permits a separate approval only when Prava is configured against its
+  sandbox host, the old state and latest charge are both `UNKNOWN`, a provider charge was actually
+  minted, and the new verified product ID differs. Production remains fail-closed.
+- The old provider mandate is not deleted or retried. Current Prava intent deletion requires a new
+  passkey and is not available through the implemented native API path; its immutable audit remains.
+- Evidence: 158 backend tests, Ruff, strict mypy, Android assemble/unit/lint all pass. ACR run `chj`
+  produced digest `sha256:f2655f58ab9e46cea25050bf9f1bfea6165ea0aa8f94623a8f2774d935ca1a8e`;
+  healthy revision `wishtrace-api--reconcile1` serves 100% traffic with PostgreSQL TLS and cache-safe
+  UCP. The matching APK installed in place on the physical phone.
+- Truth boundary: the automatic recovery and sandbox gate are deployed; the user's next approval
+  and merchant result remain pending.
 
 ### 2026-08-03 — Fresh verified gift recovery deployed
 

@@ -9,6 +9,10 @@ import com.wishtrace.app.domain.CandidateRejectionReason
 import com.wishtrace.app.domain.DiscoveryPreparation
 import com.wishtrace.app.domain.DiscoveryStage
 import com.wishtrace.app.domain.GiftDiscoveryRequest
+import com.wishtrace.app.domain.MandateDetails
+import com.wishtrace.app.domain.MandateMerchantOutcome
+import com.wishtrace.app.domain.MandateStatus
+import com.wishtrace.app.domain.MandateVisaConfirmation
 import com.wishtrace.app.domain.Money
 import com.wishtrace.app.domain.ProductCandidate
 import com.wishtrace.app.domain.PurchaseIntentDetails
@@ -24,7 +28,7 @@ import org.json.JSONObject
 class BackendGiftFlowRepository(
     private val api: WishTraceApiClient,
     private val sessionStore: SessionStore,
-) : GiftDiscoveryGateway, PurchaseFlowGateway {
+) : GiftDiscoveryGateway, PurchaseFlowGateway, MandateGateway {
     override suspend fun prepareCandidates(
         request: GiftDiscoveryRequest,
         onStage: suspend (DiscoveryStage) -> Unit,
@@ -185,6 +189,51 @@ class BackendGiftFlowRepository(
         }
     }
 
+    override suspend fun fetch(occasionId: String): MandateDetails? = authenticated { token ->
+        try {
+            api.get("/v1/occasions/$occasionId/mandate", token).toMandateDetails()
+        } catch (error: WishTraceApiException) {
+            // No mandate armed yet is an expected, not-yet-set-up state.
+            if (error.code == "MANDATE_NOT_FOUND" || error.code == "HTTP_404") {
+                null
+            } else {
+                throw error
+            }
+        }
+    }
+
+    override suspend fun setup(occasionId: String, candidateId: String): MandateDetails =
+        authenticated { token ->
+            api.post(
+                path = "/v1/occasions/$occasionId/mandate/setup",
+                json = JSONObject().put("candidate_id", candidateId),
+                accessToken = token,
+                readTimeoutMillis = 30_000,
+            ).toMandateDetails()
+        }
+
+    override suspend fun refresh(occasionId: String): MandateDetails = authenticated { token ->
+        api.post(
+            path = "/v1/occasions/$occasionId/mandate/refresh",
+            accessToken = token,
+            readTimeoutMillis = 30_000,
+        ).toMandateDetails()
+    }
+
+    override suspend fun execute(
+        occasionId: String,
+        billing: BillingContact,
+        idempotencyKey: String,
+    ): MandateDetails = authenticated { token ->
+        api.post(
+            path = "/v1/occasions/$occasionId/mandate/execute",
+            json = JSONObject().put("billing", billing.toJson()),
+            accessToken = token,
+            headers = mapOf("Idempotency-Key" to idempotencyKey),
+            readTimeoutMillis = 180_000,
+        ).toMandateDetails()
+    }
+
     private suspend fun <T> authenticated(block: suspend (String) -> T): T {
         val token = sessionStore.current()?.accessToken
             ?: throw WishTraceApiException(
@@ -278,6 +327,45 @@ private fun JSONObject.toPurchaseIntent(): PurchaseIntentDetails {
         approvalSession = approval,
         providerStatus = optionalString("provider_status"),
         merchantOrderId = optionalString("merchant_order_id"),
+        updatedAt = requiredInstant("updated_at"),
+    )
+}
+
+private fun JSONObject.toMandateDetails(): MandateDetails {
+    val approvalUrl = if (isNull("approval_session")) {
+        null
+    } else {
+        getJSONObject("approval_session").optionalString("hosted_url")
+    }
+    val charges = getJSONArray("charges")
+    val lastChargeState = if (charges.length() == 0) {
+        null
+    } else {
+        charges.getJSONObject(charges.length() - 1).requiredString("state")
+    }
+    return MandateDetails(
+        id = requiredString("id"),
+        recipientId = requiredString("recipient_id"),
+        occasionId = requiredString("occasion_id"),
+        status = MandateStatus.fromWire(requiredString("state")),
+        approvedAmountMinor = getInt("approved_amount_minor"),
+        currency = requiredString("currency"),
+        recurringFrequency = requiredString("recurring_frequency"),
+        merchantScope = requiredString("merchant_scope"),
+        maxCharges = getInt("max_charges"),
+        chargesUsed = getInt("charges_used"),
+        merchantName = requiredString("merchant_name"),
+        productTitle = requiredString("product_title"),
+        itemPriceMinor = getInt("item_price_minor"),
+        approvalUrl = approvalUrl,
+        lastProviderStatus = optionalString("provider_status"),
+        merchantOrderId = optionalString("merchant_order_id"),
+        merchantOutcome = optionalString("merchant_outcome")
+            ?.let(MandateMerchantOutcome::fromWire),
+        visaConfirmation = optionalString("visa_confirmation")
+            ?.let(MandateVisaConfirmation::fromWire),
+        lastChargeState = lastChargeState,
+        createdAt = requiredInstant("created_at"),
         updatedAt = requiredInstant("updated_at"),
     )
 }

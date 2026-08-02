@@ -2,8 +2,10 @@ package com.wishtrace.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wishtrace.app.data.MandateGateway
 import com.wishtrace.app.data.WishTraceRepository
 import com.wishtrace.app.domain.HomeSnapshot
+import com.wishtrace.app.domain.MandateDetails
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,13 +17,22 @@ sealed interface HomeUiState {
 
     data object Empty : HomeUiState
 
-    data class Content(val snapshot: HomeSnapshot) : HomeUiState
+    /**
+     * The occasion snapshot plus its reconciled autopilot [mandate], if one exists.
+     * The mandate is fetched best-effort — a failure leaves it null so the home never
+     * fails to load just because the mandate lookup did.
+     */
+    data class Content(
+        val snapshot: HomeSnapshot,
+        val mandate: MandateDetails? = null,
+    ) : HomeUiState
 
     data class Error(val message: String) : HomeUiState
 }
 
 class HomeViewModel(
     private val repository: WishTraceRepository,
+    private val mandateGateway: MandateGateway,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val state: StateFlow<HomeUiState> = mutableState.asStateFlow()
@@ -41,9 +52,15 @@ class HomeViewModel(
         loadJob = viewModelScope.launch {
             mutableState.value = HomeUiState.Loading
             mutableState.value = try {
-                repository.getHome()
-                    ?.let(HomeUiState::Content)
-                    ?: HomeUiState.Empty
+                val snapshot = repository.getHome()
+                if (snapshot == null) {
+                    HomeUiState.Empty
+                } else {
+                    val mandate = runCatching {
+                        mandateGateway.fetch(snapshot.occasion.id)
+                    }.getOrNull()
+                    HomeUiState.Content(snapshot = snapshot, mandate = mandate)
+                }
             } catch (_: Exception) {
                 HomeUiState.Error(
                     message = "We couldn't load this profile. Try again.",

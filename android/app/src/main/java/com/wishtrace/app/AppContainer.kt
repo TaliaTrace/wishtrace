@@ -7,6 +7,7 @@ import com.wishtrace.app.data.BackendGiftFlowRepository
 import com.wishtrace.app.data.BackendWishTraceRepository
 import com.wishtrace.app.data.GiftDiscoveryGateway
 import com.wishtrace.app.data.GoogleCredentialClient
+import com.wishtrace.app.data.MandateGateway
 import com.wishtrace.app.data.OccasionRepository
 import com.wishtrace.app.data.PeopleRepository
 import com.wishtrace.app.data.PurchaseFlowGateway
@@ -24,6 +25,7 @@ class AppContainer(context: Context) {
     val occasionRepository: OccasionRepository = backendRepository
     val discoveryGateway: GiftDiscoveryGateway = giftFlowRepository
     val purchaseFlowGateway: PurchaseFlowGateway = giftFlowRepository
+    val mandateGateway: MandateGateway = giftFlowRepository
     val authRepository: AuthRepository = BackendAuthRepository(apiClient, sessionStore)
     val googleCredentialClient = GoogleCredentialClient(context)
 }

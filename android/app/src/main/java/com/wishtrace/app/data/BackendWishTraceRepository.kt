@@ -5,7 +5,9 @@ import com.wishtrace.app.domain.HomeSnapshot
 import com.wishtrace.app.domain.Money
 import com.wishtrace.app.domain.Occasion
 import com.wishtrace.app.domain.OccasionKind
+import com.wishtrace.app.domain.PersonalityTraits
 import com.wishtrace.app.domain.Recipient
+import com.wishtrace.app.domain.RecurringFrequency
 import com.wishtrace.app.domain.SourceMode
 import java.time.LocalDate
 import java.time.ZoneId
@@ -34,6 +36,16 @@ class BackendWishTraceRepository(
             .put("interests", JSONArray(input.interests))
             .put("dislikes", JSONArray(input.dislikes))
             .put("hint", input.hint?.trim()?.takeIf(String::isNotEmpty) ?: JSONObject.NULL)
+        // personality_traits is a nested object of only the axes the owner set; the
+        // backend defaults it when omitted, so send it only when there is a signal.
+        input.personalityTraits?.takeUnless { it.isEmpty }?.let { traits ->
+            val traitsJson = JSONObject()
+            traits.energy?.let { traitsJson.put("energy", it) }
+            traits.environment?.let { traitsJson.put("environment", it) }
+            traits.style?.let { traitsJson.put("style", it) }
+            request.put("personality_traits", traitsJson)
+        }
+        input.ageBand?.let { request.put("age_band", it) }
         val response = if (input.id == null) {
             api.post(
                 path = "/v1/recipients",
@@ -58,6 +70,7 @@ class BackendWishTraceRepository(
             .put("time_zone", input.timeZone.id)
             .put("budget_minor", input.budget.minorUnits)
             .put("currency", input.budget.currencyCode)
+            .put("recurring_frequency", input.recurringFrequency.wire)
             .put(
                 "required_arrival_date",
                 input.requiredArrivalDate?.toString() ?: JSONObject.NULL,
@@ -113,6 +126,11 @@ private fun JSONObject.toRecipient(): Recipient {
             )
         }
     }
+    val personality = if (isNull("personality_traits")) {
+        null
+    } else {
+        getJSONObject("personality_traits").toPersonalityTraits()
+    }
     return Recipient(
         id = requiredString("id"),
         displayName = requiredString("display_name"),
@@ -121,9 +139,17 @@ private fun JSONObject.toRecipient(): Recipient {
         photoUri = null,
         interests = interests,
         dislikes = dislikes,
+        personalityTraits = personality?.takeUnless(PersonalityTraits::isEmpty),
+        ageBand = optionalString("age_band"),
         hints = hints,
     )
 }
+
+private fun JSONObject.toPersonalityTraits(): PersonalityTraits = PersonalityTraits(
+    energy = optionalString("energy"),
+    environment = optionalString("environment"),
+    style = optionalString("style"),
+)
 
 private fun JSONObject.toOccasion(): Occasion = Occasion(
     id = requiredString("id"),
@@ -135,6 +161,7 @@ private fun JSONObject.toOccasion(): Occasion = Occasion(
         minorUnits = getLong("budget_minor"),
         currencyCode = requiredString("currency"),
     ),
+    recurringFrequency = RecurringFrequency.fromWire(requiredString("recurring_frequency")),
     requiredArrivalDate = if (isNull("required_arrival_date")) {
         null
     } else {

@@ -213,6 +213,8 @@ class RecipientSetupViewModel(
                         relationship = current.relationship,
                         interests = current.selectedInterests.sorted(),
                         dislikes = splitTags(current.dislikesText),
+                        personalityTraits = initialSnapshot?.recipient?.personalityTraits,
+                        ageBand = initialSnapshot?.recipient?.ageBand,
                         hint = current.hintText.takeIf(String::isNotBlank),
                     ),
                 )
@@ -228,6 +230,8 @@ class RecipientSetupViewModel(
                             minorUnits = requireNotNull(occasionValidation.budgetMinorUnits),
                             currencyCode = "USD",
                         ),
+                        recurringFrequency = initialSnapshot?.occasion?.recurringFrequency
+                            ?: com.wishtrace.app.domain.RecurringFrequency.ONE_TIME,
                         requiredArrivalDate = initialSnapshot?.occasion?.requiredArrivalDate,
                     ),
                 )

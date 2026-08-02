@@ -28,12 +28,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.booleanResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.wishtrace.app.R
 import com.wishtrace.app.domain.VerifiedResult
 import com.wishtrace.app.ui.BillingForm
 import com.wishtrace.app.ui.CheckoutStep
@@ -61,6 +63,7 @@ fun CheckoutScreen(
     verifiedEmail: String?,
     onBack: () -> Unit,
     onBillingChange: (BillingForm) -> Unit,
+    onUseSandboxBilling: () -> Unit,
     onQuote: () -> Unit,
     onApprove: () -> Unit,
     onRefresh: () -> Unit,
@@ -133,6 +136,7 @@ fun CheckoutScreen(
                         verifiedEmail = verifiedEmail,
                         enabled = !state.busy,
                         onChange = onBillingChange,
+                        onUseSandboxBilling = onUseSandboxBilling,
                     )
 
                     CheckoutStep.READY_FOR_APPROVAL,
@@ -231,6 +235,7 @@ private fun BillingSection(
     verifiedEmail: String?,
     enabled: Boolean,
     onChange: (BillingForm) -> Unit,
+    onUseSandboxBilling: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -244,6 +249,20 @@ private fun BillingSection(
             color = InkMuted,
             style = MaterialTheme.typography.bodyMedium,
         )
+        if (booleanResource(R.bool.wishtrace_sandbox_tools)) {
+            SecondaryAction(
+                text = "Use sandbox test address",
+                onClick = onUseSandboxBilling,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "Fills a synthetic test address for the Prava expected-failure proof. " +
+                    "Not a real address.",
+                color = InkMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         Surface(color = BlueSurface, shape = RoundedCornerShape(16.dp)) {
             Row(
                 modifier = Modifier

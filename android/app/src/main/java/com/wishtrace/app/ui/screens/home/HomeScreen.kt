@@ -20,7 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.wishtrace.app.data.PreviewFixtures
 import com.wishtrace.app.domain.HomeSnapshot
+import com.wishtrace.app.domain.MandateDetails
+import com.wishtrace.app.domain.MandateStatus
 import com.wishtrace.app.ui.HomeUiState
 import com.wishtrace.app.ui.WishTraceTestTags
 import com.wishtrace.app.ui.components.EditorialCard
@@ -49,7 +53,13 @@ import com.wishtrace.app.ui.theme.BlueSurface
 import com.wishtrace.app.ui.theme.BrandBlue
 import com.wishtrace.app.ui.theme.BrandIndigo
 import com.wishtrace.app.ui.theme.LavenderSurface
+import com.wishtrace.app.ui.theme.Success
+import com.wishtrace.app.ui.theme.SuccessSurface
+import com.wishtrace.app.ui.theme.Warning
+import com.wishtrace.app.ui.theme.WarningSurface
 import com.wishtrace.app.ui.theme.WishTraceTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -78,6 +88,7 @@ fun HomeScreen(
 
             is HomeUiState.Content -> HomeContent(
                 snapshot = state.snapshot,
+                mandate = state.mandate,
                 giverDisplayName = giverDisplayName,
                 onFindGift = onFindGift,
                 onReviewRecipient = onReviewRecipient,
@@ -89,6 +100,7 @@ fun HomeScreen(
 @Composable
 private fun HomeContent(
     snapshot: HomeSnapshot,
+    mandate: MandateDetails?,
     giverDisplayName: String?,
     onFindGift: () -> Unit,
     onReviewRecipient: () -> Unit,
@@ -187,13 +199,19 @@ private fun HomeContent(
                             }
                         }
 
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(0.dp),
-                        ) {
-                            items(recipient.interests.take(3).size) { index ->
-                                InterestChip(text = recipient.interests[index])
+                        if (recipient.interests.isNotEmpty()) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(0.dp),
+                            ) {
+                                items(recipient.interests.take(3).size) { index ->
+                                    InterestChip(text = recipient.interests[index])
+                                }
                             }
+                        }
+
+                        mandate?.autopilotStatus()?.let { status ->
+                            MandateStatusPill(status = status)
                         }
 
                         Row(
@@ -214,7 +232,11 @@ private fun HomeContent(
                         }
 
                         PrimaryAction(
-                            text = "Find a gift for ${recipient.displayName}",
+                            text = if (mandate?.isArmed == true) {
+                                "Review ${recipient.displayName}'s gift"
+                            } else {
+                                "Find a gift for ${recipient.displayName}"
+                            },
                             onClick = onFindGift,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -382,6 +404,77 @@ private fun HomeContentPreview() {
             onFindGift = {},
             onReviewRecipient = {},
         )
+    }
+}
+
+/**
+ * Calm autopilot status. Honest about the reconciled backend state: only ACTIVE (or a
+ * terminal SUCCEEDED/CONSUMED) reads as "on". Everything else stays pending or muted —
+ * no "gift secured" is ever claimed here.
+ */
+private data class AutopilotStatusPill(
+    val label: String,
+    val icon: ImageVector,
+    val container: Color,
+    val content: Color,
+)
+
+private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (status) {
+    MandateStatus.ACTIVE -> AutopilotStatusPill(
+        label = "Autopilot on",
+        icon = Icons.Rounded.CheckCircle,
+        container = SuccessSurface,
+        content = Success,
+    )
+
+    MandateStatus.SUCCEEDED,
+    MandateStatus.CONSUMED,
+    -> AutopilotStatusPill(
+        label = "Handled",
+        icon = Icons.Rounded.CheckCircle,
+        container = SuccessSurface,
+        content = Success,
+    )
+
+    MandateStatus.SETUP_CREATING,
+    MandateStatus.AWAITING_APPROVAL,
+    MandateStatus.CHARGING,
+    MandateStatus.CHECKOUT_IN_PROGRESS,
+    MandateStatus.REPORTING,
+    -> AutopilotStatusPill(
+        label = "Awaiting approval",
+        icon = Icons.Rounded.Schedule,
+        container = WarningSurface,
+        content = Warning,
+    )
+
+    // DECLINED, CANCELLED, EXPIRED, FAILED, PAUSED, UNKNOWN — muted; no pill.
+    else -> null
+}
+
+@Composable
+private fun MandateStatusPill(status: AutopilotStatusPill) {
+    Surface(
+        color = status.container,
+        contentColor = status.content,
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = status.icon,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = status.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
     }
 }
 

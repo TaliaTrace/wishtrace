@@ -20,4 +20,13 @@ object WishTraceTestTags {
     const val SetupPersonStep = "setup_person_step"
     const val SetupOccasionStep = "setup_occasion_step"
     const val SetupPrimaryAction = "setup_primary_action"
+    const val GiftDnaScreen = "gift_dna_screen"
+    const val GiftDnaRedTile = "gift_dna_red_tile"
+    const val GiftDnaBlueTile = "gift_dna_blue_tile"
+    const val GiftDnaGreenTile = "gift_dna_green_tile"
+    const val GiftDnaYellowTile = "gift_dna_yellow_tile"
+    const val GiftDnaPrimaryAction = "gift_dna_primary_action"
+    const val MandateSetupScreen = "mandate_setup_screen"
+    const val MandateSetupCta = "mandate_setup_cta"
+    const val MandateArmedConfirmation = "mandate_armed_confirmation"
 }

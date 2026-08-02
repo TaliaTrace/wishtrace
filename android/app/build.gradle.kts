@@ -28,6 +28,13 @@ android {
             .trimEnd('/')
             .replace("\"", "\\\"")
         resValue("string", "wishtrace_api_base_url", "\"$backendBaseUrl\"")
+        val sandboxTools = providers
+            .gradleProperty("WISHTRACE_SANDBOX_TOOLS")
+            .orElse("false")
+            .get()
+            .trim()
+            .lowercase()
+        resValue("bool", "wishtrace_sandbox_tools", if (sandboxTools == "true") "true" else "false")
     }
 
     buildTypes {

@@ -36,7 +36,10 @@ import com.wishtrace.app.ui.components.WishTraceBottomBar
 import com.wishtrace.app.ui.screens.auth.SignInRoute
 import com.wishtrace.app.ui.screens.checkout.CheckoutScreen
 import com.wishtrace.app.ui.screens.discovery.GiftDiscoveryScreen
+import com.wishtrace.app.ui.screens.giftdna.GiftDnaRoute
+import com.wishtrace.app.ui.screens.giftdna.GiftDnaViewModel
 import com.wishtrace.app.ui.screens.home.HomeScreen
+import com.wishtrace.app.ui.screens.mandate.MandateSetupRoute
 import com.wishtrace.app.ui.screens.occasions.OccasionsScreen
 import com.wishtrace.app.ui.screens.onboarding.WelcomeScreen
 import com.wishtrace.app.ui.screens.people.PeopleScreen
@@ -60,7 +63,12 @@ private object Destination {
     const val AddPerson = "add_person"
     const val EditPerson = "edit_person"
     const val EditOccasion = "edit_occasion"
+    const val GiftDna = "gift_dna"
+    const val MandateSetup = "mandate_setup"
 }
+
+private val UUID_REGEX =
+    Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}")
 
 @Composable
 fun WishTraceApp(
@@ -72,7 +80,12 @@ fun WishTraceApp(
         AppContainer(context.applicationContext)
     }
     val homeFactory = remember(container) {
-        viewModelFactory { HomeViewModel(container.wishTraceRepository) }
+        viewModelFactory {
+            HomeViewModel(
+                repository = container.wishTraceRepository,
+                mandateGateway = container.mandateGateway,
+            )
+        }
     }
     val discoveryFactory = remember(container) {
         viewModelFactory { DiscoveryViewModel(container.discoveryGateway) }
@@ -83,11 +96,16 @@ fun WishTraceApp(
         viewModelFactory { CheckoutViewModel(container.purchaseFlowGateway) }
     }
     val checkoutViewModel: CheckoutViewModel = viewModel(factory = checkoutFactory)
+    val mandateFactory = remember(container) {
+        viewModelFactory { MandateSetupViewModel(container.mandateGateway) }
+    }
+    val mandateViewModel: MandateSetupViewModel = viewModel(factory = mandateFactory)
 
     val navController = rememberNavController()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
     val discoveryState by discoveryViewModel.state.collectAsStateWithLifecycle()
     val checkoutState by checkoutViewModel.state.collectAsStateWithLifecycle()
+    val mandateState by mandateViewModel.state.collectAsStateWithLifecycle()
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -131,21 +149,30 @@ fun WishTraceApp(
         val uri = pravaReturnUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
         if (uri == null) return@LaunchedEffect
         val purchaseIntentId = uri.getQueryParameter("purchase_intent_id")
+        val occasionId = uri.getQueryParameter("occasion_id")
         val valid = uri.scheme == "wishtrace" &&
             uri.host == "prava" &&
-            uri.path == "/return" &&
-            purchaseIntentId?.matches(
-                Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"),
-            ) == true
+            uri.path == "/return"
         if (!valid) {
             onPravaReturnConsumed()
             return@LaunchedEffect
         }
-        if (session != null) {
+        val purchaseIntentValid = purchaseIntentId?.matches(UUID_REGEX) == true
+        val occasionValid = occasionId?.matches(UUID_REGEX) == true
+        if (!purchaseIntentValid && !occasionValid) {
+            onPravaReturnConsumed()
+            return@LaunchedEffect
+        }
+        if (session == null) return@LaunchedEffect
+        if (purchaseIntentValid) {
             navController.navigate(Destination.Checkout) { launchSingleTop = true }
             checkoutViewModel.resumeFromReturn(requireNotNull(purchaseIntentId))
-            onPravaReturnConsumed()
         }
+        if (occasionValid) {
+            navController.navigate(Destination.MandateSetup) { launchSingleTop = true }
+            mandateViewModel.resumeFromReturn(requireNotNull(occasionId))
+        }
+        onPravaReturnConsumed()
     }
 
     LaunchedEffect(checkoutState.approvalUrl) {
@@ -166,6 +193,27 @@ fun WishTraceApp(
                 .launchUrl(context, requireNotNull(uri))
         }.onFailure {
             checkoutViewModel.approvalLaunchFailed()
+        }
+    }
+
+    LaunchedEffect(mandateState.approvalUrl) {
+        val hostedUrl = mandateState.approvalUrl ?: return@LaunchedEffect
+        val uri = runCatching { Uri.parse(hostedUrl) }.getOrNull()
+        val safe = uri?.scheme == "https" &&
+            uri.host in setOf("sandbox.collect.prava.space", "collect.prava.space") &&
+            uri.userInfo == null
+        if (!safe) {
+            mandateViewModel.approvalLaunchFailed()
+            return@LaunchedEffect
+        }
+        mandateViewModel.consumeApprovalUrl()
+        runCatching {
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+                .launchUrl(context, requireNotNull(uri))
+        }.onFailure {
+            mandateViewModel.approvalLaunchFailed()
         }
     }
 
@@ -230,7 +278,7 @@ fun WishTraceApp(
                     onRetry = homeViewModel::retry,
                     onFindGift = { navController.navigate(Destination.Discovery) },
                     onReviewRecipient = { navController.navigate(Destination.Recipient) },
-                    onAddPerson = { navController.navigate(Destination.AddPerson) },
+                    onAddPerson = { navController.navigate(Destination.GiftDna) },
                 )
             }
             composable(ShellDestination.People.route) {
@@ -314,7 +362,8 @@ fun WishTraceApp(
                         onRetry = navController::popBackStack,
                         onSelect = { candidateId ->
                             selectedCandidateId = candidateId
-                            navController.navigate(Destination.Checkout)
+                            mandateViewModel.start(snapshot.occasion.id)
+                            navController.navigate(Destination.MandateSetup)
                         },
                         onWriteMessage = navController::popBackStack,
                     )
@@ -331,6 +380,7 @@ fun WishTraceApp(
                     onBillingChange = { form ->
                         checkoutViewModel.updateBilling { form }
                     },
+                    onUseSandboxBilling = checkoutViewModel::useSandboxBillingAddress,
                     onQuote = {
                         checkoutViewModel.requestQuote(session?.user?.email)
                     },
@@ -339,6 +389,58 @@ fun WishTraceApp(
                     onMessageChange = checkoutViewModel::updateMessage,
                     onSaveMessage = checkoutViewModel::saveMessage,
                 )
+            }
+            composable(Destination.GiftDna) {
+                val today = (homeState as? HomeUiState.Content)
+                    ?.snapshot
+                    ?.today
+                    ?: LocalDate.now()
+                val giftDnaFactory = remember(container, today) {
+                    viewModelFactory {
+                        GiftDnaViewModel(
+                            peopleRepository = container.peopleRepository,
+                            occasionRepository = container.occasionRepository,
+                            today = today,
+                        )
+                    }
+                }
+                val giftDnaViewModel: GiftDnaViewModel = viewModel(
+                    key = "gift-dna",
+                    factory = giftDnaFactory,
+                )
+                GiftDnaRoute(
+                    viewModel = giftDnaViewModel,
+                    onBack = navController::popBackStack,
+                    onSaved = {
+                        navController.popBackStack()
+                        homeViewModel.retry()
+                    },
+                )
+            }
+            composable(Destination.MandateSetup) {
+                val snapshotOccasionId = remember {
+                    (homeState as? HomeUiState.Content)?.snapshot?.occasion?.id
+                }
+                // The occasion id can arrive two ways: from the home snapshot (hero path
+                // through Recommendation) or straight from the mandate VM after a deep-link
+                // return reconciled it. The deep-link cold start has no candidate id, but by
+                // then the user is past arming, so an empty candidate is never exercised.
+                val occasionId = mandateState.occasionId ?: snapshotOccasionId
+                if (occasionId == null) {
+                    LaunchedEffect(Unit) { navController.popBackStack() }
+                } else {
+                    MandateSetupRoute(
+                        viewModel = mandateViewModel,
+                        occasionId = occasionId,
+                        candidateId = selectedCandidateId.orEmpty(),
+                        verifiedEmail = session?.user?.email,
+                        onBack = navController::popBackStack,
+                        onArmed = {
+                            navController.popBackStack()
+                            homeViewModel.retry()
+                        },
+                    )
+                }
             }
             composable(Destination.AddPerson) {
                 val today = (homeState as? HomeUiState.Content)

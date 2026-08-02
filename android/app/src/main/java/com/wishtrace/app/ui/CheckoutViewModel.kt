@@ -92,6 +92,20 @@ class CheckoutViewModel(
         }
     }
 
+    /**
+     * Fills the form with a clearly synthetic US test address for the Prava sandbox
+     * expected-failure proof. This is not a real address and only reaches sandbox builds
+     * where [R.bool.wishtrace_sandbox_tools] is enabled. The verified Google email is left
+     * untouched and the card is still supplied by Prava, never typed here.
+     */
+    fun useSandboxBillingAddress() {
+        if (mutableState.value.busy) return
+        quoteKey = null
+        mutableState.update {
+            it.copy(billing = SANDBOX_TEST_BILLING, error = null)
+        }
+    }
+
     fun requestQuote(verifiedEmail: String?) {
         val current = mutableState.value
         val intent = current.intent ?: return
@@ -258,6 +272,18 @@ class CheckoutViewModel(
         mutableState.update { it.copy(step = fallback, error = safeMessage) }
     }
 }
+
+private val SANDBOX_TEST_BILLING = BillingForm(
+    firstName = "Test",
+    lastName = "Gifter",
+    addressLine1 = "123 Test Street",
+    addressLine2 = "",
+    city = "Seattle",
+    region = "WA",
+    postalCode = "98101",
+    countryCode = "US",
+    phone = "",
+)
 
 private fun BillingForm.toContact(email: String?): BillingContact = BillingContact(
     email = email?.takeIf(String::isNotBlank)

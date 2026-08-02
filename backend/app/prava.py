@@ -354,6 +354,7 @@ class PravaMandateChargeResult(BaseModel):
     credential: SensitivePaymentCredential | None
     order_id: str | None
     error_code: str | None
+    response_id: str | None = None
 
 
 class PravaMandateReportResult(BaseModel):
@@ -807,7 +808,7 @@ class PravaHttpGateway:
         )
         try:
             raw = _RawChargeResult.model_validate(response.json())
-            return _charge_result(raw)
+            return _charge_result(raw, response_id=_response_id(response))
         except (ValueError, ValidationError) as error:
             raise _invalid_response(response, outcome_unknown=True) from error
 
@@ -980,7 +981,11 @@ def _mandate_info(raw: _RawMandate) -> PravaMandateInfo:
     )
 
 
-def _charge_result(raw: _RawChargeResult) -> PravaMandateChargeResult:
+def _charge_result(
+    raw: _RawChargeResult,
+    *,
+    response_id: str | None,
+) -> PravaMandateChargeResult:
     nested = raw.credentials
     credentials = (
         nested.token if nested is not None else raw.token,
@@ -1019,6 +1024,7 @@ def _charge_result(raw: _RawChargeResult) -> PravaMandateChargeResult:
             raw.error_code
             or (raw.error.code if raw.error is not None else None)
         ),
+        response_id=response_id,
     )
 
 

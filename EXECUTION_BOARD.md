@@ -8,15 +8,15 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260802_0012` | Codex | 2026-08-02 23:39 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 143 tests; healthy Azure revision `savedcard1`; database TLS true | Codex | 2026-08-03 00:11 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS — 144 tests; exact merchant URL/state-code fixes deployed as `merchantfix1`; database TLS true | Codex | 2026-08-03 00:57 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | LIVE USER ACTION — saved enrollment failed device binding and was retired; first clean team-card enrollment returned `PROVISION_ERROR`; one explicit no-preselection retry is pending with zero charges | Codex/user | 2026-08-03 00:25 PKT |
-| Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
+| Prava transaction path understood | session + authoritative status | LIVE PROVIDER MINT BLOCKER — public card approval created an active mandate; first documented charge returned `FETCH_AGENTIC_CREDS_ERROR` before credentials or merchant submission | Codex/user | 2026-08-03 00:44 PKT |
+| Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — fresh live Jackbox quote is exactly $5; checkout actor is ready, but Prava issued no credential | Codex | 2026-08-03 00:44 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — authenticated network runtime; latest APK installed without crash | Codex | 2026-08-02 23:46 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — sandbox-proof APK built, tested, linted and installed on the connected phone | Codex | 2026-08-03 00:57 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
@@ -29,9 +29,9 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. User completes the final explicit no-preselection hosted approval with the organizer-issued team card; Codex performs no phone inspection, Chrome automation or card entry.
-2. Reconcile the mandate once and, only if it is `ACTIVE`, execute exactly one tokenized merchant attempt.
-3. If Prava returns another provisioning/device failure, retain the safe evidence and escalate without another blind retry.
+1. Send Prava support the active mandate, charge transaction and `FETCH_AGENTIC_CREDS_ERROR` evidence.
+2. Wait for Prava to repair/confirm sandbox credential minting; do not retry the failed charge meanwhile.
+3. After confirmation, refresh the still-active provider mandate and run one explicit tokenized Jackbox attempt.
 
 ## Next
 
@@ -40,6 +40,34 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Apply for production access only with the captured sandbox evidence.
 
 ## Milestone evidence
+
+### 2026-08-03 — Active mandate proven; credential minting escalated
+
+- The public sandbox card ending `7912` passed card collection, the documented OTP and Android
+  passkey creation. Prava's live mandate list returned one `active` mandate, and WishTrace persisted
+  that authoritative identity without exposing card data.
+- Before requesting a credential, two local preflights exposed and preserved audit-only failures:
+  the mandate stored a merchant origin instead of the exact product URL, and Shopify's state select
+  expected option value `WA` rather than label `WA`. Neither preflight called Prava charge or
+  submitted payment. Both mappings are fixed, and a fresh isolated live quote verified item $5,
+  shipping $0, tax $0 and total $5 USD.
+- WishTrace then made exactly one documented live mandate charge. Prava returned a provider charge
+  identity with `failed / FETCH_AGENTIC_CREDS_ERROR`, no one-use credential and no transaction
+  reference usable for reporting. Consequently no card reached Jackbox, no merchant payment was
+  submitted and no Prava report was sent.
+- Safe support evidence: mandate `mdt_01KZ1Z8MG4M65X01EVPZK3A4BS`, setup X-Response-ID
+  `3534497b-24a6-4245-b351-0f6716beafe7`, failed charge
+  `txn_01KZ1ZTD34T08SD7QPFS24XFJ1`. The charge response did not expose an X-Response-ID.
+- Quality: 144 backend tests, Ruff, strict mypy and Alembic head pass. Truth boundary: approval and
+  mandate activation are live sandbox facts; credential minting, merchant decline, report and order
+  remain unproven and are not claimed.
+- Deployment: ACR build `chd` succeeded and Azure accepted revision
+  `wishtrace-api--merchantfix1`; the public HTTPS health endpoint remains healthy with PostgreSQL
+  TLS true. The local Azure CLI later required fresh MFA, so the deployment response—not a later
+  management-plane listing—is the recorded revision evidence.
+- Android recovery: the hackathon APK now enables the explicit “Run sandbox merchant proof” control.
+  Home reopens an active mandate or prior proof attempt instead of routing back through discovery,
+  and the corrected APK was installed over the existing physical-phone app without clearing data.
 
 ### 2026-08-03 — Reuse the enrolled card and expire abandoned approval sessions
 

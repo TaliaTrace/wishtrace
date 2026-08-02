@@ -13,24 +13,29 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Session creation verified: LIVE SANDBOX — a real authorize-only mandate setup session was created
   by the deployed backend and its allowlisted hosted URL opened in an Android Custom Tab. Exact
   decimal money, response-ID handling and session-token discard also pass transport tests.
-- Hosted approval verified: LIVE PROVIDER SETUP FAILURES + FINAL USER RETRY — an earlier exact-contract hosted attempt
+- Hosted approval verified: LIVE SANDBOX PASS — after earlier safely recorded provisioning/device
+  failures, the public sandbox card ending `7912` passed card collection, OTP and Android passkey
+  creation. Prava returned one active mandate; no card number, OTP or passkey entered WishTrace.
+  An earlier exact-contract hosted attempt
   returned authoritative `failed` with safe categories `PROVISION_ERROR` and
   `DEVICE_BINDING_FAILED` before creating a mandate or credential. A later abandoned session
   expired with zero transactions/credentials. The production adapter then observed and explicitly
   preselected one active default saved-card enrollment; that setup also returned
   `DEVICE_BINDING_FAILED`. WishTrace retired the failed enrollment through Prava's documented
-  delete-card endpoint. A clean team-card enrollment then returned `PROVISION_ERROR`. One final
-  no-preselection retry exists only because the user explicitly requested it; it remains pending.
+  delete-card endpoint. The organizer-issued team card then returned `PROVISION_ERROR`; Birdie
+  explicitly authorized the standard public cards as the immediate sandbox fallback.
 - App return verified: PARTIAL — the hosted failure remained in the Custom Tab, so no automatic
   Prava redirect was observed. A validated physical-phone app-link opened WishTrace and reconciled
   the exact backend failure into its terminal recovery UI.
 - Mandate association verified: LIVE LIST + CONTRACT — the real sandbox list endpoint parsed through
-  the production adapter; it returned zero before approval. Post-return association matches customer,
-  time, merchant, amount, currency, frequency and scope and refuses ambiguity. After the failed
-  hosted attempt, the live list still returned zero and payment-result confirmed failure; the
-  backend stored `FAILED/failed` without binding a provider mandate.
-- Mandate charge verified: CURRENT CONTRACT + MOCK TRANSPORT — current `mandateId`, `transactionId`,
-  nested credentials and `awaiting_result` shape pass; credentials remain masked and memory-only.
+  the production adapter and now returned one active mandate after approval. Post-return association
+  matched customer, time, merchant, amount, currency, frequency and scope and refused ambiguity;
+  WishTrace persisted the authoritative provider mandate ID and rendered Autopilot on.
+- Mandate charge verified: LIVE PROVIDER FAILURE + CONTRACT — one documented `$5.00` charge against
+  the active live mandate returned provider transaction
+  `txn_01KZ1ZTD34T08SD7QPFS24XFJ1` and `failed / FETCH_AGENTIC_CREDS_ERROR`. No credential or
+  reportable transaction reference was issued; no merchant submission followed. Current successful
+  `mandateId`, `transactionId`, nested credentials and `awaiting_result` shapes remain transport-tested.
 - Mandate report verified: CURRENT CONTRACT + MOCK TRANSPORT — current completed/failed result,
   mandate/transaction identity and Visa confirmation are checked; no live charge has been reported.
 - Real-merchant browser attempt verified:
@@ -52,20 +57,20 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   provider failure categories.
   The observed sandbox create response omitted documented `authorizeOnly`; omission is accepted only
   with explicit request intent, while an explicit `false` fails closed.
-- Saved-card fact: LIVE SANDBOX — the failed default enrollment ending `7789` was the only active
-  card and was retired through the official API after `DEVICE_BINDING_FAILED`; Prava now returns
-  zero active cards. The organizer card ending `2218` did not survive the failed provisioning
-  attempt and is not claimed as enrolled.
-- Known blockers: the user must complete the final hosted approval manually. Only after a
-  live mandate and one-use credential exist can WishTrace run the organizer-required merchant
-  attempt and report its result. If provisioning/device binding still fails, Prava support must
-  verify that the organizer-issued card is provisioned for this sandbox key/customer;
-  WishTrace will not create another blind retry. Staging permits the exact $5 stored-value path
-  solely for this proof.
-- Last verified: 2026-08-03 00:25 PKT
+- Saved-card fact: LIVE SANDBOX — the failed default enrollment ending `7789` was retired through
+  the official API after `DEVICE_BINDING_FAILED`. Public card ending `7912` subsequently completed
+  enrollment and mandate approval. Card metadata is used only to distinguish enrollments. The
+  organizer card ending `2218` did not survive its failed provisioning attempt and is not claimed
+  as enrolled.
+- Known blocker: Prava must repair or explain `FETCH_AGENTIC_CREDS_ERROR` for the active sandbox
+  mandate. WishTrace will not retry the failed charge before provider confirmation. The Jackbox
+  actor has a fresh exact $5 quote and is ready to make the one organizer-required merchant attempt
+  once a one-use credential exists.
+- Last verified: 2026-08-03 00:57 PKT
 - Evidence location: safe response ID above; migration `20260802_0012`; deployed revision
-  `wishtrace-api--savedcard1`; 143 backend tests plus Android build/unit/lint. No credential, card
-  data or provider payload retained.
+  `wishtrace-api--merchantfix1`; 144 backend tests plus Android build/unit/lint. The installed
+  hackathon APK exposes the explicit proof control and reopens an existing mandate/proof attempt
+  from Home. No credential, card data or provider payload retained.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation

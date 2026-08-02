@@ -276,7 +276,21 @@ fun WishTraceApp(
                     state = homeState,
                     giverDisplayName = session?.user?.displayName,
                     onRetry = homeViewModel::retry,
-                    onFindGift = { navController.navigate(Destination.Discovery) },
+                    onFindGift = {
+                        val content = homeState as? HomeUiState.Content
+                        val existingMandate = content?.mandate
+                        if (
+                            existingMandate?.isArmed == true ||
+                            existingMandate?.lastChargeState != null
+                        ) {
+                            mandateViewModel.start(content.snapshot.occasion.id)
+                            navController.navigate(Destination.MandateSetup) {
+                                launchSingleTop = true
+                            }
+                        } else {
+                            navController.navigate(Destination.Discovery)
+                        }
+                    },
                     onReviewRecipient = { navController.navigate(Destination.Recipient) },
                     onAddPerson = { navController.navigate(Destination.GiftDna) },
                 )

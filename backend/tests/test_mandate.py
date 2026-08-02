@@ -300,8 +300,9 @@ class MemoryMandateStore:
         charge_id: uuid.UUID,
         provider_charge_id: str,
         error_code: str,
+        response_id: str | None,
     ) -> MandateResponse:
-        del user_id, occasion_id, provider_charge_id, error_code
+        del user_id, occasion_id, provider_charge_id, error_code, response_id
         self.declined_charges.append(charge_id)
         self.mandate = self.mandate.model_copy(
             update={"state": MandateState.DECLINED}

@@ -651,7 +651,10 @@ async def _fill_billing(page: Page, billing: BillingContact) -> None:
     )
     if billing.region:
         if await zone_select.count() == 1:
-            await zone_select.select_option(label=billing.region)
+            if _is_region_code(billing.region):
+                await zone_select.select_option(value=billing.region)
+            else:
+                await zone_select.select_option(label=billing.region)
         elif await zone_input.count() == 1:
             await zone_input.fill(billing.region)
     postal = page.locator(
@@ -664,6 +667,10 @@ async def _fill_billing(page: Page, billing: BillingContact) -> None:
     if billing.phone and await phone.count() == 1:
         await phone.fill(billing.phone)
     await postal.press("Tab")
+
+
+def _is_region_code(value: str) -> bool:
+    return re.fullmatch(r"[A-Z]{2}", value) is not None
 
 
 async def _wait_for_quote(page: Page, item_minor: int) -> tuple[int, int]:

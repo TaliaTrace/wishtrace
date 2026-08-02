@@ -232,10 +232,14 @@ private fun HomeContent(
                         }
 
                         PrimaryAction(
-                            text = if (mandate?.isArmed == true) {
-                                "Review ${recipient.displayName}'s gift"
-                            } else {
-                                "Find a gift for ${recipient.displayName}"
+                            text = when {
+                                mandate?.isArmed == true ->
+                                    "Open ${recipient.displayName}'s autopilot"
+
+                                mandate?.lastChargeState != null ->
+                                    "Review sandbox attempt"
+
+                                else -> "Find a gift for ${recipient.displayName}"
                             },
                             onClick = onFindGift,
                             modifier = Modifier

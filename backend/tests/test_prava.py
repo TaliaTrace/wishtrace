@@ -650,6 +650,7 @@ async def test_charge_mandate_mints_memory_only_credentials() -> None:
     assert observed == {"amount": "5.00", "reference": "occasion-123-charge-1"}
     assert result.status == "awaiting_result"
     assert result.order_id == "order-1"
+    assert result.response_id == "response-charge-1"
     assert result.credential is not None
     assert result.credential.token.get_secret_value() == "mandate-token-redacted"
     serialized = result.model_dump_json()

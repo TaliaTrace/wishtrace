@@ -14,6 +14,7 @@ from app.merchant_browser import (
     MerchantQuote,
     MerchantQuoteRequest,
     _extract_order_id,
+    _is_region_code,
     _money_minor,
     _numeric_variant_id,
     _PlaywrightLoopThread,
@@ -82,6 +83,11 @@ def test_billing_rejects_invalid_country_code() -> None:
         _billing().model_copy(update={"country_code": "U1"}).model_validate(
             _billing().model_dump() | {"country_code": "U1"}
         )
+
+
+def test_region_code_uses_shopify_option_value() -> None:
+    assert _is_region_code("WA") is True
+    assert _is_region_code("Washington") is False
 
 
 def test_shopify_variant_id_is_reduced_to_numeric_value() -> None:

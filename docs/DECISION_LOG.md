@@ -432,3 +432,27 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: On another deterministic setup failure, reconcile it, preserve safe support
   evidence and contact Prava. Do not recreate a session until Prava confirms the card/key binding.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 00:44 PKT — An active mandate is not merchant-proof until credential minting succeeds
+
+- Context: A Birdie-approved public sandbox card passed collection, OTP and Android passkey setup,
+  creating an authoritative active mandate. Two local browser preflights then uncovered exact
+  product-URL and Shopify region-option mismatches before Prava was charged.
+- Evidence: After fixing both mismatches, an isolated real Jackbox quote returned exactly $5 USD.
+  The first and only live mandate charge then returned provider transaction
+  `txn_01KZ1ZTD34T08SD7QPFS24XFJ1`, status `failed` and undocumented
+  `FETCH_AGENTIC_CREDS_ERROR`, with no credential. Current Prava docs describe successful merchant
+  callers as receiving plaintext credentials and do not document this error.
+- Decision: Preserve the two local preflight failures as audit rows, but do not count them as money
+  attempts. Count the provider charge as the single live attempt and do not retry it automatically.
+  Escalate the safe mandate/transaction evidence to Prava; only after provider confirmation may a
+  new explicit charge proceed to the already-proven Jackbox actor.
+- Consequence: WishTrace truthfully proves live approval and mandate activation but does not claim a
+  tokenized merchant attempt yet. Product URL and state-code fixes are covered by tests and deployed
+  in Azure revision `wishtrace-api--merchantfix1`; the remaining proof blocker is Prava sandbox
+  credential minting. The installed hackathon APK exposes proof separately from mandate activation,
+  and Home can reopen the authoritative attempt instead of collapsing it into “Done.”
+- Rollback/fallback: If Prava cannot mint against this mandate, use a one-time hosted session only
+  with explicit user approval and a recorded scope decision; never fabricate credentials or call
+  the provider decline a merchant decline.
+- Owner: WishTrace team / Codex

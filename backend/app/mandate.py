@@ -313,6 +313,7 @@ class ChargeStore(Protocol):
         charge_id: uuid.UUID,
         provider_charge_id: str,
         error_code: str,
+        response_id: str | None,
     ) -> MandateResponse: ...
 
     async def begin_charge_checkout(
@@ -704,6 +705,7 @@ class MandateService:
                 charge_id=charge.id,
                 provider_charge_id=charge_result.charge_id,
                 error_code=charge_result.error_code or "PRAVA_CHARGE_DECLINED",
+                response_id=charge_result.response_id,
             )
         credential: SensitivePaymentCredential = charge_result.credential
         merchant_result = await self._run_merchant_checkout(
@@ -998,7 +1000,9 @@ class SqlMandateStore:
                 max_charges=max_charges,
                 merchant_id=discovery.merchant_id,
                 merchant_name=discovery.merchant_name,
-                merchant_url=_origin(candidate.product_url),
+                # The hosted Prava request uses the bare merchant origin, but the
+                # browser actor needs the exact allowlisted product URL later.
+                merchant_url=candidate.product_url,
                 merchant_product_id=candidate.merchant_product_id,
                 merchant_variant_id=candidate.merchant_variant_id,
                 product_title=candidate.title,
@@ -1190,12 +1194,14 @@ class SqlMandateStore:
         charge_id: uuid.UUID,
         provider_charge_id: str,
         error_code: str,
+        response_id: str | None,
     ) -> MandateResponse:
         async with self._session_factory() as db, db.begin():
             mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
             charge = await _owned_charge(db, mandate.id, charge_id, lock=True)
             charge.provider_charge_id = provider_charge_id
             charge.provider_error_code = error_code
+            charge.charge_response_id = response_id
             _set_charge_state(charge, MandateChargeState.DECLINED)
             _transition(mandate, MandateState.DECLINED)
             return await _flush_mandate_response(db, mandate)
@@ -1313,14 +1319,6 @@ def _keyed_hash(pepper: bytes, purpose: str, value: bytes) -> bytes:
     mac.update(b"\x00")
     mac.update(value)
     return mac.digest()
-
-
-def _origin(url: str) -> str:
-    scheme, separator, rest = url.partition("://")
-    if not separator:
-        return url
-    host = rest.split("/", 1)[0]
-    return f"{scheme}://{host}"
 
 
 def _not_found(code: str, message: str) -> ApiError:

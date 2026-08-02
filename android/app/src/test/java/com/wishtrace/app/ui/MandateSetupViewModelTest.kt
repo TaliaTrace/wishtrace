@@ -324,6 +324,37 @@ class MandateSetupViewModelTest {
             assertTrue(!merchantViewModel.state.value.canChooseAnotherSandboxCard)
         }
 
+    @Test
+    fun choosingAgainRetiresActiveApprovalAndForcesFreshCardOnNextSetup() =
+        runTest(dispatcher) {
+            val gateway = FakeMandateGateway().apply {
+                current = details(
+                    status = MandateStatus.ACTIVE,
+                    lastChargeState = "FAILED",
+                    lastChargeFailureCode = "MERCHANT_QUOTE_FAILED",
+                )
+                setupResult = details(MandateStatus.AWAITING_APPROVAL)
+            }
+            val viewModel = MandateSetupViewModel(gateway)
+
+            viewModel.start("occasion")
+            advanceUntilIdle()
+            viewModel.chooseAnotherGift()
+            advanceUntilIdle()
+
+            assertEquals(1, gateway.cancelCalls)
+            assertTrue(viewModel.state.value.freshSelectionReady)
+
+            viewModel.consumeFreshSelectionReady()
+            viewModel.prepareSelection("occasion")
+            viewModel.arm("candidate-fresh")
+            advanceUntilIdle()
+
+            assertEquals(1, gateway.setupCalls)
+            assertTrue(gateway.lastRequireFreshCard)
+            assertEquals(MandateSetupStep.AWAITING_APPROVAL, viewModel.state.value.step)
+        }
+
     private class FakeMandateGateway : MandateGateway {
         var current = details(MandateStatus.ACTIVE)
         var setupResult: MandateDetails? = null
@@ -333,6 +364,8 @@ class MandateSetupViewModelTest {
         var refreshResult: MandateDetails? = null
         var lastCandidateId: String? = null
         var lastReplacementMandateId: String? = null
+        var lastRequireFreshCard = false
+        var cancelCalls = 0
         var executeCalls = 0
         var executeError: WishTraceApiException? = null
         var executeFailureState: MandateDetails? = null
@@ -345,10 +378,12 @@ class MandateSetupViewModelTest {
             occasionId: String,
             candidateId: String,
             replaceUnknownMandateId: String?,
+            requireFreshCard: Boolean,
         ): MandateDetails {
             setupCalls += 1
             lastCandidateId = candidateId
             lastReplacementMandateId = replaceUnknownMandateId
+            lastRequireFreshCard = requireFreshCard
             setupError?.let { throw it }
             return setupResult ?: current
         }
@@ -356,6 +391,12 @@ class MandateSetupViewModelTest {
         override suspend fun refresh(occasionId: String): MandateDetails {
             refreshCalls += 1
             current = refreshResult ?: current
+            return current
+        }
+
+        override suspend fun cancel(occasionId: String): MandateDetails {
+            cancelCalls += 1
+            current = current.copy(status = MandateStatus.CANCELLED)
             return current
         }
 

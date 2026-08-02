@@ -50,6 +50,7 @@ from app.prava import (
     HostedPravaSession,
     PravaCardInfo,
     PravaGatewayError,
+    PravaMandateCancelResult,
     PravaMandateChargeResult,
     PravaMandateFrequency,
     PravaMandateInfo,
@@ -124,6 +125,7 @@ class MandateSetupRequest(BaseModel):
 
     candidate_id: uuid.UUID
     replace_unknown_mandate_id: uuid.UUID | None = None
+    require_fresh_card: bool = False
 
 
 class MandateExecuteRequest(BaseModel):
@@ -245,6 +247,15 @@ class MandateStore(Protocol):
         info: PravaMandateInfo,
     ) -> MandateResponse: ...
 
+    async def record_cancellation(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        mandate_id: uuid.UUID,
+        response_id: str | None,
+    ) -> MandateResponse: ...
+
 
 class MandatePravaOperations(Protocol):
     async def list_cards(self, customer_id: str) -> list[PravaCardInfo]: ...
@@ -274,6 +285,11 @@ class MandatePravaOperations(Protocol):
         charge_id: str,
         outcome: PravaReportOutcome,
     ) -> PravaMandateReportResult: ...
+
+    async def cancel_mandate(
+        self,
+        mandate_id: str,
+    ) -> PravaMandateCancelResult: ...
 
 
 class MandateSetupFacts(BaseModel):
@@ -407,6 +423,12 @@ class MandateOperations(Protocol):
         occasion_id: uuid.UUID,
     ) -> MandateResponse: ...
 
+    async def cancel(
+        self,
+        user: AuthenticatedUser,
+        occasion_id: uuid.UUID,
+    ) -> MandateResponse: ...
+
     async def execute(
         self,
         user: AuthenticatedUser,
@@ -454,7 +476,11 @@ class MandateService:
             replace_unknown_mandate_id=body.replace_unknown_mandate_id,
         )
         try:
-            cards = await self._prava.list_cards(str(user.id))
+            cards = (
+                []
+                if body.require_fresh_card
+                else await self._prava.list_cards(str(user.id))
+            )
             request = self._setup_request(
                 user,
                 occasion_id,
@@ -488,6 +514,63 @@ class MandateService:
             user_id=user.id,
             occasion_id=occasion_id,
             session=session,
+        )
+
+    async def cancel(
+        self,
+        user: AuthenticatedUser,
+        occasion_id: uuid.UUID,
+    ) -> MandateResponse:
+        mandate = await self._store.get(user_id=user.id, occasion_id=occasion_id)
+        if mandate.state not in {
+            MandateState.ACTIVE,
+            MandateState.DECLINED,
+            MandateState.PAUSED,
+        }:
+            raise ApiError(
+                status_code=409,
+                code="MANDATE_NOT_CANCELLABLE",
+                message="This approval cannot be safely replaced in its current state.",
+                recoverable=True,
+            )
+        if (
+            mandate.provider_mandate_id is None
+            or mandate.merchant_order_id is not None
+            or mandate.merchant_outcome is not None
+            or any(
+                charge.state
+                in {
+                    MandateChargeState.CHECKOUT_IN_PROGRESS,
+                    MandateChargeState.REPORTING,
+                    MandateChargeState.SUCCEEDED,
+                    MandateChargeState.UNKNOWN,
+                }
+                for charge in mandate.charges
+            )
+        ):
+            raise ApiError(
+                status_code=409,
+                code="MANDATE_REPLACEMENT_UNSAFE",
+                message=(
+                    "WishTrace must resolve the current purchase attempt before "
+                    "replacing this approval."
+                ),
+                recoverable=True,
+            )
+        try:
+            result = await self._prava.cancel_mandate(mandate.provider_mandate_id)
+        except PravaGatewayError as error:
+            raise ApiError(
+                status_code=503 if error.recoverable else 502,
+                code=error.code,
+                message=error.safe_message,
+                recoverable=error.recoverable,
+            ) from error
+        return await self._store.record_cancellation(
+            user_id=user.id,
+            occasion_id=occasion_id,
+            mandate_id=mandate.id,
+            response_id=result.response_id,
         )
 
     async def refresh(
@@ -1211,6 +1294,40 @@ class SqlMandateStore:
             mandate = await _owned_mandate(db, user_id, occasion_id)
             return await _mandate_response(db, mandate)
 
+    async def record_cancellation(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        mandate_id: uuid.UUID,
+        response_id: str | None,
+    ) -> MandateResponse:
+        async with self._session_factory() as db, db.begin():
+            mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
+            if mandate.id != mandate_id:
+                raise ApiError(
+                    status_code=409,
+                    code="MANDATE_CHANGED",
+                    message="The approval changed while WishTrace was replacing it. Refresh first.",
+                    recoverable=True,
+                )
+            if MandateState(mandate.state) not in {
+                MandateState.ACTIVE,
+                MandateState.DECLINED,
+                MandateState.PAUSED,
+            }:
+                raise ApiError(
+                    status_code=409,
+                    code="MANDATE_CHANGED",
+                    message="The approval changed while WishTrace was replacing it. Refresh first.",
+                    recoverable=True,
+                )
+            mandate.provider_status = PravaMandateStatus.CANCELLED.value
+            mandate.last_response_id = response_id
+            mandate.setup_failure_code = "OWNER_REPLACED_APPROVAL"
+            _transition(mandate, MandateState.CANCELLED)
+            return await _flush_mandate_response(db, mandate)
+
     async def record_activation(
         self,
         *,
@@ -1821,6 +1938,14 @@ class UnavailableMandateService:
         raise _unavailable()
 
     async def refresh(
+        self,
+        user: AuthenticatedUser,
+        occasion_id: uuid.UUID,
+    ) -> MandateResponse:
+        del user, occasion_id
+        raise _unavailable()
+
+    async def cancel(
         self,
         user: AuthenticatedUser,
         occasion_id: uuid.UUID,

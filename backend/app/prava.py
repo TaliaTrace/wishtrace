@@ -370,6 +370,19 @@ class PravaMandateReportResult(BaseModel):
     response_id: str | None
 
 
+class PravaMandateCancelResult(BaseModel):
+    """Authoritative acknowledgement of a mandate revocation.
+
+    Prava's public skill documents the cancel endpoint but does not require a
+    stable response-body schema. WishTrace therefore trusts only the successful
+    HTTP acknowledgement and its support-safe response id.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    response_id: str | None
+
+
 class _RawSession(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -844,6 +857,19 @@ class PravaHttpGateway:
             response_id=_response_id(response),
         )
 
+    async def cancel_mandate(self, mandate_id: str) -> PravaMandateCancelResult:
+        """Revoke one provider mandate using the documented no-body endpoint."""
+
+        _require_provider_id(mandate_id, "mandate_id")
+        response = await self._request(
+            "POST",
+            f"/v1/mandates/{mandate_id}/cancel",
+            outcome_unknown_on_network_failure=True,
+            ambiguous_write=True,
+            require_json=False,
+        )
+        return PravaMandateCancelResult(response_id=_response_id(response))
+
     async def _request(
         self,
         method: str,
@@ -851,6 +877,7 @@ class PravaHttpGateway:
         *,
         outcome_unknown_on_network_failure: bool = False,
         ambiguous_write: bool = False,
+        require_json: bool = True,
         **kwargs: Any,
     ) -> httpx.Response:
         timeout = httpx.Timeout(20.0, connect=10.0)
@@ -927,7 +954,7 @@ class PravaHttpGateway:
                 provider_code=provider_code,
             )
         content_type = response.headers.get("content-type", "").casefold()
-        if "application/json" not in content_type:
+        if require_json and "application/json" not in content_type:
             raise _invalid_response(response, outcome_unknown=ambiguous_write)
         return response
 

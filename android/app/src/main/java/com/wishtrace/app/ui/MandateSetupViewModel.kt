@@ -42,6 +42,7 @@ data class MandateSetupUiState(
     val approvalUrl: String? = null,
     val occasionId: String? = null,
     val error: String? = null,
+    val freshSelectionReady: Boolean = false,
 ) {
     val busy: Boolean
         get() = step in setOf(
@@ -78,6 +79,7 @@ class MandateSetupViewModel(
     private var setupKey: String? = null
     private var openedApprovalSessionId: String? = null
     private var replaceUnknownMandateId: String? = null
+    private var requireFreshCard = false
 
     /** Loads the occasion's current mandate, if any, and reconciles into a UI step. */
     fun start(occasionId: String) {
@@ -104,6 +106,49 @@ class MandateSetupViewModel(
         val current = mutableState.value
         replaceUnknownMandateId = current.mandate?.id
             ?.takeIf { current.step == MandateSetupStep.UNKNOWN }
+    }
+
+    /** Retires safe old authority before a replacement approval is created. */
+    fun chooseAnotherGift() {
+        val current = mutableState.value
+        val mandate = current.mandate
+        val occasionId = current.occasionId ?: return
+        if (current.busy) return
+        if (current.step == MandateSetupStep.UNKNOWN) {
+            prepareUnknownReplacement()
+            mutableState.update { it.copy(freshSelectionReady = true, error = null) }
+            return
+        }
+        if (mandate?.status !in setOf(
+                MandateStatus.ACTIVE,
+                MandateStatus.DECLINED,
+                MandateStatus.PAUSED,
+            )
+        ) {
+            mutableState.update { it.copy(freshSelectionReady = true, error = null) }
+            return
+        }
+        mutableState.update { it.copy(step = MandateSetupStep.REFRESHING, error = null) }
+        viewModelScope.launch {
+            runCatching { gateway.cancel(occasionId) }
+                .onSuccess { cancelled ->
+                    requireFreshCard = true
+                    setupKey = null
+                    openedApprovalSessionId = null
+                    replaceUnknownMandateId = null
+                    mutableState.value = MandateSetupUiState(
+                        step = MandateSetupStep.CANCELLED,
+                        mandate = cancelled,
+                        occasionId = occasionId,
+                        freshSelectionReady = true,
+                    )
+                }
+                .onFailure(::showError)
+        }
+    }
+
+    fun consumeFreshSelectionReady() {
+        mutableState.update { it.copy(freshSelectionReady = false) }
     }
 
     /** Begins an explicit new gift selection without replaying the prior attempt. */
@@ -145,8 +190,10 @@ class MandateSetupViewModel(
                     occasionId = occasionId,
                     candidateId = candidateId,
                     replaceUnknownMandateId = replaceUnknownMandateId,
+                    requireFreshCard = requireFreshCard,
                 )
                 replaceUnknownMandateId = null
+                requireFreshCard = false
                 applyMandate(mandate)
             } catch (error: Throwable) {
                 if ((error as? WishTraceApiException)?.code == "MANDATE_ALREADY_EXISTS") {

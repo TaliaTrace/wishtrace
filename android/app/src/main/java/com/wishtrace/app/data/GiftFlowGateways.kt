@@ -72,9 +72,12 @@ interface MandateGateway {
         occasionId: String,
         candidateId: String,
         replaceUnknownMandateId: String? = null,
+        requireFreshCard: Boolean = false,
     ): MandateDetails
 
     suspend fun refresh(occasionId: String): MandateDetails
+
+    suspend fun cancel(occasionId: String): MandateDetails
 
     suspend fun execute(
         occasionId: String,

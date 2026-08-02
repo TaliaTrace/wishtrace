@@ -748,6 +748,27 @@ async def test_report_mandate_charge_sends_documented_fields() -> None:
     assert result.response_id == "response-mandate-report-1"
 
 
+async def test_cancel_mandate_posts_documented_no_body_endpoint() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/mandates/mandate-1/cancel"
+        assert request.content == b""
+        return httpx.Response(
+            204,
+            headers={"X-Response-ID": "response-mandate-cancel-1"},
+        )
+
+    result = await _gateway(httpx.MockTransport(handler)).cancel_mandate("mandate-1")
+
+    assert result.response_id == "response-mandate-cancel-1"
+
+
+async def test_cancel_mandate_rejects_path_identifier_injection() -> None:
+    with pytest.raises(ValueError, match="mandate_id is invalid"):
+        await _gateway(
+            httpx.MockTransport(lambda request: httpx.Response(200))
+        ).cancel_mandate("../mandates/other")
+
+
 async def test_mandate_charge_path_identifier_rejects_injection() -> None:
     with pytest.raises(ValueError, match="mandate_id is invalid"):
         await _gateway(

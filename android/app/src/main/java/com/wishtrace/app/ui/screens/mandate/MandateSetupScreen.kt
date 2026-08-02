@@ -88,6 +88,13 @@ fun MandateSetupRoute(
         }
     }
 
+    LaunchedEffect(state.freshSelectionReady) {
+        if (state.freshSelectionReady) {
+            viewModel.consumeFreshSelectionReady()
+            onChooseAnotherGift()
+        }
+    }
+
     MandateSetupScreen(
         state = state,
         onBack = onBack,
@@ -95,7 +102,7 @@ fun MandateSetupRoute(
         onRetryApproval = { viewModel.retryApproval(candidateId) },
         onRetryCardIssue = { viewModel.retryCardIssue(verifiedEmail) },
         onRefresh = viewModel::refresh,
-        onChooseAnotherGift = onChooseAnotherGift,
+        onChooseAnotherGift = viewModel::chooseAnotherGift,
         onArmed = onArmed,
     )
 }
@@ -611,7 +618,7 @@ private fun MandateActionBar(
                     )
                 } else if (sandboxTools && state.canChooseAnotherSandboxCard) {
                     PrimaryAction(
-                        text = "Choose another gift",
+                        text = "Use a new sandbox card",
                         onClick = onChooseAnotherGift,
                         modifier = Modifier.fillMaxWidth(),
                     )

@@ -58,6 +58,17 @@ def build_mandate_router(android_return_uri: str) -> APIRouter:
         return await mandate.refresh(user, occasion_id)
 
     @router.post(
+        "/occasions/{occasion_id}/mandate/cancel",
+        response_model=MandateResponse,
+    )
+    async def cancel_mandate(
+        occasion_id: uuid.UUID,
+        user: Annotated[AuthenticatedUser, Depends(require_user)],
+        mandate: Annotated[MandateOperations, Depends(get_mandate_operations)],
+    ) -> MandateResponse:
+        return await mandate.cancel(user, occasion_id)
+
+    @router.post(
         "/occasions/{occasion_id}/mandate/execute",
         response_model=MandateResponse,
     )

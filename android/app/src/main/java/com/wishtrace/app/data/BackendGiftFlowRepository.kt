@@ -206,12 +206,14 @@ class BackendGiftFlowRepository(
         occasionId: String,
         candidateId: String,
         replaceUnknownMandateId: String?,
+        requireFreshCard: Boolean,
     ): MandateDetails =
         authenticated { token ->
             val body = JSONObject().put("candidate_id", candidateId)
             replaceUnknownMandateId?.let {
                 body.put("replace_unknown_mandate_id", it)
             }
+            if (requireFreshCard) body.put("require_fresh_card", true)
             api.post(
                 path = "/v1/occasions/$occasionId/mandate/setup",
                 json = body,
@@ -223,6 +225,14 @@ class BackendGiftFlowRepository(
     override suspend fun refresh(occasionId: String): MandateDetails = authenticated { token ->
         api.post(
             path = "/v1/occasions/$occasionId/mandate/refresh",
+            accessToken = token,
+            readTimeoutMillis = 30_000,
+        ).toMandateDetails()
+    }
+
+    override suspend fun cancel(occasionId: String): MandateDetails = authenticated { token ->
+        api.post(
+            path = "/v1/occasions/$occasionId/mandate/cancel",
             accessToken = token,
             readTimeoutMillis = 30_000,
         ).toMandateDetails()

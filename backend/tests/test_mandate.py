@@ -34,6 +34,7 @@ from app.prava import (
     PravaCardInfo,
     PravaGatewayError,
     PravaLineItemResult,
+    PravaMandateCancelResult,
     PravaMandateChargeResult,
     PravaMandateFrequency,
     PravaMandateInfo,
@@ -152,6 +153,7 @@ class MemoryMandateStore:
         self.checkout_started: list[uuid.UUID] = []
         self.recorded_checkouts: list[uuid.UUID] = []
         self.replace_unknown_mandate_id: uuid.UUID | None = None
+        self.cancelled_mandates: list[uuid.UUID] = []
 
     # -- setup surface ------------------------------------------------------
     async def create_setup(
@@ -267,6 +269,26 @@ class MemoryMandateStore:
                 "state": mapping[info.status],
                 "provider_mandate_id": info.mandate_id,
                 "provider_status": info.status.value,
+            }
+        )
+        return self.mandate
+
+    async def record_cancellation(
+        self,
+        *,
+        user_id: uuid.UUID,
+        occasion_id: uuid.UUID,
+        mandate_id: uuid.UUID,
+        response_id: str | None,
+    ) -> MandateResponse:
+        del user_id, occasion_id, response_id
+        assert mandate_id == self.mandate.id
+        self.cancelled_mandates.append(mandate_id)
+        self.mandate = self.mandate.model_copy(
+            update={
+                "state": MandateState.CANCELLED,
+                "provider_status": PravaMandateStatus.CANCELLED.value,
+                "setup_failure_code": "OWNER_REPLACED_APPROVAL",
             }
         )
         return self.mandate
@@ -437,6 +459,8 @@ class FakeMandatePrava:
         self.payment_result_calls: list[str] = []
         self.charge_calls: list[tuple[str, int, str]] = []
         self.report_calls: list[tuple[str, str, PravaReportOutcome]] = []
+        self.cancel_calls: list[str] = []
+        self.cancel_error: PravaGatewayError | None = None
 
     async def list_cards(self, customer_id: str) -> list[PravaCardInfo]:
         self.list_calls.append(f"cards:{customer_id}")
@@ -517,6 +541,15 @@ class FakeMandatePrava:
                 response_id="response-report-1",
             )
         return self.report_result
+
+    async def cancel_mandate(
+        self,
+        mandate_id: str,
+    ) -> PravaMandateCancelResult:
+        self.cancel_calls.append(mandate_id)
+        if self.cancel_error is not None:
+            raise self.cancel_error
+        return PravaMandateCancelResult(response_id="response-cancel-1")
 
 
 class FakeMerchantCheckout:
@@ -1143,6 +1176,75 @@ async def test_setup_does_not_guess_when_multiple_active_cards_exist() -> None:
     )
 
     assert prava.session_requests[0].card_id is None
+
+
+async def test_setup_fresh_card_recovery_never_reuses_saved_card() -> None:
+    store = MemoryMandateStore(_mandate(state=MandateState.CANCELLED))
+    prava = FakeMandatePrava()
+    prava.listed_cards = [
+        PravaCardInfo(
+            card_id="card-exhausted",
+            last4="7789",
+            status="active",
+            is_default=True,
+        )
+    ]
+    service = _service(store, prava, checkout=None)
+
+    await service.setup(
+        _user(),
+        store.mandate.occasion_id,
+        MandateSetupRequest(
+            candidate_id=uuid.uuid4(),
+            require_fresh_card=True,
+        ),
+    )
+
+    assert prava.list_calls == []
+    assert prava.session_requests[0].card_id is None
+
+
+async def test_cancel_active_mandate_revokes_provider_before_local_replacement() -> None:
+    store = MemoryMandateStore(_mandate(state=MandateState.ACTIVE))
+    prava = FakeMandatePrava()
+    service = _service(store, prava, checkout=None)
+
+    result = await service.cancel(_user(), store.mandate.occasion_id)
+
+    assert prava.cancel_calls == [_MANDATE_ID]
+    assert store.cancelled_mandates == [store.mandate.id]
+    assert result.state is MandateState.CANCELLED
+    assert result.provider_status == PravaMandateStatus.CANCELLED.value
+
+
+async def test_cancel_refuses_unresolved_merchant_attempt_without_provider_call() -> None:
+    unresolved = _mandate(state=MandateState.UNKNOWN).model_copy(
+        update={
+            "charges": [
+                MandateChargeView(
+                    id=uuid.uuid4(),
+                    reference="charge-unresolved",
+                    amount_minor=500,
+                    state=MandateChargeState.UNKNOWN,
+                    failure_code="MERCHANT_CHECKOUT_OUTCOME_UNKNOWN",
+                    merchant_order_id=None,
+                    merchant_outcome=MerchantCheckoutOutcome.UNKNOWN,
+                    visa_confirmation=None,
+                    created_at=_NOW,
+                    updated_at=_NOW,
+                )
+            ]
+        }
+    )
+    store = MemoryMandateStore(unresolved)
+    prava = FakeMandatePrava()
+    service = _service(store, prava, checkout=None)
+
+    with pytest.raises(ApiError) as blocked:
+        await service.cancel(_user(), store.mandate.occasion_id)
+
+    assert blocked.value.code == "MANDATE_NOT_CANCELLABLE"
+    assert prava.cancel_calls == []
 
 
 async def test_setup_prava_error_fails_mandate_and_raises() -> None:

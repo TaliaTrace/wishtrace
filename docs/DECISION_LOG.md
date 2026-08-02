@@ -658,3 +658,25 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: Remove the ranking-history input if merchant product identity proves unstable;
   retain deterministic hard constraints and honest reuse after catalog exhaustion.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 04:34 PKT — Exhausted mint recovery requires a fresh owner-approved card choice
+
+- Context: The newest mandate invocation and its sole explicit retry both stopped before credentials
+  with `FETCH_AGENTIC_CREDS_ERROR`. The user-provided Prava dashboard, whose timestamps are IST,
+  separately shows the matching authorization/credential/failure stages. The official Prava skills
+  repository confirms the implemented charge and report contracts and forbids treating credential
+  generation as a completed merchant transaction.
+- Decision: Never create a third charge under the exhausted recovery. In sandbox tools only, expose
+  a fresh live-gift route; a later attempt creates a new hosted approval where the owner explicitly
+  selects a different approved sandbox card. Keep the hosted ceremony in a real Custom Tab, not an
+  embedded Android WebView, and never insert or retain card data in WishTrace.
+- Consequence: The user can recover without being trapped or repeating the same failing operation.
+  Home shows `Last attempt failed` and reopens the exact recovery after restart. The existing
+  credential-generated rows remain evidence of minting only, and the unresolved merchant run
+  remains `UNKNOWN`.
+- Evidence: official repository commit `f4d7515`; focused Android state test; debug APK assembly,
+  unit tests and lint; successful physical-phone install and
+  `artifacts/screenshots/prava-exhausted-card-recovery-2026-08-03.png`.
+- Rollback/fallback: Hide the sandbox recovery control and retain `Done`. Do not weaken the immutable
+  ledger, add another retry, or claim a merchant decline without merchant evidence.
+- Owner: WishTrace team / Codex

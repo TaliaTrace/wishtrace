@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+private val CredentialMintFailureCodes = setOf("FETCH_AGENTIC_CREDS_ERROR", "NO_TOKEN")
+
 /** The mandate setup lifecycle, mirroring [CheckoutStep]'s approval/poll/reconcile. */
 enum class MandateSetupStep {
     IDLE,
@@ -57,6 +59,13 @@ data class MandateSetupUiState(
                     "AUTH_CANCELLED",
                     "SESSION_EXPIRED",
                 )
+        } == true
+
+    val canChooseAnotherSandboxCard: Boolean
+        get() = step == MandateSetupStep.PROOF_DECLINED && mandate?.let {
+            !it.mintRetryAvailable &&
+                it.merchantOutcome == null &&
+                it.lastChargeFailureCode in CredentialMintFailureCodes
         } == true
 }
 

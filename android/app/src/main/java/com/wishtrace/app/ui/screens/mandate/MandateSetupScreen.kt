@@ -488,6 +488,9 @@ private fun ProofDeclined(state: MandateSetupUiState) {
         } else if (canRetryCard) {
             "Your approval is still active. No payment was submitted to Jackbox. You can try " +
                 "issuing the sandbox card once more without another passkey."
+        } else if (state.canChooseAnotherSandboxCard) {
+            "Prava couldn't create the one-time card after two tries. Choose another gift, then " +
+                "select a different approved test card in Prava."
         } else {
             "No card was issued, no payment was submitted to Jackbox, and nothing was purchased."
         },
@@ -603,6 +606,17 @@ private fun MandateActionBar(
                     )
                     SecondaryAction(
                         text = "Not now",
+                        onClick = onArmed,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (sandboxTools && state.canChooseAnotherSandboxCard) {
+                    PrimaryAction(
+                        text = "Choose another gift",
+                        onClick = onChooseAnotherGift,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    SecondaryAction(
+                        text = "Done",
                         onClick = onArmed,
                         modifier = Modifier.fillMaxWidth(),
                     )

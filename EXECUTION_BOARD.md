@@ -12,11 +12,11 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | PARTIAL LIVE PASS — an earlier tokenized Jackbox attempt is locked `UNKNOWN`; the newest approval and its one explicit retry both failed at Prava credential mint with `FETCH_AGENTIC_CREDS_ERROR` before payment submission | Codex/user | 2026-08-03 04:21 PKT |
+| Prava transaction path understood | session + authoritative status | PARTIAL LIVE PASS — the IST dashboard corroborates approval, credential-generation and failure stages; an earlier tokenized Jackbox attempt is locked `UNKNOWN`, while the newest approval and its one explicit retry both failed at Prava credential mint before payment submission | Codex/user | 2026-08-03 04:34 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL LIVE PASS — four exact products have live facts; a tokenized Drawful 2 Pay attempt occurred, with no confirmed order or decline | Codex | 2026-08-03 03:17 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — bounded mint recovery and concise failure UI built, tested, linted and installed in place | Codex | 2026-08-03 04:21 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — exhausted-card recovery built, tested, linted, installed and rendered on the physical phone | Codex | 2026-08-03 04:39 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
@@ -29,10 +29,10 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Freeze backend behavior. The single permitted mint retry returned the same provider failure and
-   the app removed the action; do not create a third charge or imply a merchant decline.
-2. Preserve both response IDs as evidence of the external sandbox blocker and keep the earlier
-   tokenized Jackbox submission labeled `UNKNOWN`.
+1. Freeze backend behavior. The official Prava skills audit matches the implemented mandate charge
+   and report contracts; do not create a third charge or imply a merchant decline.
+2. If one final sandbox attempt is necessary, start a fresh owner-approved setup and choose a
+   different approved test card. Never reuse the exhausted charge or silently repeat checkout.
 3. Move immediately to the red/blue/green/yellow bento-question UX and submission pass.
 
 ## Next
@@ -43,6 +43,28 @@ Update this file during the hackathon. Do not manage the project from memory.
 3. Treat another merchant as future adapter work; it cannot repair a pre-merchant Prava mint failure.
 
 ## Milestone evidence
+
+### 2026-08-03 — Exhausted sandbox-card recovery verified
+
+- The user-provided dashboard timestamps are IST (UTC+05:30). Its latest sequence—`$9.99`
+  `Creds_Generated` at 04:37, `$10.00` `Authorized` at 04:38, then `$9.99` `Failed` at 04:39 and
+  04:40—corroborates the provider stages already recorded in the WishTrace ledger. Authorization is
+  mandate approval, credential generation is card minting, and neither label is a merchant order or
+  decline.
+- The official Prava skills repository at commit `f4d7515` was audited. WishTrace already matches its
+  mandate charge body (`amount` plus stable `reference`), mandate report body (`txn_status` plus
+  `PURCHASE`), server-only credential boundary and required report-after-merchant rule. No backend
+  contract change was required.
+- After two pre-merchant credential-mint failures, the terminal sandbox UI now offers `Choose another
+  gift` and `Done`; it never exposes a third retry. A restart shows `Last attempt failed` and `View
+  merchant proof` on Home, which reopens this exact recovery, so the user is not trapped. A later
+  attempt must create a fresh approval and let the owner select a different approved sandbox card.
+- Evidence: focused mandate-state test, Android debug assembly and lint passed; the APK installed on
+  the physical phone and reopened the real persisted Zaid occasion. The rendered recovery is captured
+  at `artifacts/screenshots/prava-exhausted-card-recovery-2026-08-03.png`. No Prava session, charge or
+  merchant checkout was created during this verification.
+- Truth boundary: backend behavior is frozen and the recovery is installed. The existing tokenized
+  merchant submission remains `UNKNOWN`; the latest two failures stopped before Jackbox payment.
 
 ### 2026-08-03 — Credential-mint failure isolated; one bounded recovery deployed
 

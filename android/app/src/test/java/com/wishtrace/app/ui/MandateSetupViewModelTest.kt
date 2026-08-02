@@ -292,6 +292,38 @@ class MandateSetupViewModelTest {
         assertEquals(0, gateway.setupCalls)
     }
 
+    @Test
+    fun exhaustedCredentialMintOffersFreshSandboxCardPathOnlyBeforeMerchant() =
+        runTest(dispatcher) {
+            val gateway = FakeMandateGateway().apply {
+                current = details(
+                    status = MandateStatus.DECLINED,
+                    lastChargeState = "DECLINED",
+                    lastChargeFailureCode = "FETCH_AGENTIC_CREDS_ERROR",
+                    mintRetryAvailable = false,
+                )
+            }
+            val viewModel = MandateSetupViewModel(gateway)
+
+            viewModel.start("occasion")
+            advanceUntilIdle()
+
+            assertEquals(MandateSetupStep.PROOF_DECLINED, viewModel.state.value.step)
+            assertTrue(viewModel.state.value.canChooseAnotherSandboxCard)
+
+            gateway.current = details(
+                status = MandateStatus.CONSUMED,
+                merchantOutcome = MandateMerchantOutcome.DECLINED,
+                lastChargeState = "DECLINED",
+                lastChargeFailureCode = "MERCHANT_PAYMENT_DECLINED",
+            )
+            val merchantViewModel = MandateSetupViewModel(gateway)
+            merchantViewModel.start("occasion")
+            advanceUntilIdle()
+
+            assertTrue(!merchantViewModel.state.value.canChooseAnotherSandboxCard)
+        }
+
     private class FakeMandateGateway : MandateGateway {
         var current = details(MandateStatus.ACTIVE)
         var setupResult: MandateDetails? = null

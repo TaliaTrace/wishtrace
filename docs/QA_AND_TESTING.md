@@ -75,7 +75,9 @@
 - one explicit pre-credential mint retry reuses the active approval without a new session;
 - mint retry is refused when the provider charge count reached the mandate limit;
 - a second pre-credential mint failure permanently removes the retry;
+- an exhausted mint offers only a fresh owner-approved sandbox-card path, never a third charge;
 - post-mint unknown never qualifies as a mint retry;
+- `Authorized` and `Creds_Generated` dashboard rows are never mapped to a merchant order or decline;
 - changed price requires new approval.
 
 ## Android UX cases
@@ -89,7 +91,8 @@
 - 48dp targets;
 - low network;
 - product image failure;
-- empty and error states.
+- empty and error states;
+- exhausted-card terminal recovery and the persistent Home `View merchant proof` route.
 
 ## Demo preflight
 

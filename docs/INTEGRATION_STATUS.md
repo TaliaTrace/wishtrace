@@ -79,6 +79,13 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   retire `7789`. WishTrace now preselects a card only when exactly one active enrollment exists;
   with these two cards it omits `card_id` and requires the owner to choose in Prava's hosted UI.
   Card metadata is used only to distinguish enrollments and no PAN/CVV is stored.
+- Official skill audit: PASS — Prava's public `prava-skills` repository at commit `f4d7515`
+  (2026-07-31 09:58:58 IST) confirms the implemented mandate charge body (`amount` and stable
+  `reference`), report endpoint/body (`txn_status`, `txn_type: PURCHASE`), single-use credential
+  handling and mandatory post-merchant report. Its SDK integration is web/iframe based, so Android
+  continues to use a secure Custom Tab rather than an unsupported WebView. The separate
+  `prava-shopping` linked-agent CLI is not substituted into the native SDK/API architecture during
+  the backend freeze.
 - Latest approval evidence: LIVE SANDBOX PROVIDER FAILURE — after preserving the earlier Drawful 2
   post-mint `UNKNOWN`, the phone completed a separate `$10` Quiplash 2 approval. Prava lists that
   mandate as active with zero counted charges, but the first invocation returned
@@ -103,7 +110,16 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   `FETCH_AGENTIC_CREDS_ERROR`; the second immutable charge now makes the action permanently
   unavailable. Safe response IDs: `3282c85d-cb92-4b4b-8a0d-6a4381be7272` and
   `ce11dddc-e591-4196-977a-d718d42de574`.
-- Last verified: 2026-08-03 04:21 PKT
+- Dashboard correlation: USER-OBSERVED — timestamps supplied by the user are IST, not PKT. The
+  latest 04:37–04:40 IST sequence shows `Creds_Generated`, `Authorized`, then two `Failed` rows at
+  the expected amounts. These labels corroborate provider stages only; they do not prove merchant
+  contact, decline, Visa confirmation or an order.
+- Exhausted-card recovery: INSTALLED — after the second pre-credential failure, Android offers a
+  fresh live-gift path only under sandbox tools and no third mint retry. After restart, Home renders
+  `Last attempt failed` and `View merchant proof`, which reopens the recovery. A new attempt requires
+  a fresh owner-approved Prava setup and a different approved sandbox card; WishTrace never inserts
+  card data itself.
+- Last verified: 2026-08-03 04:39 PKT (05:09 IST)
 - Evidence location: migration `20260803_0014`; ACR build `chk`, image digest
   `sha256:c34d7a774e94bc0be78f13dc04563e6453d5d96f045670e861d0b2705269f49a`, and healthy deployed
   revision `wishtrace-api--mintretry1` at 100% traffic. Public health reports PostgreSQL 17.6 over
@@ -245,7 +261,10 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Accessibility checked: primary/back targets asserted at 48dp; semantic headings/labels and onboarding page semantics present; core contrast pairs are 5.95:1–14.91:1; onboarding captured at 130% text scale; motion snaps when animator duration is disabled. TalkBack/manual switch-access testing remains pending.
 - Keyboard/IME checked: API 30 physical-device form collapse was fixed by removing duplicate IME
   inset consumption; connected Compose regression passed 1/1 with name and relationship visible
-- Evidence location: `artifacts/screenshots/milestone-4/`, `artifacts/screenshots/milestone-3/`, `artifacts/screenshots/milestone-2/`, `android/evidence/`, `android/app/build/reports/androidTests/connected/debug/`
+- Evidence location: `artifacts/screenshots/milestone-4/`, `artifacts/screenshots/milestone-3/`,
+  `artifacts/screenshots/milestone-2/`,
+  `artifacts/screenshots/prava-exhausted-card-recovery-2026-08-03.png`, `android/evidence/`,
+  `android/app/build/reports/androidTests/connected/debug/`
 - Live decision proof: PASS — the phone submitted user-created recipient context and a
   user-authorized editable 2026-08-09 sandbox occasion, restored it after restart, retrieved the
   real Jackbox $5 candidate and rendered the grounded Azure ranking. The date is not claimed as the
@@ -259,10 +278,12 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   boundary and expose one explicit `Retry Prava approval` action. The latest pre-credential mint
   failure instead exposes one `Try card again` action under the same active approval; it never opens
   another card/passkey ceremony and disappears after a second failure. Debug assembly, unit tests
-  and lint pass; the updated APK is installed in place.
+  and lint pass; the updated APK is installed in place. Once that retry is exhausted, the terminal
+  sandbox surface offers a fresh live-gift/different-card route and `Done`, while a cold restart
+  returns Home to `Last attempt failed` and `View merchant proof`.
 - Known blockers: the latest provider credential retry is exhausted after the same mint failure. The
   older post-mint `UNKNOWN` remains non-retryable. Prava report, Visa confirmation and merchant order
-  remain unproven; the app shows `Done` and exposes no further money-adjacent action.
+  remain unproven; the app exposes no further action against the exhausted charge.
 
 ## Demo
 

@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -178,8 +179,6 @@ class PravaMandateSessionRequest(BaseModel):
             "user_email": self.user_email,
             "total_amount": _minor_to_decimal(self.total_minor),
             "currency": self.currency,
-            "intent": "mandate_setup",
-            "authorize_only": True,
             "callback_url": self.callback_url,
             "external_order_ref": self.external_order_ref,
             "purchase_context": [
@@ -200,6 +199,7 @@ class PravaMandateSessionRequest(BaseModel):
                 }
             ],
             "mandate_setup": {
+                "intent": "mandate_setup",
                 "recurring_frequency": self.recurring_frequency.value,
                 "merchant_scope": self.merchant_scope.value,
                 "max_charges": self.max_charges,
@@ -216,8 +216,9 @@ class HostedPravaSession(BaseModel):
     order_id: str
     expires_at: datetime
     response_id: str | None
-    # Populated only for mandate setup: Prava mints the mandate record (in
-    # ``pending``) at setup time and returns its id so it can be charged later.
+    # Current Prava session responses omit the mandate id. Keep this optional
+    # solely for backwards-compatible parsing; callers associate the mandate
+    # through the documented customer-scoped list endpoint after approval.
     mandate_id: str | None = None
 
 
@@ -291,9 +292,11 @@ class PravaMandateInfo(BaseModel):
     approved_amount: str
     currency: str
     created_at: datetime
-    valid_until: datetime
+    valid_until: datetime | None
     total_charges: int = 0
     remaining_charges: int = 0
+    merchant_name: str = ""
+    external_user_id: str | None = None
 
 
 class PravaMandateChargeResult(BaseModel):
@@ -303,9 +306,9 @@ class PravaMandateChargeResult(BaseModel):
 
     mandate_id: str
     charge_id: str
-    status: Literal["completed", "failed"]
+    status: Literal["awaiting_result", "failed"]
     credential: SensitivePaymentCredential | None
-    txn_ref_id: str | None
+    order_id: str | None
     error_code: str | None
 
 
@@ -314,10 +317,10 @@ class PravaMandateReportResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    status: Literal["confirmed"]
+    status: Literal["completed", "failed"]
+    mandate_id: str
     charge_id: str
-    txn_ref_id: str
-    txn_status: PravaReportOutcome
+    order_id: str | None
     visa_confirmation: Literal["SUCCESS", "FAILURE"]
     response_id: str | None
 
@@ -400,42 +403,118 @@ class _RawReportResult(BaseModel):
 
 
 class _RawMandate(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     id: str = Field(pattern=PROVIDER_ID_REGEX)
     status: PravaMandateStatus
-    recurring_frequency: PravaMandateFrequency
-    merchant_scope: PravaMandateScope
-    approved_amount: str
-    currency: str
-    created_at: datetime
-    valid_until: datetime
-    total_charges: int = 0
+    recurring_frequency: PravaMandateFrequency = Field(
+        validation_alias=AliasChoices("recurringFrequency", "recurring_frequency")
+    )
+    merchant_scope: PravaMandateScope = Field(
+        validation_alias=AliasChoices("merchantScope", "merchant_scope")
+    )
+    approved_amount: str = Field(
+        pattern=r"^\d{1,12}(?:\.\d{1,2})?$",
+        validation_alias=AliasChoices("approvedAmount", "approved_amount")
+    )
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    created_at: datetime = Field(
+        validation_alias=AliasChoices("createdAt", "created_at")
+    )
+    valid_until: datetime | None = Field(
+        default=None,
+        validation_alias=AliasChoices("validUntil", "valid_until"),
+    )
+    total_charges: int = Field(
+        default=0,
+        validation_alias=AliasChoices("chargeCount", "total_charges"),
+    )
     remaining_charges: int = 0
+    merchant_name: str = Field(
+        default="",
+        validation_alias=AliasChoices("merchantName", "merchant_name"),
+    )
+    external_user_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("externalUserId", "external_user_id"),
+    )
+
+    @field_validator("created_at", "valid_until")
+    @classmethod
+    def require_aware_mandate_time(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("mandate timestamps must include a timezone")
+        return value
+
+
+class _RawMandateList(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    mandates: list[_RawMandate] = Field(default_factory=list)
+
+
+class _RawChargeCredentials(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    token: SecretStr
+    dynamic_cvv: SecretStr = Field(
+        validation_alias=AliasChoices("dynamicCvv", "dynamic_cvv")
+    )
+    expiry_month: SecretStr = Field(
+        validation_alias=AliasChoices("expiryMonth", "expiry_month")
+    )
+    expiry_year: SecretStr = Field(
+        validation_alias=AliasChoices("expiryYear", "expiry_year")
+    )
 
 
 class _RawChargeResult(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    mandate_id: str = Field(pattern=PROVIDER_ID_REGEX)
-    charge_id: str = Field(pattern=PROVIDER_ID_REGEX)
-    txn_ref_id: str | None = Field(default=None, pattern=PROVIDER_ID_REGEX)
-    status: Literal["completed", "failed"]
+    mandate_id: str = Field(
+        pattern=PROVIDER_ID_REGEX,
+        validation_alias=AliasChoices("mandateId", "mandate_id"),
+    )
+    charge_id: str = Field(
+        pattern=PROVIDER_ID_REGEX,
+        validation_alias=AliasChoices("transactionId", "charge_id"),
+    )
+    order_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("orderId", "order_id"),
+    )
+    status: Literal["awaiting_result", "completed", "failed"]
+    credentials: _RawChargeCredentials | None = None
     token: SecretStr | None = None
     dynamic_cvv: SecretStr | None = None
     expiry_month: SecretStr | None = None
     expiry_year: SecretStr | None = None
     error: _RawTransactionError | None = None
+    error_code: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("errorCode", "error_code"),
+    )
 
 
 class _RawMandateReport(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    status: Literal["confirmed"]
-    charge_id: str = Field(pattern=PROVIDER_ID_REGEX)
-    txn_ref_id: str = Field(pattern=PROVIDER_ID_REGEX)
-    txn_status: PravaReportOutcome
-    visa_confirmation: Literal["SUCCESS", "FAILURE"]
+    mandate_id: str = Field(
+        pattern=PROVIDER_ID_REGEX,
+        validation_alias=AliasChoices("mandateId", "mandate_id"),
+    )
+    charge_id: str = Field(
+        pattern=PROVIDER_ID_REGEX,
+        validation_alias=AliasChoices("transactionId", "charge_id"),
+    )
+    order_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("orderId", "order_id"),
+    )
+    status: Literal["completed", "failed"]
+    visa_confirmation: Literal["SUCCESS", "FAILURE"] = Field(
+        validation_alias=AliasChoices("visaConfirmation", "visa_confirmation")
+    )
 
 
 class PravaHttpGateway:
@@ -587,6 +666,19 @@ class PravaHttpGateway:
             raise _invalid_response(response) from error
         return _mandate_info(raw)
 
+    async def list_mandates(self, customer_id: str) -> list[PravaMandateInfo]:
+        _require_provider_id(customer_id, "customer_id")
+        response = await self._request(
+            "GET",
+            "/v1/mandates",
+            params={"customer_id": customer_id, "standing_only": "true"},
+        )
+        try:
+            raw = _RawMandateList.model_validate(response.json())
+        except (ValueError, ValidationError) as error:
+            raise _invalid_response(response) from error
+        return [_mandate_info(mandate) for mandate in raw.mandates]
+
     async def charge_mandate(
         self,
         *,
@@ -639,9 +731,9 @@ class PravaHttpGateway:
             raise _invalid_response(response) from error
         return PravaMandateReportResult(
             status=raw.status,
+            mandate_id=raw.mandate_id,
             charge_id=raw.charge_id,
-            txn_ref_id=raw.txn_ref_id,
-            txn_status=raw.txn_status,
+            order_id=raw.order_id,
             visa_confirmation=raw.visa_confirmation,
             response_id=_response_id(response),
         )
@@ -778,37 +870,50 @@ def _mandate_info(raw: _RawMandate) -> PravaMandateInfo:
         valid_until=raw.valid_until,
         total_charges=raw.total_charges,
         remaining_charges=raw.remaining_charges,
+        merchant_name=raw.merchant_name,
+        external_user_id=raw.external_user_id,
     )
 
 
 def _charge_result(raw: _RawChargeResult) -> PravaMandateChargeResult:
-    credentials = (raw.token, raw.dynamic_cvv, raw.expiry_month, raw.expiry_year)
+    nested = raw.credentials
+    credentials = (
+        nested.token if nested is not None else raw.token,
+        nested.dynamic_cvv if nested is not None else raw.dynamic_cvv,
+        nested.expiry_month if nested is not None else raw.expiry_month,
+        nested.expiry_year if nested is not None else raw.expiry_year,
+    )
     supplied = [value is not None for value in credentials]
     if any(supplied) and not all(supplied):
         raise ValueError("Prava returned incomplete mandate charge credentials")
     credential: SensitivePaymentCredential | None = None
     if all(supplied):
-        assert raw.token is not None
-        assert raw.dynamic_cvv is not None
-        assert raw.expiry_month is not None
-        assert raw.expiry_year is not None
+        token, dynamic_cvv, expiry_month, expiry_year = credentials
+        assert token is not None
+        assert dynamic_cvv is not None
+        assert expiry_month is not None
+        assert expiry_year is not None
         credential = SensitivePaymentCredential(
-            token=raw.token,
-            dynamic_cvv=raw.dynamic_cvv,
-            expiry_month=raw.expiry_month,
-            expiry_year=raw.expiry_year,
+            token=token,
+            dynamic_cvv=dynamic_cvv,
+            expiry_month=expiry_month,
+            expiry_year=expiry_year,
         )
-    if credential is not None and raw.status != "completed":
-        raise ValueError("Prava returned mandate credentials on a non-completed charge")
-    if raw.status == "completed" and credential is None:
-        raise ValueError("Prava completed a mandate charge without credentials")
+    successful_status = raw.status in {"awaiting_result", "completed"}
+    if credential is not None and not successful_status:
+        raise ValueError("Prava returned mandate credentials on a failed charge")
+    if successful_status and credential is None:
+        raise ValueError("Prava issued a mandate charge without credentials")
     return PravaMandateChargeResult(
         mandate_id=raw.mandate_id,
         charge_id=raw.charge_id,
-        status=raw.status,
+        status="awaiting_result" if successful_status else "failed",
         credential=credential,
-        txn_ref_id=raw.txn_ref_id,
-        error_code=(raw.error.code if raw.error is not None else None),
+        order_id=raw.order_id,
+        error_code=(
+            raw.error_code
+            or (raw.error.code if raw.error is not None else None)
+        ),
     )
 
 

@@ -374,14 +374,14 @@ async def test_create_mandate_session_sends_setup_block_and_discards_token() -> 
         _mandate_request()
     )
 
-    assert observed["intent"] == "mandate_setup"
-    assert observed["authorize_only"] is True
     assert observed["mandate_setup"] == {
+        "intent": "mandate_setup",
         "recurring_frequency": "yearly",
         "merchant_scope": "listed",
         "max_charges": 5,
         "valid_until": "2031-08-01T00:00:00Z",
     }
+    assert "authorize_only" not in observed
     assert session.session_id == "session-m1"
     assert session.hosted_url == "https://sandbox.collect.prava.space/checkout?session=m1"
     assert "provider-session-token-must-not-escape" not in session.model_dump_json()
@@ -418,14 +418,14 @@ async def test_get_mandate_parses_guardrails() -> None:
             json={
                 "id": "mandate-1",
                 "status": "active",
-                "recurring_frequency": "yearly",
-                "merchant_scope": "listed",
-                "approved_amount": "5.00",
+                "recurringFrequency": "yearly",
+                "merchantScope": "listed",
+                "merchantName": "Jackbox Games",
+                "approvedAmount": "5.00",
                 "currency": "USD",
-                "created_at": "2026-08-01T12:00:00Z",
-                "valid_until": "2031-08-01T00:00:00Z",
-                "total_charges": 5,
-                "remaining_charges": 5,
+                "createdAt": "2026-08-01T12:00:00Z",
+                "validUntil": "2031-08-01T00:00:00Z",
+                "chargeCount": 5,
             },
         )
 
@@ -434,7 +434,43 @@ async def test_get_mandate_parses_guardrails() -> None:
     assert mandate.status == PravaMandateStatus.ACTIVE
     assert mandate.recurring_frequency == PravaMandateFrequency.YEARLY
     assert mandate.merchant_scope == PravaMandateScope.LISTED
-    assert mandate.remaining_charges == 5
+    assert mandate.total_charges == 5
+
+
+async def test_list_mandates_uses_customer_scope_and_parses_current_shape() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/mandates"
+        assert dict(request.url.params) == {
+            "customer_id": "user-123",
+            "standing_only": "true",
+        }
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/json"},
+            json={
+                "mandates": [
+                    {
+                        "id": "mandate-1",
+                        "status": "active",
+                        "recurringFrequency": "yearly",
+                        "merchantScope": "listed",
+                        "merchantName": "Jackbox Games",
+                        "approvedAmount": "5.00",
+                        "currency": "USD",
+                        "validUntil": "2031-08-01T00:00:00Z",
+                        "createdAt": "2026-08-01T12:00:00Z",
+                        "externalUserId": "user-123",
+                    }
+                ]
+            },
+        )
+
+    mandates = await _gateway(httpx.MockTransport(handler)).list_mandates("user-123")
+
+    assert len(mandates) == 1
+    assert mandates[0].mandate_id == "mandate-1"
+    assert mandates[0].merchant_name == "Jackbox Games"
+    assert mandates[0].external_user_id == "user-123"
 
 
 async def test_charge_mandate_mints_memory_only_credentials() -> None:
@@ -450,14 +486,17 @@ async def test_charge_mandate_mints_memory_only_credentials() -> None:
                 "X-Response-ID": "response-charge-1",
             },
             json={
-                "mandate_id": "mandate-1",
-                "charge_id": "charge-1",
-                "txn_ref_id": "line-1",
-                "status": "completed",
-                "token": "mandate-token-redacted",
-                "dynamic_cvv": "599",
-                "expiry_month": "12",
-                "expiry_year": "2027",
+                "mandateId": "mandate-1",
+                "transactionId": "charge-1",
+                "orderId": "order-1",
+                "status": "awaiting_result",
+                "fetchStatus": "SUCCESS",
+                "credentials": {
+                    "token": "mandate-token-redacted",
+                    "dynamicCvv": "599",
+                    "expiryMonth": "12",
+                    "expiryYear": "2027",
+                },
             },
         )
 
@@ -468,7 +507,8 @@ async def test_charge_mandate_mints_memory_only_credentials() -> None:
     )
 
     assert observed == {"amount": "5.00", "reference": "occasion-123-charge-1"}
-    assert result.status == "completed"
+    assert result.status == "awaiting_result"
+    assert result.order_id == "order-1"
     assert result.credential is not None
     assert result.credential.token.get_secret_value() == "mandate-token-redacted"
     serialized = result.model_dump_json()
@@ -483,10 +523,10 @@ async def test_charge_mandate_over_cap_declines_without_credentials() -> None:
             200,
             headers={"Content-Type": "application/json"},
             json={
-                "mandate_id": "mandate-1",
-                "charge_id": "charge-2",
+                "mandateId": "mandate-1",
+                "transactionId": "charge-2",
                 "status": "failed",
-                "error": {"code": "THRESHOLD_EXCEEDED", "message": "over cap"},
+                "errorCode": "THRESHOLD_EXCEEDED",
             },
         )
 
@@ -508,13 +548,15 @@ async def test_charge_mandate_rejects_credentials_on_failed_status() -> None:
             200,
             headers={"Content-Type": "application/json"},
             json={
-                "mandate_id": "mandate-1",
-                "charge_id": "charge-3",
+                "mandateId": "mandate-1",
+                "transactionId": "charge-3",
                 "status": "failed",
-                "token": "leaked-token",
-                "dynamic_cvv": "599",
-                "expiry_month": "12",
-                "expiry_year": "2027",
+                "credentials": {
+                    "token": "leaked-token",
+                    "dynamicCvv": "599",
+                    "expiryMonth": "12",
+                    "expiryYear": "2027",
+                },
             },
         )
 
@@ -541,11 +583,12 @@ async def test_report_mandate_charge_sends_documented_fields() -> None:
                 "X-Response-ID": "response-mandate-report-1",
             },
             json={
-                "status": "confirmed",
-                "charge_id": "charge-1",
-                "txn_ref_id": "line-1",
-                "txn_status": "DECLINED",
-                "visa_confirmation": "FAILURE",
+                "mandateId": "mandate-1",
+                "transactionId": "charge-1",
+                "orderId": "order-1",
+                "status": "failed",
+                "mandateStatus": "active",
+                "visaConfirmation": "FAILURE",
             },
         )
 
@@ -556,7 +599,9 @@ async def test_report_mandate_charge_sends_documented_fields() -> None:
     )
 
     assert observed == {"txn_status": "DECLINED", "txn_type": "PURCHASE"}
-    assert result.status == "confirmed"
+    assert result.status == "failed"
+    assert result.mandate_id == "mandate-1"
+    assert result.charge_id == "charge-1"
     assert result.visa_confirmation == "FAILURE"
     assert result.response_id == "response-mandate-report-1"
 

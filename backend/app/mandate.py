@@ -20,6 +20,7 @@ import json
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Literal, Protocol
 
@@ -223,6 +224,8 @@ class MandatePravaOperations(Protocol):
     ) -> HostedPravaSession: ...
 
     async def get_mandate(self, mandate_id: str) -> PravaMandateInfo: ...
+
+    async def list_mandates(self, customer_id: str) -> list[PravaMandateInfo]: ...
 
     async def charge_mandate(
         self,
@@ -432,12 +435,31 @@ class MandateService:
         occasion_id: uuid.UUID,
     ) -> MandateResponse:
         mandate = await self._store.get(user_id=user.id, occasion_id=occasion_id)
-        if mandate.provider_mandate_id is None:
-            return mandate
         if mandate.state in _TERMINAL_MANDATE_STATES:
             return mandate
         try:
-            info = await self._prava.get_mandate(mandate.provider_mandate_id)
+            if mandate.provider_mandate_id is None:
+                candidates = await self._prava.list_mandates(str(user.id))
+                matches = [
+                    candidate
+                    for candidate in candidates
+                    if _matches_local_mandate(candidate, mandate, user.id)
+                ]
+                if not matches:
+                    return mandate
+                if len(matches) > 1:
+                    raise ApiError(
+                        status_code=502,
+                        code="PRAVA_RESPONSE_AMBIGUOUS",
+                        message=(
+                            "Prava returned more than one matching approval. "
+                            "WishTrace will not choose one automatically."
+                        ),
+                        recoverable=False,
+                    )
+                info = matches[0]
+            else:
+                info = await self._prava.get_mandate(mandate.provider_mandate_id)
         except PravaGatewayError as error:
             raise ApiError(
                 status_code=503 if error.recoverable else 502,
@@ -445,7 +467,10 @@ class MandateService:
                 message=error.safe_message,
                 recoverable=error.recoverable,
             ) from error
-        if info.mandate_id != mandate.provider_mandate_id:
+        if (
+            mandate.provider_mandate_id is not None
+            and info.mandate_id != mandate.provider_mandate_id
+        ):
             raise ApiError(
                 status_code=502,
                 code="PRAVA_RESPONSE_INVALID",
@@ -563,7 +588,21 @@ class MandateService:
                 message=error.safe_message,
                 recoverable=error.recoverable,
             ) from error
-        if charge_result.status != "completed" or charge_result.credential is None:
+        if charge_result.mandate_id != mandate.provider_mandate_id:
+            await self._store.mark_charge_unknown(
+                user_id=user.id,
+                occasion_id=occasion_id,
+                charge_id=charge.id,
+                reason_code="PRAVA_CHARGE_MANDATE_MISMATCH",
+                response_id=None,
+            )
+            raise ApiError(
+                status_code=502,
+                code="PRAVA_RESPONSE_MISMATCH",
+                message="Prava returned a charge for a different mandate.",
+                recoverable=False,
+            )
+        if charge_result.status != "awaiting_result" or charge_result.credential is None:
             return await self._store.record_charge_declined(
                 user_id=user.id,
                 occasion_id=occasion_id,
@@ -673,9 +712,13 @@ class MandateService:
         expected_confirmation = (
             "SUCCESS" if report_outcome is PravaReportOutcome.APPROVED else "FAILURE"
         )
+        expected_status = (
+            "completed" if report_outcome is PravaReportOutcome.APPROVED else "failed"
+        )
         if (
-            report.charge_id != provider_charge_id
-            or report.txn_status is not report_outcome
+            report.mandate_id != provider_mandate_id
+            or report.charge_id != provider_charge_id
+            or report.status != expected_status
             or report.visa_confirmation != expected_confirmation
         ):
             await self._store.mark_charge_unknown(
@@ -930,6 +973,17 @@ class SqlMandateStore:
     ) -> MandateResponse:
         async with self._session_factory() as db, db.begin():
             mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
+            if (
+                mandate.provider_mandate_id is not None
+                and mandate.provider_mandate_id != info.mandate_id
+            ):
+                raise ApiError(
+                    status_code=502,
+                    code="PRAVA_RESPONSE_MISMATCH",
+                    message="Prava returned a mismatched mandate.",
+                    recoverable=False,
+                )
+            mandate.provider_mandate_id = info.mandate_id
             mandate.provider_status = info.status.value
             if mandate.valid_until is None:
                 mandate.valid_until = info.valid_until
@@ -1150,6 +1204,42 @@ def _origin(url: str) -> str:
 
 def _not_found(code: str, message: str) -> ApiError:
     return ApiError(status_code=404, code=code, message=message, recoverable=False)
+
+
+def _matches_local_mandate(
+    candidate: PravaMandateInfo,
+    local: MandateResponse,
+    user_id: uuid.UUID,
+) -> bool:
+    """Bind a provider mandate only when every observable setup fact agrees.
+
+    Prava's documented create-session response does not include the new mandate
+    id, so the only supported association path is the customer-scoped mandate
+    list. A timestamp floor prevents an older, otherwise identical mandate from
+    being attached after a retry; multiple matches still fail closed in refresh.
+    """
+
+    try:
+        approved_amount = Decimal(candidate.approved_amount)
+    except InvalidOperation:
+        return False
+    expected_amount = Decimal(local.approved_amount_minor) / Decimal(100)
+    created_floor = local.created_at - timedelta(minutes=2)
+    return (
+        candidate.created_at >= created_floor
+        and approved_amount == expected_amount
+        and candidate.currency == local.currency
+        and candidate.recurring_frequency is local.recurring_frequency
+        and candidate.merchant_scope is local.merchant_scope
+        and (
+            not candidate.merchant_name
+            or candidate.merchant_name.casefold() == local.merchant_name.casefold()
+        )
+        and (
+            candidate.external_user_id is None
+            or candidate.external_user_id == str(user_id)
+        )
+    )
 
 
 def _state_from_mandate_status(

@@ -218,7 +218,11 @@ class MemoryMandateStore:
             PravaMandateStatus.PENDING: MandateState.AWAITING_APPROVAL,
         }
         self.mandate = self.mandate.model_copy(
-            update={"state": mapping[info.status], "provider_status": info.status.value}
+            update={
+                "state": mapping[info.status],
+                "provider_mandate_id": info.mandate_id,
+                "provider_status": info.status.value,
+            }
         )
         return self.mandate
     # -- charge surface -----------------------------------------------------
@@ -366,6 +370,8 @@ class FakeMandatePrava:
         self.report_result: PravaMandateReportResult | None = None
         self.report_error: PravaGatewayError | None = None
         self.mandate_info: PravaMandateInfo | None = None
+        self.listed_mandates: list[PravaMandateInfo] = []
+        self.list_calls: list[str] = []
         self.charge_calls: list[tuple[str, int, str]] = []
         self.report_calls: list[tuple[str, str, PravaReportOutcome]] = []
 
@@ -381,7 +387,7 @@ class FakeMandatePrava:
             order_id="order-1",
             expires_at=datetime(2099, 8, 1, 16, 0, tzinfo=UTC),
             response_id="response-create-1",
-            mandate_id=_MANDATE_ID,
+            mandate_id=None,
         )
 
     async def get_mandate(self, mandate_id: str) -> PravaMandateInfo:
@@ -389,6 +395,10 @@ class FakeMandatePrava:
         if self.mandate_info is None:
             raise AssertionError("mandate_info not configured")
         return self.mandate_info
+
+    async def list_mandates(self, customer_id: str) -> list[PravaMandateInfo]:
+        self.list_calls.append(customer_id)
+        return self.listed_mandates
 
     async def charge_mandate(
         self,
@@ -416,10 +426,12 @@ class FakeMandatePrava:
             raise self.report_error
         if self.report_result is None:
             return PravaMandateReportResult(
-                status="confirmed",
+                status=(
+                    "completed" if outcome is PravaReportOutcome.APPROVED else "failed"
+                ),
+                mandate_id=mandate_id,
                 charge_id=charge_id,
-                txn_ref_id="txn-ref-1",
-                txn_status=outcome,
+                order_id="order-1",
                 visa_confirmation=(
                     "SUCCESS" if outcome is PravaReportOutcome.APPROVED else "FAILURE"
                 ),
@@ -501,9 +513,9 @@ def _minted_credential() -> PravaMandateChargeResult:
     return PravaMandateChargeResult(
         mandate_id=_MANDATE_ID,
         charge_id="charge-1",
-        status="completed",
+        status="awaiting_result",
         credential=_credential(),
-        txn_ref_id="txn-ref-1",
+        order_id="order-1",
         error_code=None,
     )
 # ── Happy-path: one-time mandate executes → merchant verified → reported → consumed ──
@@ -606,7 +618,7 @@ async def test_execute_prava_decline_records_and_never_checks_out() -> None:
         charge_id="charge-declined",
         status="failed",
         credential=None,
-        txn_ref_id=None,
+        order_id=None,
         error_code="THRESHOLD_EXCEEDED",
     )
     checkout = FakeMerchantCheckout(_ok_checkout())
@@ -724,10 +736,10 @@ async def test_execute_report_mismatch_marks_charge_unknown() -> None:
     prava = FakeMandatePrava()
     prava.charge_result = _minted_credential()
     prava.report_result = PravaMandateReportResult(
-        status="confirmed",
+        status="completed",
+        mandate_id=_MANDATE_ID,
         charge_id="charge-DIFFERENT",
-        txn_ref_id="txn-ref-1",
-        txn_status=PravaReportOutcome.APPROVED,
+        order_id="order-1",
         visa_confirmation="SUCCESS",
         response_id="response-report-1",
     )
@@ -760,7 +772,7 @@ async def test_setup_creates_session_with_frequency_and_records_awaiting() -> No
 
     assert result.state is MandateState.AWAITING_APPROVAL
     assert result.approval_session is not None
-    assert result.provider_mandate_id == _MANDATE_ID
+    assert result.provider_mandate_id is None
     assert len(prava.session_requests) == 1
     request = prava.session_requests[0]
     assert request.recurring_frequency is PravaMandateFrequency.ONE_TIME
@@ -816,6 +828,68 @@ async def test_refresh_activates_pending_mandate_from_provider() -> None:
 
     assert result.state is MandateState.ACTIVE
     assert result.provider_status == "active"
+
+
+async def test_refresh_associates_current_customer_mandate_after_hosted_approval() -> None:
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.AWAITING_APPROVAL,
+            provider_mandate_id=None,
+        )
+    )
+    prava = FakeMandatePrava()
+    prava.listed_mandates = [
+        PravaMandateInfo(
+            mandate_id=_MANDATE_ID,
+            status=PravaMandateStatus.ACTIVE,
+            recurring_frequency=PravaMandateFrequency.ONE_TIME,
+            merchant_scope=PravaMandateScope.LISTED,
+            approved_amount="5.00",
+            currency="USD",
+            created_at=_NOW,
+            valid_until=datetime(2099, 8, 1, tzinfo=UTC),
+            merchant_name="Jackbox Games",
+        )
+    ]
+    service = _service(store, prava, checkout=None)
+    user = _user()
+
+    result = await service.refresh(user, store.mandate.occasion_id)
+
+    assert prava.list_calls == [str(user.id)]
+    assert result.provider_mandate_id == _MANDATE_ID
+    assert result.state is MandateState.ACTIVE
+
+
+async def test_refresh_rejects_ambiguous_current_customer_mandates() -> None:
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.AWAITING_APPROVAL,
+            provider_mandate_id=None,
+        )
+    )
+    match = PravaMandateInfo(
+        mandate_id=_MANDATE_ID,
+        status=PravaMandateStatus.ACTIVE,
+        recurring_frequency=PravaMandateFrequency.ONE_TIME,
+        merchant_scope=PravaMandateScope.LISTED,
+        approved_amount="5.00",
+        currency="USD",
+        created_at=_NOW,
+        valid_until=datetime(2099, 8, 1, tzinfo=UTC),
+        merchant_name="Jackbox Games",
+    )
+    prava = FakeMandatePrava()
+    prava.listed_mandates = [
+        match,
+        match.model_copy(update={"mandate_id": "mandate-other"}),
+    ]
+    service = _service(store, prava, checkout=None)
+
+    with pytest.raises(ApiError) as ambiguous:
+        await service.refresh(_user(), store.mandate.occasion_id)
+
+    assert ambiguous.value.code == "PRAVA_RESPONSE_AMBIGUOUS"
 
 
 async def test_refresh_rejects_mismatched_provider_mandate() -> None:

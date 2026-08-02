@@ -159,7 +159,12 @@ fun MandateSetupScreen(
                     )
                     MandateSetupStep.FAILED -> TerminalState(
                         title = "Autopilot did not arm",
-                        message = "Refresh for the authoritative state.",
+                        message = if (state.mandate?.lastProviderStatus == "failed") {
+                            "Prava returned a failed sandbox setup before any mandate or merchant " +
+                                "charge was created. Nothing was charged. You can try again."
+                        } else {
+                            "Prava could not complete setup. Nothing was charged. You can try again."
+                        },
                     )
                     MandateSetupStep.UNKNOWN -> TerminalState(
                         title = "Result still unknown",

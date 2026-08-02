@@ -56,6 +56,8 @@ from app.prava import (
     PravaMandateScope,
     PravaMandateSessionRequest,
     PravaMandateStatus,
+    PravaPaymentResult,
+    PravaPaymentStatus,
     PravaReportOutcome,
     SensitivePaymentCredential,
 )
@@ -202,6 +204,7 @@ class MandateStore(Protocol):
         occasion_id: uuid.UUID,
         unknown: bool,
         response_id: str | None,
+        provider_status: str | None = None,
     ) -> MandateResponse: ...
 
     async def get(
@@ -228,6 +231,8 @@ class MandatePravaOperations(Protocol):
     async def get_mandate(self, mandate_id: str) -> PravaMandateInfo: ...
 
     async def list_mandates(self, customer_id: str) -> list[PravaMandateInfo]: ...
+
+    async def get_payment_result(self, session_id: str) -> PravaPaymentResult: ...
 
     async def charge_mandate(
         self,
@@ -457,6 +462,52 @@ class MandateService:
                     if _matches_local_mandate(candidate, mandate, user.id)
                 ]
                 if not matches:
+                    approval = mandate.approval_session
+                    if approval is None:
+                        return mandate
+                    result = await self._prava.get_payment_result(approval.session_id)
+                    if result.session_id != approval.session_id:
+                        raise ApiError(
+                            status_code=502,
+                            code="PRAVA_RESPONSE_INVALID",
+                            message="Prava returned a mismatched approval result.",
+                            recoverable=False,
+                        )
+                    if result.status is PravaPaymentStatus.FAILED:
+                        provider_code = next(
+                            (
+                                transaction.error_code
+                                for transaction in result.transactions
+                                if transaction.error_code
+                            ),
+                            "NO_PROVIDER_CODE",
+                        )
+                        logger.warning(
+                            "prava_mandate_hosted_setup_failed",
+                            extra={"error_category": _safe_provider_code(provider_code)},
+                        )
+                        return await self._store.fail_setup(
+                            user_id=user.id,
+                            occasion_id=occasion_id,
+                            unknown=False,
+                            response_id=result.response_id,
+                            provider_status=result.status.value,
+                        )
+                    if result.status in {
+                        PravaPaymentStatus.AWAITING_RESULT,
+                        PravaPaymentStatus.COMPLETED,
+                    }:
+                        logger.warning(
+                            "prava_mandate_setup_missing_after_provider_result",
+                            extra={"error_category": result.status.value},
+                        )
+                        return await self._store.fail_setup(
+                            user_id=user.id,
+                            occasion_id=occasion_id,
+                            unknown=True,
+                            response_id=result.response_id,
+                            provider_status=result.status.value,
+                        )
                     return mandate
                 if len(matches) > 1:
                     raise ApiError(
@@ -956,10 +1007,13 @@ class SqlMandateStore:
         occasion_id: uuid.UUID,
         unknown: bool,
         response_id: str | None,
+        provider_status: str | None = None,
     ) -> MandateResponse:
         async with self._session_factory() as db, db.begin():
             mandate = await _owned_mandate(db, user_id, occasion_id, lock=True)
             mandate.last_response_id = response_id
+            if provider_status is not None:
+                mandate.provider_status = provider_status
             _transition(
                 mandate,
                 MandateState.UNKNOWN if unknown else MandateState.FAILED,
@@ -1252,6 +1306,13 @@ def _matches_local_mandate(
             or candidate.external_user_id == str(user_id)
         )
     )
+
+
+def _safe_provider_code(value: str) -> str:
+    """Keep provider diagnostics useful without allowing arbitrary log content."""
+
+    normalized = value.strip().upper()
+    return normalized if re.fullmatch(r"[A-Z0-9_:-]{1,100}", normalized) else "UNKNOWN"
 
 
 def _state_from_mandate_status(

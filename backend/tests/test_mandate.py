@@ -28,6 +28,7 @@ from app.merchant_browser import (
 from app.prava import (
     HostedPravaSession,
     PravaGatewayError,
+    PravaLineItemResult,
     PravaMandateChargeResult,
     PravaMandateFrequency,
     PravaMandateInfo,
@@ -35,7 +36,10 @@ from app.prava import (
     PravaMandateScope,
     PravaMandateSessionRequest,
     PravaMandateStatus,
+    PravaPaymentResult,
+    PravaPaymentStatus,
     PravaReportOutcome,
+    PravaTransactionResult,
     SensitivePaymentCredential,
 )
 
@@ -184,11 +188,13 @@ class MemoryMandateStore:
         occasion_id: uuid.UUID,
         unknown: bool,
         response_id: str | None,
+        provider_status: str | None = None,
     ) -> MandateResponse:
         del user_id, occasion_id, response_id
         self.mandate = self.mandate.model_copy(
             update={
-                "state": MandateState.UNKNOWN if unknown else MandateState.FAILED
+                "state": MandateState.UNKNOWN if unknown else MandateState.FAILED,
+                "provider_status": provider_status,
             }
         )
         return self.mandate
@@ -372,7 +378,9 @@ class FakeMandatePrava:
         self.report_error: PravaGatewayError | None = None
         self.mandate_info: PravaMandateInfo | None = None
         self.listed_mandates: list[PravaMandateInfo] = []
+        self.payment_result: PravaPaymentResult | None = None
         self.list_calls: list[str] = []
+        self.payment_result_calls: list[str] = []
         self.charge_calls: list[tuple[str, int, str]] = []
         self.report_calls: list[tuple[str, str, PravaReportOutcome]] = []
 
@@ -400,6 +408,18 @@ class FakeMandatePrava:
     async def list_mandates(self, customer_id: str) -> list[PravaMandateInfo]:
         self.list_calls.append(customer_id)
         return self.listed_mandates
+
+    async def get_payment_result(self, session_id: str) -> PravaPaymentResult:
+        self.payment_result_calls.append(session_id)
+        if self.payment_result is None:
+            return PravaPaymentResult(
+                session_id=session_id,
+                order_id=None,
+                status=PravaPaymentStatus.PENDING,
+                transactions=[],
+                response_id="response-pending-1",
+            )
+        return self.payment_result
 
     async def charge_mandate(
         self,
@@ -861,6 +881,74 @@ async def test_refresh_associates_current_customer_mandate_after_hosted_approval
     assert prava.list_calls == [str(user.id)]
     assert result.provider_mandate_id == _MANDATE_ID
     assert result.state is MandateState.ACTIVE
+
+
+async def test_refresh_records_failed_hosted_setup_when_no_mandate_was_created() -> None:
+    approval = MandateApprovalSession(
+        session_id="session-failed-1",
+        hosted_url="https://sandbox.collect.prava.space/checkout?session=failed",
+        expires_at=datetime(2099, 8, 1, 16, 0, tzinfo=UTC),
+    )
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.AWAITING_APPROVAL,
+            provider_mandate_id=None,
+        ).model_copy(update={"approval_session": approval, "provider_status": "pending"})
+    )
+    prava = FakeMandatePrava()
+    prava.payment_result = PravaPaymentResult(
+        session_id=approval.session_id,
+        order_id="provider-order-present",
+        status=PravaPaymentStatus.FAILED,
+        transactions=[
+            PravaTransactionResult(
+                txn_id="transaction-failed-1",
+                status=PravaPaymentStatus.FAILED,
+                line_items=[
+                    PravaLineItemResult(
+                        txn_ref_id="line-item-failed-1",
+                        merchant_name="Jackbox Games",
+                        merchant_url="https://checkout.jackboxgames.com",
+                        total_minor=500,
+                        status=PravaPaymentStatus.FAILED,
+                        credential=None,
+                    )
+                ],
+                error_code="PROVISION_ERROR",
+            )
+        ],
+        response_id="response-failed-1",
+    )
+    service = _service(store, prava, checkout=None)
+
+    result = await service.refresh(_user(), store.mandate.occasion_id)
+
+    assert prava.payment_result_calls == [approval.session_id]
+    assert result.state is MandateState.FAILED
+    assert result.provider_status == "failed"
+    assert result.provider_mandate_id is None
+
+
+async def test_refresh_keeps_pending_hosted_setup_awaiting() -> None:
+    approval = MandateApprovalSession(
+        session_id="session-pending-1",
+        hosted_url="https://sandbox.collect.prava.space/checkout?session=pending",
+        expires_at=datetime(2099, 8, 1, 16, 0, tzinfo=UTC),
+    )
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.AWAITING_APPROVAL,
+            provider_mandate_id=None,
+        ).model_copy(update={"approval_session": approval, "provider_status": "pending"})
+    )
+    prava = FakeMandatePrava()
+    service = _service(store, prava, checkout=None)
+
+    result = await service.refresh(_user(), store.mandate.occasion_id)
+
+    assert prava.payment_result_calls == [approval.session_id]
+    assert result.state is MandateState.AWAITING_APPROVAL
+    assert result.provider_status == "pending"
 
 
 async def test_refresh_rejects_ambiguous_current_customer_mandates() -> None:

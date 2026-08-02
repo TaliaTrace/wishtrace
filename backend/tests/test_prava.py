@@ -375,7 +375,6 @@ async def test_create_mandate_session_sends_setup_block_and_discards_token() -> 
     )
 
     assert observed["mandate_setup"] == {
-        "intent": "mandate_setup",
         "recurring_frequency": "yearly",
         "merchant_scope": "listed",
         "max_charges": 5,

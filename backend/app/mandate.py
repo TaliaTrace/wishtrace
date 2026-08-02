@@ -17,6 +17,7 @@ the one-time purchase path in :mod:`app.purchase`.
 import hashlib
 import hmac
 import json
+import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -64,6 +65,7 @@ IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,255}$")
 _ONE_TIME_VALID_DAYS = 7
 _RECURRING_VALID_DAYS = 400
 _RECURRING_MAX_CHARGES = 5
+logger = logging.getLogger("wishtrace")
 
 
 class MandateState(StrEnum):
@@ -411,6 +413,14 @@ class MandateService:
         try:
             session = await self._prava.create_mandate_session(request)
         except PravaGatewayError as error:
+            logger.warning(
+                "prava_mandate_setup_failed",
+                extra={
+                    "error_category": (
+                        f"{error.code}:{error.provider_code or 'NO_PROVIDER_CODE'}"
+                    )
+                },
+            )
             await self._store.fail_setup(
                 user_id=user.id,
                 occasion_id=occasion_id,

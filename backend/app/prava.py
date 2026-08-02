@@ -199,7 +199,6 @@ class PravaMandateSessionRequest(BaseModel):
                 }
             ],
             "mandate_setup": {
-                "intent": "mandate_setup",
                 "recurring_frequency": self.recurring_frequency.value,
                 "merchant_scope": self.merchant_scope.value,
                 "max_charges": self.max_charges,

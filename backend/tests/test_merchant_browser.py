@@ -14,8 +14,10 @@ from app.merchant_browser import (
     MerchantQuote,
     MerchantQuoteRequest,
     _extract_order_id,
+    _has_explicit_payment_failure,
     _is_region_code,
     _money_minor,
+    _normalize_checkout_text,
     _numeric_variant_id,
     _PlaywrightLoopThread,
 )
@@ -172,6 +174,47 @@ def test_decline_cannot_carry_order_id() -> None:
 def test_order_id_is_extracted_only_from_confirmation_copy() -> None:
     assert _extract_order_id("Thank you. Order #HX-12345") == "HX-12345"
     assert _extract_order_id("Your cart reference is abc") is None
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Payment failed",
+        "Your card was declined. Try another payment method.",
+        "Your payment couldn\u2019t be processed. Try again.",
+        "There was an issue processing your payment.",
+        "Your payment couldn\ufffdt be verified.",
+    ],
+)
+def test_checkout_classifier_accepts_explicit_payment_failures(message: str) -> None:
+    assert _has_explicit_payment_failure([message]) is True
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Payment is processing",
+        "Enter a valid card number",
+        "The checkout could not load. Check your connection.",
+        "Your shipping address could not be verified.",
+        "Pay now",
+    ],
+)
+def test_checkout_classifier_rejects_ambiguous_or_field_errors(message: str) -> None:
+    assert _has_explicit_payment_failure([message]) is False
+
+
+def test_checkout_classifier_combines_payment_frame_evidence() -> None:
+    assert _has_explicit_payment_failure(
+        ["Pay now", "Offsite payment failed"]
+    ) is True
+
+
+def test_checkout_text_normalization_handles_smart_punctuation() -> None:
+    assert (
+        _normalize_checkout_text("Your payment couldn\u2019t be processed")
+        == "your payment couldn t be processed"
+    )
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows event-loop boundary")

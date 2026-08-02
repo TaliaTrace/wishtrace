@@ -18,6 +18,7 @@ from playwright.async_api import (
     APIResponse,
     Browser,
     BrowserContext,
+    Frame,
     Page,
     Playwright,
     async_playwright,
@@ -43,12 +44,33 @@ ORDER_ID_PATTERNS = (
         re.IGNORECASE,
     ),
 )
-EXPLICIT_DECLINE_PATTERNS = (
+EXPLICIT_PAYMENT_FAILURE_MARKERS = (
+    "payment failed",
+    "offsite payment failed",
     "card was declined",
+    "card is declined",
+    "card has been declined",
     "payment could not be processed",
+    "payment couldn t be processed",
+    "payment cannot be processed",
+    "payment can t be processed",
+    "payment could not be verified",
+    "payment couldn t be verified",
+    "payment cannot be verified",
+    "payment can t be verified",
     "there was an issue processing your payment",
+    "there was a problem processing your payment",
+    "there was an error processing your payment",
     "your payment was declined",
+    "your payment is declined",
+    "your payment has been declined",
     "transaction was declined",
+)
+TRUSTED_PAYMENT_FRAME_HOSTS = frozenset(
+    {
+        SHOPIFY_CARD_HOST,
+        "checkout.shopify.com",
+    }
 )
 SAFE_TEXT_PATTERN = re.compile(r"^[^\x00-\x1f\x7f]{1,200}$")
 PHONE_PATTERN = re.compile(r"^[0-9+(). -]{7,32}$")
@@ -878,9 +900,9 @@ async def _fill_optional_frame_field(
 async def _observe_checkout_outcome(
     page: Page,
 ) -> tuple[MerchantCheckoutOutcome, str | None, str]:
-    for _ in range(45):
+    for _ in range(60):
         await page.wait_for_timeout(1000)
-        body = (await page.locator("body").inner_text()).strip()
+        body = await _visible_frame_text(page.main_frame)
         folded = body.casefold()
         parsed = urlsplit(page.url)
         if "thank_you" in parsed.path or any(
@@ -894,7 +916,18 @@ async def _observe_checkout_outcome(
                     order_id,
                     "MERCHANT_ORDER_VERIFIED",
                 )
-        if any(marker in folded for marker in EXPLICIT_DECLINE_PATTERNS):
+        evidence = [body]
+        for frame in page.frames:
+            if frame is page.main_frame:
+                continue
+            if (
+                urlsplit(frame.url).hostname or ""
+            ).casefold() not in TRUSTED_PAYMENT_FRAME_HOSTS:
+                continue
+            frame_text = await _visible_frame_text(frame)
+            if frame_text:
+                evidence.append(frame_text)
+        if _has_explicit_payment_failure(evidence):
             return (
                 MerchantCheckoutOutcome.DECLINED,
                 None,
@@ -905,6 +938,21 @@ async def _observe_checkout_outcome(
         None,
         "MERCHANT_CHECKOUT_OUTCOME_UNKNOWN",
     )
+
+
+async def _visible_frame_text(frame: Frame) -> str:
+    with suppress(Exception):
+        return (await frame.locator("body").inner_text(timeout=1_500)).strip()
+    return ""
+
+
+def _has_explicit_payment_failure(values: list[str]) -> bool:
+    normalized = _normalize_checkout_text("\n".join(values))
+    return any(marker in normalized for marker in EXPLICIT_PAYMENT_FAILURE_MARKERS)
+
+
+def _normalize_checkout_text(value: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()).split())
 
 
 def _extract_order_id(value: str) -> str | None:

@@ -120,6 +120,7 @@ enum class CandidateRejectionReason {
     OVER_BUDGET,
     LATE_DELIVERY,
     EXCLUDED,
+    RECENTLY_ATTEMPTED,
 }
 
 data class CandidateRejection(

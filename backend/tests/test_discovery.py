@@ -182,6 +182,7 @@ def _context() -> DiscoveryContext:
         dislikes=["pink"],
         budget_minor=8000,
         currency="USD",
+        previous_product_ids=frozenset(),
     )
 
 
@@ -308,6 +309,71 @@ async def test_discovery_maps_merchant_failure_to_safe_api_error() -> None:
         assert error.recoverable is True
     else:
         raise AssertionError("merchant failure should be mapped")
+
+
+async def test_discovery_prefers_fresh_live_product_after_prior_attempt() -> None:
+    context = _context()
+    context = DiscoveryContext(
+        recipient_id=context.recipient_id,
+        occasion_id=context.occasion_id,
+        interests=context.interests,
+        dislikes=context.dislikes,
+        budget_minor=context.budget_minor,
+        currency=context.currency,
+        previous_product_ids=frozenset({"product-1"}),
+    )
+    store = RecordingStore(context)
+    merchant = RecordingMerchant(
+        [_candidate(product_id="product-1"), _candidate(product_id="product-2")]
+    )
+    service = DiscoveryService(
+        store=store,
+        merchant=merchant,
+        allow_stored_value_products=False,
+    )
+
+    response = await service.create(
+        uuid.uuid4(),
+        DiscoveryCreate(
+            recipient_id=context.recipient_id,
+            occasion_id=context.occasion_id,
+        ),
+    )
+
+    assert response.candidates[0].eligible is False
+    assert response.candidates[0].rejection is not None
+    assert response.candidates[0].rejection.code == "RECENTLY_ATTEMPTED"
+    assert response.candidates[1].eligible is True
+
+
+async def test_discovery_keeps_prior_product_when_no_fresh_live_option_exists() -> None:
+    context = _context()
+    context = DiscoveryContext(
+        recipient_id=context.recipient_id,
+        occasion_id=context.occasion_id,
+        interests=context.interests,
+        dislikes=context.dislikes,
+        budget_minor=context.budget_minor,
+        currency=context.currency,
+        previous_product_ids=frozenset({"product-1"}),
+    )
+    store = RecordingStore(context)
+    merchant = RecordingMerchant([_candidate(product_id="product-1")])
+    service = DiscoveryService(
+        store=store,
+        merchant=merchant,
+        allow_stored_value_products=False,
+    )
+
+    response = await service.create(
+        uuid.uuid4(),
+        DiscoveryCreate(
+            recipient_id=context.recipient_id,
+            occasion_id=context.occasion_id,
+        ),
+    )
+
+    assert response.candidates[0].eligible is True
 
 
 async def test_authenticated_discovery_routes_keep_user_ownership() -> None:

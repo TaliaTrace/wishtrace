@@ -208,7 +208,9 @@ fun MandateSetupScreen(
                     )
                     MandateSetupStep.UNKNOWN -> TerminalState(
                         title = "Result still unknown",
-                        message = "WishTrace will not claim the autopilot is on. Refresh to reconcile.",
+                        message = "The merchant result could not be confirmed, so this one-time " +
+                            "card is locked and will not be reused. You can choose a different " +
+                            "gift in a separate approval.",
                     )
                 }
             }
@@ -616,15 +618,28 @@ private fun MandateActionBar(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                MandateSetupStep.UNKNOWN,
-                -> SecondaryAction(
-                    text = "Refresh result",
-                    onClick = onRefresh,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.busy,
-                )
+                MandateSetupStep.UNKNOWN -> {
+                    PrimaryAction(
+                        text = "Choose another gift",
+                        onClick = onChooseAnotherGift,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    SecondaryAction(
+                        text = "Refresh result",
+                        onClick = onRefresh,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.busy,
+                    )
+                }
 
-                else -> Unit
+                MandateSetupStep.IDLE,
+                MandateSetupStep.LOADING,
+                -> SecondaryAction(
+                    text = "Loading…",
+                    onClick = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = false,
+                )
             }
         }
     }

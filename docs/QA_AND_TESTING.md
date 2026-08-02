@@ -39,7 +39,9 @@
 - late delivery;
 - missing delivery data;
 - stale price;
-- unsupported merchant.
+- unsupported merchant;
+- prior product recedes when a different live eligible candidate exists;
+- prior product remains eligible when live inventory has no valid alternative.
 
 ## Model cases
 

@@ -8,7 +8,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
 | Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260803_0014` | Codex | 2026-08-03 01:54 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 154 tests; healthy Azure revision `wishtrace-api--statefix1` serves 100% traffic | Codex | 2026-08-03 03:21 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 156 tests; healthy Azure revision `wishtrace-api--freshgifts1` serves 100% traffic | Codex | 2026-08-03 03:34 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
@@ -16,7 +16,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL LIVE PASS — four exact products have live facts; a tokenized Drawful 2 Pay attempt occurred, with no confirmed order or decline | Codex | 2026-08-03 03:17 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — sticky-unknown recovery, existing-mandate routing and branded secure Prava handoff built, tested, linted and installed in place | Codex | 2026-08-03 03:21 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — fresh-gift recovery, sticky-unknown state and secure Prava handoff built, tested, linted and installed in place | Codex | 2026-08-03 03:34 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
@@ -29,19 +29,36 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Deploy/install the sticky-unknown fix so Prava's still-active authorization cannot erase the
-   unresolved post-mint merchant result or trigger another one-time card.
-2. Freeze the backend at the observed boundary: approval, credential mint and one tokenized Jackbox
-   Pay attempt are proven; merchant decline/order and Prava report are not.
-3. Move immediately to the red/blue/green/yellow bento-question UX and submission pass.
+1. Let the user run one bounded physical-phone recovery: unknown result → choose another live gift →
+   fresh approval → automatic merchant proof. Do not retry or double-tap an unresolved operation.
+2. Capture the exact authoritative result without claiming an order or accepted decline early.
+3. Freeze backend behavior, then move immediately to the red/blue/green/yellow bento-question UX
+   and submission pass.
 
 ## Next
 
-1. Set Zaid's budget to at least `$10` to expose distinct live games, then verify manual selection.
+1. Confirm the new run leads with a different verified product when one remains eligible.
 2. Capture the exact Prava/merchant result without claiming an order.
 3. Move immediately to the UX/submission pass after the single bounded payment proof.
 
 ## Milestone evidence
+
+### 2026-08-03 — Fresh verified gift recovery deployed
+
+- Discovery now remembers merchant product IDs already selected into a mandate for the same user and
+  occasion. After all commerce constraints pass, a prior selection recedes only when another live,
+  eligible product exists; it is never replaced by random or invented inventory.
+- If no fresh eligible product remains, WishTrace keeps the valid prior product rather than creating
+  a false empty state. The Android client recognizes the factual `RECENTLY_ATTEMPTED` rejection and
+  the locked-unknown screen offers one explicit `Choose another gift` recovery.
+- Evidence: focused discovery tests cover both rotation and honest exhaustion; the full backend suite
+  passes 156 tests plus Ruff and strict mypy. Android assemble, unit tests and lint pass. ACR run
+  `chh` produced digest `sha256:af67d20f4dbd7449083cb9d1ab17ef735a0bd58134c1d9ad82b8c08ecda3ef29`;
+  healthy revision `wishtrace-api--freshgifts1` serves 100% traffic. Public health confirms
+  PostgreSQL 17.6 over TLS, UCP returns 200 with `public, max-age=300`, and the APK installed in
+  place on the physical phone.
+- Truth boundary: freshness is deterministic and runtime-live, but the new physical-phone recovery
+  has not yet produced an authoritative merchant result.
 
 ### 2026-08-03 — Tokenized merchant attempt completed; unresolved result locked
 

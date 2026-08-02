@@ -587,3 +587,18 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: Reconcile only from new authoritative merchant/Prava evidence. Never clear the
   unknown state merely because the mandate remains active.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 03:34 PKT — Freshness is deterministic, not random
+
+- Context: Re-entering discovery after an unresolved purchase could rank the same valid product
+  again, making the recovery feel stuck even while other live products remained eligible.
+- Decision: Record prior product identity through the occasion's immutable mandate history. Apply
+  every checkout, availability, variant, budget and dislike constraint first, then reject a prior
+  selection as `RECENTLY_ATTEMPTED` only when at least one fresh candidate already passed those
+  constraints. Never alter price facts or invent products to force novelty.
+- Consequence: Each subsequent choice leads with a genuinely different live gift while alternatives
+  remain. Once the verified catalog is exhausted, WishTrace honestly permits the valid prior item
+  instead of showing fake variety or an artificial no-results state.
+- Rollback/fallback: Remove only the freshness preference if merchant product identity proves
+  unstable; keep the immutable mandate audit and all hard commerce filters.
+- Owner: WishTrace team / Codex

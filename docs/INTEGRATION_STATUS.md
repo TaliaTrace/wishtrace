@@ -88,11 +88,11 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   WishTrace's exact-product Playwright actor is therefore the correct post-mint implementation.
 - Known blocker: none that justifies another payment attempt. The observed post-mint merchant result
   is unknown and must remain locked; UX/submission work proceeds without claiming a decline/order.
-- Last verified: 2026-08-03 03:21 PKT
-- Evidence location: migration `20260803_0014`; ACR build `chg`, image digest
-  `sha256:0ca8f34bccd0a20f6481985da76f0f7384770ec93e24e7a566d2b2c4a2e1bd37`, and healthy deployed
-  revision `wishtrace-api--statefix1` at 100% traffic. Public health reports PostgreSQL 17.6 over
-  TLS; the UCP profile returns 200 with `public, max-age=300`; 154 backend tests plus Android
+- Last verified: 2026-08-03 03:34 PKT
+- Evidence location: migration `20260803_0014`; ACR build `chh`, image digest
+  `sha256:af67d20f4dbd7449083cb9d1ab17ef735a0bd58134c1d9ad82b8c08ecda3ef29`, and healthy deployed
+  revision `wishtrace-api--freshgifts1` at 100% traffic. Public health reports PostgreSQL 17.6 over
+  TLS; the UCP profile returns 200 with `public, max-age=300`; 156 backend tests plus Android
   build/unit/lint pass; the matching APK installed in place. No credential, card data or provider
   payload is retained.
 
@@ -107,6 +107,10 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Backup merchant/path: none enabled; HyperX physical was retired because the user has no US
   shipping address, and Turtle Beach's digital card starts at $50
 - Mode: live only; no controlled/runtime fixture fallback
+- Repeat-discovery rule: product IDs already selected into a mandate for the same occasion recede
+  only when another candidate has independently passed every live commerce constraint. If live
+  inventory has no fresh eligible alternative, the prior product remains available; WishTrace does
+  not fabricate variety.
 - UCP profile verified: YES — `checkout.jackboxgames.com/.well-known/ucp` advertises UCP
   `2026-04-08`, Shopify catalog/cart/checkout/order, and card payment handlers. An app UCP search
   still requires the permanent public WishTrace profile URL after deployment.
@@ -212,15 +216,15 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   The user then created one real runtime recipient/occasion context and a force-stop/relaunch restored
   it from the backend.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
-  Apps behind managed HTTPS; healthy revision `wishtrace-api--statefix1` receives 100% traffic
+  Apps behind managed HTTPS; healthy revision `wishtrace-api--freshgifts1` receives 100% traffic
 - Custom tab/hosted approval verified: LIVE SANDBOX PASS — AndroidX Browser `1.10.0` opened the real
   Prava sandbox collection host, the user completed approval, the app return reconciled an active
   `$10` mandate, and Prava later issued one one-time credential to the backend-only merchant path.
   An earlier standard purchase-intent session remains truthfully recorded as terminal `FAILED`.
-- App link verified: DEVICE RECOVERY PASS — a synthetic return carrying only a random, nonexistent
-  UUID reached the singleTop activity, called the authenticated public backend and rendered its safe
-  `PURCHASE_INTENT_NOT_FOUND` recovery instead of trusting browser state. An actual Prava return
-  remains pending.
+- App link verified: LIVE SANDBOX PASS — a real hosted approval returned to WishTrace and reconciled
+  its exact active mandate. A synthetic return carrying only a random, nonexistent UUID also reached
+  the singleTop activity and rendered safe `PURCHASE_INTENT_NOT_FOUND` recovery instead of trusting
+  browser state.
 - Process recreation tested: PASS for authenticated recipient/home recovery after a physical-device
   force-stop/relaunch; payment-return process-death recovery still needs the hosted run.
 - Accessibility checked: primary/back targets asserted at 48dp; semantic headings/labels and onboarding page semantics present; core contrast pairs are 5.95:1–14.91:1; onboarding captured at 130% text scale; motion snaps when animator duration is disabled. TalkBack/manual switch-access testing remains pending.

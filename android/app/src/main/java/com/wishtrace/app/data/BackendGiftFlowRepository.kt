@@ -390,6 +390,7 @@ private fun rejectionReason(code: String): CandidateRejectionReason = when (code
     "MISSING_VARIANT" -> CandidateRejectionReason.MISSING_VARIANT
     "OVER_BUDGET" -> CandidateRejectionReason.OVER_BUDGET
     "EXPLICIT_DISLIKE" -> CandidateRejectionReason.EXCLUDED
+    "RECENTLY_ATTEMPTED" -> CandidateRejectionReason.RECENTLY_ATTEMPTED
     else -> throw invalidResponse()
 }
 

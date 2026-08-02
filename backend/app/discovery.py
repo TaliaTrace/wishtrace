@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.commerce import (
     AvailabilityState,
     CandidateEvaluation,
+    CandidateRejection,
     DeliveryState,
     MerchantGatewayError,
     MerchantSearchResult,
@@ -23,6 +24,7 @@ from app.models import (
     CandidateRejectionModel,
     CandidateSnapshotModel,
     DiscoveryRunModel,
+    MandateModel,
     OccasionModel,
     RecipientModel,
     RecipientPreferenceModel,
@@ -100,6 +102,7 @@ class DiscoveryContext:
     dislikes: list[str]
     budget_minor: int
     currency: Literal["USD"]
+    previous_product_ids: frozenset[str]
 
 
 class DiscoveryStore(Protocol):
@@ -182,6 +185,10 @@ class DiscoveryService:
             dislikes=context.dislikes,
             allow_stored_value_products=self._allow_stored_value_products,
         )
+        evaluations = _prefer_fresh_candidates(
+            evaluations,
+            previous_product_ids=context.previous_product_ids,
+        )
         return await self._store.persist_completed(
             user_id=user_id,
             context=context,
@@ -258,6 +265,16 @@ class SqlDiscoveryStore:
             # relationship and occasion carry the first-pass ranking, so an empty
             # interest list is a valid partial profile rather than an error.
             interests = [item.value for item in preferences if item.kind == "INTEREST"]
+            previous_product_ids = frozenset(
+                (
+                    await session.scalars(
+                        select(MandateModel.merchant_product_id).where(
+                            MandateModel.user_id == user_id,
+                            MandateModel.occasion_id == occasion_id,
+                        )
+                    )
+                ).all()
+            )
             return DiscoveryContext(
                 recipient_id=recipient.id,
                 occasion_id=occasion.id,
@@ -265,6 +282,7 @@ class SqlDiscoveryStore:
                 dislikes=[item.value for item in preferences if item.kind == "DISLIKE"],
                 budget_minor=occasion.budget_minor,
                 currency="USD",
+                previous_product_ids=previous_product_ids,
             )
 
     async def persist_completed(
@@ -430,6 +448,42 @@ def _catalog_query(interests: list[str]) -> str:
     # ranking receives distinct products instead of a single denomination.
     first = next((interest.strip() for interest in interests if interest.strip()), "")
     return first or "games"
+
+
+def _prefer_fresh_candidates(
+    evaluations: list[CandidateEvaluation],
+    *,
+    previous_product_ids: frozenset[str],
+) -> list[CandidateEvaluation]:
+    """Prefer a new verified gift without manufacturing variety.
+
+    Previously selected products recede only when at least one other candidate already
+    passed every hard commerce constraint. If live availability leaves no alternative,
+    the prior product stays eligible rather than turning a valid search into a fake empty state.
+    """
+
+    has_fresh_eligible = any(
+        evaluation.eligible
+        and evaluation.candidate.merchant_product_id not in previous_product_ids
+        for evaluation in evaluations
+    )
+    if not has_fresh_eligible:
+        return evaluations
+    return [
+        evaluation.model_copy(
+            update={
+                "rejection": CandidateRejection(
+                    candidate_source_key=evaluation.candidate.source_key,
+                    code=RejectionCode.RECENTLY_ATTEMPTED,
+                    reason="Already selected for this occasion; showing a fresh option first.",
+                )
+            }
+        )
+        if evaluation.eligible
+        and evaluation.candidate.merchant_product_id in previous_product_ids
+        else evaluation
+        for evaluation in evaluations
+    ]
 
 
 def _not_found(code: str, message: str) -> ApiError:

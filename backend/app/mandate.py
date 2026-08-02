@@ -892,8 +892,7 @@ class SqlMandateStore:
             mandate.provider_status = PravaMandateStatus.PENDING.value
             mandate.last_response_id = session.response_id
             _transition(mandate, MandateState.AWAITING_APPROVAL)
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def fail_setup(
         self,
@@ -910,8 +909,7 @@ class SqlMandateStore:
                 mandate,
                 MandateState.UNKNOWN if unknown else MandateState.FAILED,
             )
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def get(
         self,
@@ -938,8 +936,7 @@ class SqlMandateStore:
             target = _state_from_mandate_status(info.status, MandateState(mandate.state))
             if target is not MandateState(mandate.state):
                 _transition(mandate, target)
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def begin_charge(
         self,
@@ -1008,8 +1005,7 @@ class SqlMandateStore:
                 mandate,
                 MandateState.UNKNOWN if outcome_unknown else MandateState.FAILED,
             )
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def record_charge_declined(
         self,
@@ -1027,8 +1023,7 @@ class SqlMandateStore:
             charge.provider_error_code = error_code
             _set_charge_state(charge, MandateChargeState.DECLINED)
             _transition(mandate, MandateState.DECLINED)
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def begin_charge_checkout(
         self,
@@ -1044,8 +1039,7 @@ class SqlMandateStore:
             charge.provider_charge_id = provider_charge_id
             _set_charge_state(charge, MandateChargeState.CHECKOUT_IN_PROGRESS)
             _transition(mandate, MandateState.CHECKOUT_IN_PROGRESS)
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def record_charge_checkout(
         self,
@@ -1079,8 +1073,7 @@ class SqlMandateStore:
                 _transition(mandate, MandateState.UNKNOWN)
             mandate.merchant_order_id = result.order_id
             mandate.merchant_outcome = result.outcome.value
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def mark_charge_unknown(
         self,
@@ -1099,8 +1092,7 @@ class SqlMandateStore:
             _set_charge_state(charge, MandateChargeState.UNKNOWN)
             if MandateState(mandate.state) is not MandateState.UNKNOWN:
                 _transition(mandate, MandateState.UNKNOWN)
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
     async def settle_charge(
         self,
@@ -1138,8 +1130,7 @@ class SqlMandateStore:
             else:
                 _transition(mandate, MandateState.CONSUMED)
                 mandate.provider_status = PravaMandateStatus.CONSUMED.value
-            await db.flush()
-            return await _mandate_response(db, mandate)
+            return await _flush_mandate_response(db, mandate)
 
 
 def _keyed_hash(pepper: bytes, purpose: str, value: bytes) -> bytes:
@@ -1306,6 +1297,22 @@ async def _mandate_response(
         created_at=mandate.created_at,
         updated_at=mandate.updated_at,
     )
+
+
+async def _flush_mandate_response(
+    session: AsyncSession,
+    mandate: MandateModel,
+) -> MandateResponse:
+    """Flush server-managed timestamps, then reload before synchronous serialization.
+
+    PostgreSQL expires ``updated_at`` after the SQL ``onupdate`` expression. Accessing that
+    expired attribute from Pydantic serialization would otherwise trigger implicit async IO and
+    SQLAlchemy's ``MissingGreenlet`` error.
+    """
+
+    await session.flush()
+    await session.refresh(mandate)
+    return await _mandate_response(session, mandate)
 
 
 # Kept for symmetry with app.purchase; JSON canonicalization for future keys.

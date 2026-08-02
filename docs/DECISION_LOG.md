@@ -328,3 +328,26 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback: Set both staging flags false to make the candidate deterministically ineligible without
   changing or redeploying code.
 - Owner: WishTrace team / Codex
+
+### 2026-08-02 22:11 PKT — Associate mandates from current Prava facts, never a guessed session field
+
+- Context: The current Prava create-session response returns a hosted session but no mandate ID;
+  charge and report responses use camelCase identities, nested one-use credentials and
+  `awaiting_result`. The initial mandate implementation assumed older response fields.
+- Evidence: Current official Create Session, List Mandates, Charge a Mandate and Report a Mandate
+  Charge documentation was checked against the published REST examples. The real sandbox list
+  endpoint parsed through the corrected adapter. A physical-phone setup retry also exposed the safe
+  provider error `DUPLICATE_EXTERNAL_ORDER_REF` after an earlier created session lost its local row
+  to an ORM serialization rollback.
+- Decision: After hosted return, discover the mandate only through Prava's customer-scoped list and
+  bind it when time, merchant, amount, currency, frequency and scope all match; refuse zero/ambiguous
+  facts rather than guessing. Parse the current charge/report identities exactly and keep one-use
+  credentials in backend memory only. Give each persisted setup attempt its own external order
+  reference while retaining duplicate-tap protection for that attempt.
+- Consequence: A hosted session cannot falsely arm an unrelated mandate, and a recoverable retry
+  cannot collide with an abandoned provider session. Azure revision `wishtrace-api--pravafcf597f`
+  is healthy and has opened a fresh hosted sandbox session on the physical phone. Approval, charge,
+  merchant attempt and report remain pending and are not claimed.
+- Rollback/fallback: If Prava's list response cannot uniquely identify the current setup, leave the
+  mandate awaiting approval and require support/recovery; never select the newest mandate by guess.
+- Owner: WishTrace team / Codex

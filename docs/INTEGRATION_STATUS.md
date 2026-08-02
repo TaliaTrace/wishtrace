@@ -5,19 +5,24 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 ## Prava
 
 - Environment: sandbox configured in ignored local environment
-- Path: hosted full-checkout API through the backend; official polling + report-status
+- Path: hosted mandate setup through the backend; customer-scoped mandate association; official
+  charge + mandate-report; exact one-shot merchant browser attempt
 - Dashboard/API key created: YES (user-provided environment; value never recorded here)
 - Authentication request verified: YES during official window — authenticated missing-session probe
   returned expected `404 NOT_FOUND`, response `9fecc0ee-838b-40c4-9ece-048f5f16bb5c`
-- Session creation verified: CONTRACT + MOCK TRANSPORT — exact decimal money, hosted URL allowlist,
-  response-ID capture and session-token discard tested; the live judged-window session is the next
-  physical-phone step
-- Hosted approval verified:
+- Session creation verified: LIVE SANDBOX — a real authorize-only mandate setup session was created
+  by the deployed backend and its allowlisted hosted URL opened in an Android Custom Tab. Exact
+  decimal money, response-ID handling and session-token discard also pass transport tests.
+- Hosted approval verified: IN PROGRESS — the real hosted page is open for the user's private
+  organizer-issued sandbox card and passkey step; no card-page screenshot or dump was taken
 - App return verified:
-- Payment-result polling verified: CONTRACT + MOCK TRANSPORT — credentials remain masked and
-  memory-only; no live approval result polled yet
-- Report-status verified: CONTRACT + MOCK TRANSPORT — only the documented purchase outcome fields
-  are sent; no live merchant attempt has been reported yet
+- Mandate association verified: LIVE LIST + CONTRACT — the real sandbox list endpoint parsed through
+  the production adapter; it returned zero before approval. Post-return association matches customer,
+  time, merchant, amount, currency, frequency and scope and refuses ambiguity.
+- Mandate charge verified: CURRENT CONTRACT + MOCK TRANSPORT — current `mandateId`, `transactionId`,
+  nested credentials and `awaiting_result` shape pass; credentials remain masked and memory-only.
+- Mandate report verified: CURRENT CONTRACT + MOCK TRANSPORT — current completed/failed result,
+  mandate/transaction identity and Visa confirmation are checked; no live charge has been reported.
 - Real-merchant browser attempt verified:
 - Authoritative success verified:
 - Decline/cancel/unknown tested: create timeout, server error, unsafe redirect and malformed success
@@ -31,12 +36,14 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   checkout becomes `UNKNOWN` and is not blindly retried. If the merchant result was persisted before
   report-status was interrupted, reconciliation re-reports that result and never checks out again.
   Prava facts must match the approved merchant origin and total.
-- Known blockers: no judged-window hosted session, tokenized-card attempt or authoritative provider
-  result yet. Staging permits the exact $5 stored-value path solely for the organizer-required
-  sandbox expected-failure proof; production compatibility still requires Prava approval/evidence.
-- Last verified: 2026-08-02 00:37 PKT
-- Evidence location: safe response ID above; `backend/app/prava.py`, `backend/app/purchase.py` and
-  isolated transport/state tests; no credential or provider payload retained
+- Known blockers: the live hosted session still needs the user's private card/passkey completion,
+  deep-link return, one mandate charge, merchant attempt and authoritative report. Staging permits
+  the exact $5 stored-value path solely for the organizer-required sandbox expected-failure proof;
+  production compatibility still requires Prava approval/evidence.
+- Last verified: 2026-08-02 22:11 PKT
+- Evidence location: safe response ID above; deployed revision
+  `wishtrace-api--pravafcf597f`; `backend/app/prava.py`, `backend/app/mandate.py` and isolated
+  transport/state tests. No credential, card data or provider payload retained.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -117,18 +124,19 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Path: session pooler on port 5432 with SQLAlchemy async psycopg 3 and `NullPool`
 - Client TLS verified: YES via libpq `ssl_in_use`
 - Server version observed: PostgreSQL 17.6
-- Migration status: `20260801_0009 (head)`; Alembic model/schema drift check passes
+- Migration status: `20260801_0011 (head)`; Alembic model/schema drift check passes
 - Migration content: foundation; Google users/challenges/sessions; owned recipients, preferences,
   hints and occasions; one-recipient Gold uniqueness; owned immutable discovery runs, live candidate
   snapshots and deterministic rejection records; exact purchase snapshots, public Prava session
   identifiers, hashed idempotency operations and immutable transaction transitions; owned ranking
   runs, immutable evidence snapshots and ordered evidence-linked decisions; idempotent merchant
-  quotes, merchant/Prava outcome evidence, and one owned editable personal message per purchase
+  quotes, merchant/Prava outcome evidence, one owned editable personal message per purchase, owned
+  mandate/charge audit rows, Gift-DNA personality/age evidence and explicit occasion recurrence
 - Permanent ignored local `.env` contains `sslmode=require`: YES; a fresh settings load and read-only
   connection probe used that value directly and reported client TLS true
 - Stable local `SESSION_TOKEN_PEPPER`: YES; presence and minimum length were checked without printing
   the value
-- Last verified: 2026-08-01 23:23 PKT during official window
+- Last verified: 2026-08-02 22:11 PKT during official window
 
 ## Android
 
@@ -147,8 +155,8 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   it from the backend.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
   Apps behind managed HTTPS; one healthy revision receives 100% traffic
-- Custom tab/hosted approval verified: CODE + BUILD — AndroidX Browser `1.10.0` opens only the exact
-  HTTPS sandbox/production Prava collection hosts; an actual hosted session remains pending
+- Custom tab/hosted approval verified: LIVE OPEN — AndroidX Browser `1.10.0` opened the real Prava
+  sandbox collection host from an app-created session; user approval and actual return remain pending
 - App link verified: DEVICE RECOVERY PASS — a synthetic return carrying only a random, nonexistent
   UUID reached the singleTop activity, called the authenticated public backend and rendered its safe
   `PURCHASE_INTENT_NOT_FOUND` recovery instead of trusting browser state. An actual Prava return
@@ -163,9 +171,9 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   user-authorized editable 2026-08-09 sandbox occasion, restored it after restart, retrieved the
   real Jackbox $5 candidate and rendered the grounded Azure ranking. The date is not claimed as the
   recipient's verified birthday.
-- Known blockers: the app is at the just-in-time billing form. Exact live quote, Prava hosted
-  interaction, tokenized merchant attempt, authoritative reconciliation and persisted message remain
-  unproven until the user completes the private billing and hosted approval steps.
+- Known blockers: the app is in the real Prava hosted mandate flow. Card/passkey completion, actual
+  deep-link return, tokenized merchant attempt, authoritative reconciliation and persisted message
+  remain unproven until the user completes the private hosted step.
 
 ## Demo
 

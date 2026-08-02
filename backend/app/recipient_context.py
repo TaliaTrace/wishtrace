@@ -11,14 +11,46 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.errors import ApiError
 from app.models import HintModel, OccasionModel, RecipientModel, RecipientPreferenceModel
 
+AgeBand = Literal["child", "teen", "young_adult", "adult", "senior"]
+
+
+class PersonalityTraits(BaseModel):
+    """Green-tile "Gift DNA": three binary axes, all optional.
+
+    Captured from three either/or taps rather than free-text so onboarding needs
+    zero typing. Any axis may be omitted; an empty object means "no signal yet".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # ⚔️ Competitive ↔ 🌿 Chill
+    energy: Literal["competitive", "chill"] | None = None
+    # 📱 Screens ↔ 🏔️ Outdoors
+    environment: Literal["screens", "outdoors"] | None = None
+    # ✨ Trendy ↔ 📻 Nostalgic
+    style: Literal["trendy", "nostalgic"] | None = None
+
+    def as_storage(self) -> dict[str, str] | None:
+        """Only persist axes the owner actually set; None when nothing is set."""
+        stored = {
+            key: value
+            for key, value in self.model_dump().items()
+            if value is not None
+        }
+        return stored or None
+
 
 class RecipientWrite(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     display_name: str = Field(min_length=1, max_length=100)
     relationship: str = Field(min_length=1, max_length=100)
-    interests: list[str] = Field(min_length=1, max_length=10)
+    # Interests are now optional: the green-tile taps (personality_traits) plus
+    # relationship and age band are enough for a strong first-pass ranking.
+    interests: list[str] = Field(default_factory=list, max_length=10)
     dislikes: list[str] = Field(default_factory=list, max_length=10)
+    personality_traits: PersonalityTraits = Field(default_factory=PersonalityTraits)
+    age_band: AgeBand | None = None
     hint: str | None = Field(default=None, max_length=1_000)
 
     @field_validator("interests", "dislikes")
@@ -55,6 +87,9 @@ class OccasionWrite(BaseModel):
     time_zone: str = Field(min_length=1, max_length=64)
     budget_minor: int = Field(gt=0, le=10_000_000)
     currency: Literal["USD"]
+    # Yellow-tile toggle: "Just this once" vs "Every year, automatically" — this
+    # is what arms the mandate as one-time vs recurring.
+    recurring_frequency: Literal["one_time", "yearly"] = "one_time"
     required_arrival_date: date | None = None
 
     @model_validator(mode="after")
@@ -91,6 +126,8 @@ class RecipientResponse(BaseModel):
     initials: str
     interests: list[str]
     dislikes: list[str]
+    personality_traits: PersonalityTraits
+    age_band: AgeBand | None
     hints: list[HintResponse]
 
 
@@ -104,6 +141,7 @@ class OccasionResponse(BaseModel):
     time_zone: str
     budget_minor: int
     currency: Literal["USD"]
+    recurring_frequency: Literal["one_time", "yearly"]
     required_arrival_date: date | None
 
 
@@ -180,12 +218,16 @@ class SqlContextStore:
                         user_id=user_id,
                         display_name=body.display_name,
                         relationship=body.relationship,
+                        personality_traits=body.personality_traits.as_storage(),
+                        age_band=body.age_band,
                     )
                     .on_conflict_do_update(
                         index_elements=[RecipientModel.user_id],
                         set_={
                             "display_name": body.display_name,
                             "relationship": body.relationship,
+                            "personality_traits": body.personality_traits.as_storage(),
+                            "age_band": body.age_band,
                             "updated_at": now,
                         },
                     )
@@ -196,6 +238,8 @@ class SqlContextStore:
                 recipient = await _owned_recipient(session, user_id, recipient_id, lock=True)
                 recipient.display_name = body.display_name
                 recipient.relationship = body.relationship
+                recipient.personality_traits = body.personality_traits.as_storage()
+                recipient.age_band = body.age_band
                 recipient.updated_at = datetime.now(UTC)
 
             await session.execute(
@@ -265,6 +309,7 @@ class SqlContextStore:
                         time_zone=body.time_zone,
                         budget_minor=body.budget_minor,
                         currency=body.currency,
+                        recurring_frequency=body.recurring_frequency,
                         required_arrival_date=body.required_arrival_date,
                     )
                     session.add(occasion)
@@ -292,6 +337,7 @@ class SqlContextStore:
             occasion.time_zone = body.time_zone
             occasion.budget_minor = body.budget_minor
             occasion.currency = body.currency
+            occasion.recurring_frequency = body.recurring_frequency
             occasion.required_arrival_date = body.required_arrival_date
             occasion.updated_at = datetime.now(UTC)
             await session.flush()
@@ -373,6 +419,10 @@ async def _recipient_response(
         initials=_initials(recipient.display_name),
         interests=[item.value for item in preferences if item.kind == "INTEREST"],
         dislikes=[item.value for item in preferences if item.kind == "DISLIKE"],
+        personality_traits=PersonalityTraits.model_validate(
+            recipient.personality_traits or {}
+        ),
+        age_band=recipient.age_band,
         hints=[
             HintResponse(
                 id=hint.id,
@@ -393,6 +443,7 @@ def _occasion_response(occasion: OccasionModel) -> OccasionResponse:
         time_zone=occasion.time_zone,
         budget_minor=occasion.budget_minor,
         currency="USD",
+        recurring_frequency=occasion.recurring_frequency,
         required_arrival_date=occasion.required_arrival_date,
     )
 

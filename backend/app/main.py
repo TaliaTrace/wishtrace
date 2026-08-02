@@ -21,6 +21,12 @@ from app.discovery import (
 )
 from app.discovery_api import build_discovery_router
 from app.errors import register_error_handlers
+from app.mandate import (
+    MandateOperations,
+    UnavailableMandateService,
+    build_mandate_service,
+)
+from app.mandate_api import build_mandate_router
 from app.merchant_browser import JackboxPlaywrightCheckoutGateway
 from app.message import MessageOperations, SqlMessageStore
 from app.message_api import build_message_router
@@ -51,6 +57,7 @@ def create_app(
     context_operations: ContextOperations | None = None,
     discovery_operations: DiscoveryOperations | None = None,
     purchase_operations: PurchaseOperations | None = None,
+    mandate_operations: MandateOperations | None = None,
     ranking_operations: RankingOperations | None = None,
     message_operations: MessageOperations | None = None,
 ) -> FastAPI:
@@ -149,6 +156,33 @@ def create_app(
                 resolved_purchase_operations = UnavailablePurchaseService()
         else:
             resolved_purchase_operations = UnavailablePurchaseService()
+    resolved_mandate_operations = mandate_operations
+    if resolved_mandate_operations is None and session_factory is not None:
+        # The mandate autopilot needs the same live Prava + checkout footing as
+        # one-time purchases: charge credentials get spent in a real merchant
+        # checkout, so both must be configured before it can arm.
+        if prava_checkout_ready and merchant_checkout is not None:
+            assert resolved_settings.prava_base_url is not None
+            assert resolved_settings.prava_secret_key is not None
+            assert resolved_settings.session_token_pepper is not None
+            try:
+                mandate_prava = PravaHttpGateway(
+                    base_url=str(resolved_settings.prava_base_url),
+                    secret_key=resolved_settings.prava_secret_key,
+                )
+                resolved_mandate_operations = build_mandate_service(
+                    session_factory=session_factory,
+                    prava=mandate_prava,
+                    public_base_url=str(resolved_settings.public_base_url),
+                    merchant_checkout=merchant_checkout,
+                    idempotency_pepper=(
+                        resolved_settings.session_token_pepper.get_secret_value()
+                    ),
+                )
+            except ValueError:
+                resolved_mandate_operations = UnavailableMandateService()
+        else:
+            resolved_mandate_operations = UnavailableMandateService()
     resolved_ranking_operations = ranking_operations
     if resolved_ranking_operations is None and session_factory is not None:
         ranking_gateway: RankingGateway = UnavailableRankingGateway()
@@ -199,6 +233,11 @@ def create_app(
         app.state.purchase_operations = resolved_purchase_operations
         app.include_router(
             build_purchase_router(resolved_settings.android_return_uri)
+        )
+    if resolved_mandate_operations is not None:
+        app.state.mandate_operations = resolved_mandate_operations
+        app.include_router(
+            build_mandate_router(resolved_settings.android_return_uri)
         )
     if resolved_ranking_operations is not None:
         app.state.ranking_operations = resolved_ranking_operations

@@ -69,6 +69,10 @@ class UserModel(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    mandates: Mapped[list["MandateModel"]] = orm_relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class AuthChallengeModel(Base):
@@ -114,6 +118,8 @@ class RecipientModel(Base):
     )
     display_name: Mapped[str] = mapped_column(String(100))
     relationship: Mapped[str] = mapped_column(String(100))
+    personality_traits: Mapped[dict[str, str] | None] = mapped_column(JSON)
+    age_band: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -183,6 +189,10 @@ class OccasionModel(Base):
         CheckConstraint("kind = 'BIRTHDAY'", name="ck_occasion_kind"),
         CheckConstraint("budget_minor > 0", name="ck_occasion_budget_positive"),
         CheckConstraint("currency = 'USD'", name="ck_occasion_currency_usd"),
+        CheckConstraint(
+            "recurring_frequency IN ('one_time', 'yearly')",
+            name="ck_occasion_recurring_frequency",
+        ),
         UniqueConstraint("recipient_id", "kind", name="uq_recipient_occasion_kind"),
     )
 
@@ -198,6 +208,9 @@ class OccasionModel(Base):
     time_zone: Mapped[str] = mapped_column(String(64))
     budget_minor: Mapped[int] = mapped_column(BigInteger)
     currency: Mapped[str] = mapped_column(String(3))
+    recurring_frequency: Mapped[str] = mapped_column(
+        String(16), server_default="one_time"
+    )
     required_arrival_date: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -213,6 +226,10 @@ class OccasionModel(Base):
         cascade="all, delete-orphan",
     )
     purchase_intents: Mapped[list["PurchaseIntentModel"]] = orm_relationship(
+        back_populates="occasion",
+        cascade="all, delete-orphan",
+    )
+    mandates: Mapped[list["MandateModel"]] = orm_relationship(
         back_populates="occasion",
         cascade="all, delete-orphan",
     )
@@ -438,7 +455,8 @@ class RankingEvidenceModel(Base):
     __tablename__ = "ranking_evidence"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('INTEREST', 'HINT', 'RELATIONSHIP', 'OCCASION')",
+            "kind IN ('INTEREST', 'HINT', 'RELATIONSHIP', 'OCCASION', "
+            "'PERSONALITY', 'AGE')",
             name="ck_ranking_evidence_kind",
         ),
         CheckConstraint("position >= 0", name="ck_ranking_evidence_position"),
@@ -748,3 +766,149 @@ class TransactionTransitionModel(Base):
     purchase_intent: Mapped[PurchaseIntentModel] = orm_relationship(
         back_populates="transitions"
     )
+
+
+class MandateModel(Base):
+    """A standing spend authorization armed once per occasion.
+
+    The owner approves this a single time with a passkey; WishTrace can then
+    charge within the cap when a moment nears, without re-approval. Card
+    credentials minted per charge are never persisted here — they stay in
+    backend memory for the length of a single checkout only.
+    """
+
+    __tablename__ = "mandates"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('SETUP_CREATING', 'AWAITING_APPROVAL', 'ACTIVE', "
+            "'CHARGING', 'CHECKOUT_IN_PROGRESS', 'REPORTING', 'SUCCEEDED', "
+            "'DECLINED', 'CONSUMED', 'PAUSED', 'CANCELLED', 'EXPIRED', "
+            "'FAILED', 'UNKNOWN')",
+            name="ck_mandate_state",
+        ),
+        CheckConstraint("currency = 'USD'", name="ck_mandate_currency_usd"),
+        CheckConstraint(
+            "approved_amount_minor > 0", name="ck_mandate_amount_positive"
+        ),
+        CheckConstraint("max_charges >= 1", name="ck_mandate_max_charges"),
+        CheckConstraint(
+            "recurring_frequency IN ('one_time', 'weekly', 'monthly', 'yearly')",
+            name="ck_mandate_recurring_frequency",
+        ),
+        CheckConstraint(
+            "merchant_scope IN ('listed', 'any')", name="ck_mandate_merchant_scope"
+        ),
+        CheckConstraint(
+            "visa_confirmation IS NULL OR visa_confirmation IN ('SUCCESS', 'FAILURE')",
+            name="ck_mandate_visa_confirmation",
+        ),
+        CheckConstraint(
+            "merchant_outcome IS NULL OR merchant_outcome IN "
+            "('ORDER_VERIFIED', 'DECLINED', 'UNKNOWN')",
+            name="ck_mandate_merchant_outcome",
+        ),
+        UniqueConstraint("occasion_id", name="uq_mandate_occasion"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    recipient_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("recipients.id", ondelete="CASCADE"), index=True
+    )
+    occasion_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("occasions.id", ondelete="CASCADE"), index=True
+    )
+    state: Mapped[str] = mapped_column(String(32))
+    approved_amount_minor: Mapped[int] = mapped_column(BigInteger)
+    currency: Mapped[str] = mapped_column(String(3))
+    recurring_frequency: Mapped[str] = mapped_column(String(16))
+    merchant_scope: Mapped[str] = mapped_column(String(16))
+    max_charges: Mapped[int] = mapped_column(Integer)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    merchant_id: Mapped[str] = mapped_column(String(100))
+    merchant_name: Mapped[str] = mapped_column(String(200))
+    merchant_url: Mapped[str] = mapped_column(Text)
+    merchant_product_id: Mapped[str] = mapped_column(String(255))
+    merchant_variant_id: Mapped[str] = mapped_column(String(255))
+    product_title: Mapped[str] = mapped_column(String(500))
+    item_price_minor: Mapped[int] = mapped_column(BigInteger)
+    setup_session_id: Mapped[str | None] = mapped_column(String(255))
+    setup_hosted_url: Mapped[str | None] = mapped_column(Text)
+    setup_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    setup_response_id: Mapped[str | None] = mapped_column(String(255))
+    provider_mandate_id: Mapped[str | None] = mapped_column(String(255), unique=True)
+    provider_status: Mapped[str | None] = mapped_column(String(32))
+    charges_used: Mapped[int] = mapped_column(Integer, server_default="0")
+    merchant_order_id: Mapped[str | None] = mapped_column(String(255))
+    merchant_outcome: Mapped[str | None] = mapped_column(String(32))
+    visa_confirmation: Mapped[str | None] = mapped_column(String(16))
+    last_response_id: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[UserModel] = orm_relationship(back_populates="mandates")
+    recipient: Mapped[RecipientModel] = orm_relationship()
+    occasion: Mapped[OccasionModel] = orm_relationship(back_populates="mandates")
+    charges: Mapped[list["MandateChargeModel"]] = orm_relationship(
+        back_populates="mandate",
+        cascade="all, delete-orphan",
+    )
+
+
+class MandateChargeModel(Base):
+    """An individual charge attempt against a mandate, for audit and idempotency.
+
+    Deduplicated by ``reference`` so a retried execute never double-charges.
+    """
+
+    __tablename__ = "mandate_charges"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('CHARGING', 'CHECKOUT_IN_PROGRESS', 'REPORTING', "
+            "'SUCCEEDED', 'DECLINED', 'FAILED', 'UNKNOWN')",
+            name="ck_mandate_charge_state",
+        ),
+        CheckConstraint(
+            "amount_minor > 0", name="ck_mandate_charge_amount_positive"
+        ),
+        CheckConstraint(
+            "visa_confirmation IS NULL OR visa_confirmation IN ('SUCCESS', 'FAILURE')",
+            name="ck_mandate_charge_visa_confirmation",
+        ),
+        CheckConstraint(
+            "merchant_outcome IS NULL OR merchant_outcome IN "
+            "('ORDER_VERIFIED', 'DECLINED', 'UNKNOWN')",
+            name="ck_mandate_charge_merchant_outcome",
+        ),
+        UniqueConstraint("mandate_id", "reference", name="uq_mandate_charge_reference"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    mandate_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("mandates.id", ondelete="CASCADE"), index=True
+    )
+    reference: Mapped[str] = mapped_column(String(255))
+    amount_minor: Mapped[int] = mapped_column(BigInteger)
+    state: Mapped[str] = mapped_column(String(32))
+    provider_charge_id: Mapped[str | None] = mapped_column(String(255))
+    provider_txn_ref_id: Mapped[str | None] = mapped_column(String(255))
+    provider_error_code: Mapped[str | None] = mapped_column(String(100))
+    merchant_order_id: Mapped[str | None] = mapped_column(String(255))
+    merchant_outcome: Mapped[str | None] = mapped_column(String(32))
+    visa_confirmation: Mapped[str | None] = mapped_column(String(16))
+    charge_response_id: Mapped[str | None] = mapped_column(String(255))
+    report_response_id: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    mandate: Mapped[MandateModel] = orm_relationship(back_populates="charges")

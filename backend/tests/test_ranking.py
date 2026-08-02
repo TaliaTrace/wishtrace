@@ -34,6 +34,7 @@ from app.ranking import (
     RankingStore,
     RankingUncertainty,
     ValidatedRanking,
+    deterministic_ranking,
 )
 
 
@@ -487,3 +488,61 @@ async def test_ranking_routes_require_authentication() -> None:
         )
         assert fetched.status_code == 200
         assert fetched.json()["model_request_id"] == "resp_model_1"
+
+
+def test_deterministic_ranking_grounds_a_persona_only_profile() -> None:
+    # No interests captured: only the green-tile personality taps and age band.
+    # The deterministic fallback must still ground a pick against the catalog.
+    package = _package().model_copy(
+        update={
+            "evidence": [
+                RankingEvidence(
+                    id="ev_relationship",
+                    kind=EvidenceKind.RELATIONSHIP,
+                    value="Sibling",
+                ),
+                RankingEvidence(
+                    id="ev_personality_env",
+                    kind=EvidenceKind.PERSONALITY,
+                    value="video games and streaming",
+                ),
+                RankingEvidence(
+                    id="ev_age",
+                    kind=EvidenceKind.AGE,
+                    value="popular teen games",
+                ),
+            ]
+        }
+    )
+
+    ranking = deterministic_ranking(package)
+
+    assert ranking is not None
+    # The gaming headset candidate carries "games" in its description/categories,
+    # so persona + age evidence lands on it over the fitness mat.
+    assert ranking.selected_candidate_id == package.candidates[0].id
+    cited = {
+        evidence_id
+        for rationale in ranking.rationales
+        for evidence_id in rationale.evidence_ids
+    }
+    assert "ev_personality_env" in cited or "ev_age" in cited
+
+
+def test_deterministic_ranking_ignores_relationship_only_profile() -> None:
+    # Relationship alone is not a usable ranking signal; with nothing else the
+    # fallback declines rather than guessing, deferring to a user choice.
+    package = _package().model_copy(
+        update={
+            "evidence": [
+                RankingEvidence(
+                    id="ev_relationship",
+                    kind=EvidenceKind.RELATIONSHIP,
+                    value="Sibling",
+                ),
+            ]
+        }
+    )
+
+    assert deterministic_ranking(package) is None
+

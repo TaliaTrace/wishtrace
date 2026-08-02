@@ -31,6 +31,27 @@ class PravaReportOutcome(StrEnum):
     DECLINED = "DECLINED"
 
 
+class PravaMandateFrequency(StrEnum):
+    ONE_TIME = "one_time"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
+class PravaMandateScope(StrEnum):
+    LISTED = "listed"
+    ANY = "any"
+
+
+class PravaMandateStatus(StrEnum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    CONSUMED = "consumed"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+
+
 class PravaGatewayError(Exception):
     def __init__(
         self,
@@ -112,6 +133,81 @@ class PravaSessionRequest(BaseModel):
         }
 
 
+class PravaMandateSessionRequest(BaseModel):
+    """Session creation for mandate setup — authorize_only, no credentials issued."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+
+    user_id: str = Field(min_length=1, max_length=255)
+    user_email: str = Field(min_length=3, max_length=320)
+    total_minor: int = Field(gt=0)
+    currency: Literal["USD"]
+    merchant_name: str = Field(min_length=1, max_length=200)
+    merchant_url: str
+    merchant_country: Literal["US"]
+    product_description: str = Field(min_length=1, max_length=500)
+    product_unit_minor: int = Field(gt=0)
+    external_product_id: str = Field(min_length=1, max_length=50)
+    quantity: int = Field(default=1, gt=0, le=100)
+    callback_url: str
+    external_order_ref: str = Field(min_length=1, max_length=255)
+
+    recurring_frequency: PravaMandateFrequency
+    merchant_scope: PravaMandateScope = PravaMandateScope.LISTED
+    max_charges: int = Field(default=1, ge=1, le=365)
+    valid_until: str = Field(min_length=10, max_length=25)
+
+    @field_validator("user_email")
+    @classmethod
+    def validate_email_shape(cls, value: str) -> str:
+        local, separator, domain = value.rpartition("@")
+        if separator != "@" or not local or "." not in domain:
+            raise ValueError("user_email must be a valid email address")
+        return value
+
+    @field_validator("merchant_url", "callback_url")
+    @classmethod
+    def require_https(cls, value: str) -> str:
+        if not _is_https_url(value):
+            raise ValueError("URL must use HTTPS without embedded credentials or fragments")
+        return value
+
+    def provider_payload(self) -> dict[str, object]:
+        return {
+            "user_id": self.user_id,
+            "user_email": self.user_email,
+            "total_amount": _minor_to_decimal(self.total_minor),
+            "currency": self.currency,
+            "intent": "mandate_setup",
+            "authorize_only": True,
+            "callback_url": self.callback_url,
+            "external_order_ref": self.external_order_ref,
+            "purchase_context": [
+                {
+                    "merchant_details": {
+                        "name": self.merchant_name,
+                        "url": self.merchant_url,
+                        "country_code_iso2": self.merchant_country,
+                    },
+                    "product_details": [
+                        {
+                            "description": self.product_description,
+                            "unit_price": _minor_to_decimal(self.product_unit_minor),
+                            "product_id": self.external_product_id,
+                            "quantity": self.quantity,
+                        }
+                    ],
+                }
+            ],
+            "mandate_setup": {
+                "recurring_frequency": self.recurring_frequency.value,
+                "merchant_scope": self.merchant_scope.value,
+                "max_charges": self.max_charges,
+                "valid_until": self.valid_until,
+            },
+        }
+
+
 class HostedPravaSession(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -120,6 +216,9 @@ class HostedPravaSession(BaseModel):
     order_id: str
     expires_at: datetime
     response_id: str | None
+    # Populated only for mandate setup: Prava mints the mandate record (in
+    # ``pending``) at setup time and returns its id so it can be charged later.
+    mandate_id: str | None = None
 
 
 class SensitivePaymentCredential(BaseModel):
@@ -180,6 +279,49 @@ class PravaReportResult(BaseModel):
     response_id: str | None
 
 
+class PravaMandateInfo(BaseModel):
+    """A live mandate from Prava's GET /v1/mandates response."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mandate_id: str
+    status: PravaMandateStatus
+    recurring_frequency: PravaMandateFrequency
+    merchant_scope: PravaMandateScope
+    approved_amount: str
+    currency: str
+    created_at: datetime
+    valid_until: datetime
+    total_charges: int = 0
+    remaining_charges: int = 0
+
+
+class PravaMandateChargeResult(BaseModel):
+    """Result of POST /v1/mandates/{id}/charge — one-time credentials minted."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mandate_id: str
+    charge_id: str
+    status: Literal["completed", "failed"]
+    credential: SensitivePaymentCredential | None
+    txn_ref_id: str | None
+    error_code: str | None
+
+
+class PravaMandateReportResult(BaseModel):
+    """Result of POST /v1/mandates/{id}/charges/{txnId}/report."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: Literal["confirmed"]
+    charge_id: str
+    txn_ref_id: str
+    txn_status: PravaReportOutcome
+    visa_confirmation: Literal["SUCCESS", "FAILURE"]
+    response_id: str | None
+
+
 class _RawSession(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -188,6 +330,7 @@ class _RawSession(BaseModel):
     iframe_url: str
     order_id: str = Field(pattern=PROVIDER_ID_REGEX)
     expires_at: datetime
+    mandate_id: str | None = Field(default=None, pattern=PROVIDER_ID_REGEX)
 
     @field_validator("expires_at")
     @classmethod
@@ -251,6 +394,45 @@ class _RawReportResult(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     status: Literal["confirmed"]
+    txn_ref_id: str = Field(pattern=PROVIDER_ID_REGEX)
+    txn_status: PravaReportOutcome
+    visa_confirmation: Literal["SUCCESS", "FAILURE"]
+
+
+class _RawMandate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(pattern=PROVIDER_ID_REGEX)
+    status: PravaMandateStatus
+    recurring_frequency: PravaMandateFrequency
+    merchant_scope: PravaMandateScope
+    approved_amount: str
+    currency: str
+    created_at: datetime
+    valid_until: datetime
+    total_charges: int = 0
+    remaining_charges: int = 0
+
+
+class _RawChargeResult(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    mandate_id: str = Field(pattern=PROVIDER_ID_REGEX)
+    charge_id: str = Field(pattern=PROVIDER_ID_REGEX)
+    txn_ref_id: str | None = Field(default=None, pattern=PROVIDER_ID_REGEX)
+    status: Literal["completed", "failed"]
+    token: SecretStr | None = None
+    dynamic_cvv: SecretStr | None = None
+    expiry_month: SecretStr | None = None
+    expiry_year: SecretStr | None = None
+    error: _RawTransactionError | None = None
+
+
+class _RawMandateReport(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    status: Literal["confirmed"]
+    charge_id: str = Field(pattern=PROVIDER_ID_REGEX)
     txn_ref_id: str = Field(pattern=PROVIDER_ID_REGEX)
     txn_status: PravaReportOutcome
     visa_confirmation: Literal["SUCCESS", "FAILURE"]
@@ -356,6 +538,108 @@ class PravaHttpGateway:
             raise _invalid_response(response) from error
         return PravaReportResult(
             status=raw.status,
+            txn_ref_id=raw.txn_ref_id,
+            txn_status=raw.txn_status,
+            visa_confirmation=raw.visa_confirmation,
+            response_id=_response_id(response),
+        )
+
+    async def create_mandate_session(
+        self, request: PravaMandateSessionRequest
+    ) -> HostedPravaSession:
+        response = await self._request(
+            "POST",
+            "/v1/sessions",
+            outcome_unknown_on_network_failure=True,
+            ambiguous_write=True,
+            json=request.provider_payload(),
+        )
+        try:
+            raw = _RawSession.model_validate(response.json())
+        except (ValueError, ValidationError) as error:
+            raise _invalid_response(response, outcome_unknown=True) from error
+        if not _allowed_https_url(raw.iframe_url, self._allowed_hosted_hosts):
+            raise PravaGatewayError(
+                "PRAVA_OUTCOME_UNKNOWN",
+                "Prava created an approval response that WishTrace cannot open safely.",
+                recoverable=True,
+                outcome_unknown=True,
+                response_id=_response_id(response),
+            )
+        return HostedPravaSession(
+            session_id=raw.session_id,
+            hosted_url=raw.iframe_url,
+            order_id=raw.order_id,
+            expires_at=raw.expires_at,
+            response_id=_response_id(response),
+            mandate_id=raw.mandate_id,
+        )
+
+    async def get_mandate(self, mandate_id: str) -> PravaMandateInfo:
+        _require_provider_id(mandate_id, "mandate_id")
+        response = await self._request(
+            "GET",
+            f"/v1/mandates/{mandate_id}",
+        )
+        try:
+            raw = _RawMandate.model_validate(response.json())
+        except (ValueError, ValidationError) as error:
+            raise _invalid_response(response) from error
+        return _mandate_info(raw)
+
+    async def charge_mandate(
+        self,
+        *,
+        mandate_id: str,
+        amount_minor: int,
+        reference: str,
+    ) -> PravaMandateChargeResult:
+        _require_provider_id(mandate_id, "mandate_id")
+        _require_provider_id(reference, "reference")
+        if amount_minor <= 0:
+            raise ValueError("amount_minor must be positive")
+        response = await self._request(
+            "POST",
+            f"/v1/mandates/{mandate_id}/charge",
+            outcome_unknown_on_network_failure=True,
+            ambiguous_write=True,
+            json={
+                "amount": _minor_to_decimal(amount_minor),
+                "reference": reference,
+            },
+        )
+        try:
+            raw = _RawChargeResult.model_validate(response.json())
+            return _charge_result(raw)
+        except (ValueError, ValidationError) as error:
+            raise _invalid_response(response, outcome_unknown=True) from error
+
+    async def report_mandate_charge(
+        self,
+        *,
+        mandate_id: str,
+        charge_id: str,
+        outcome: PravaReportOutcome,
+    ) -> PravaMandateReportResult:
+        _require_provider_id(mandate_id, "mandate_id")
+        _require_provider_id(charge_id, "charge_id")
+        response = await self._request(
+            "POST",
+            f"/v1/mandates/{mandate_id}/charges/{charge_id}/report",
+            outcome_unknown_on_network_failure=True,
+            ambiguous_write=True,
+            json={
+                "txn_status": outcome.value,
+                "txn_type": "PURCHASE",
+            },
+        )
+        try:
+            raw = _RawMandateReport.model_validate(response.json())
+        except (ValueError, ValidationError) as error:
+            raise _invalid_response(response) from error
+        return PravaMandateReportResult(
+            status=raw.status,
+            charge_id=raw.charge_id,
             txn_ref_id=raw.txn_ref_id,
             txn_status=raw.txn_status,
             visa_confirmation=raw.visa_confirmation,
@@ -479,6 +763,52 @@ def _line_item(raw: _RawLineItem) -> PravaLineItemResult:
         total_minor=_decimal_to_minor(raw.total_amount),
         status=raw.status,
         credential=credential,
+    )
+
+
+def _mandate_info(raw: _RawMandate) -> PravaMandateInfo:
+    return PravaMandateInfo(
+        mandate_id=raw.id,
+        status=raw.status,
+        recurring_frequency=raw.recurring_frequency,
+        merchant_scope=raw.merchant_scope,
+        approved_amount=raw.approved_amount,
+        currency=raw.currency,
+        created_at=raw.created_at,
+        valid_until=raw.valid_until,
+        total_charges=raw.total_charges,
+        remaining_charges=raw.remaining_charges,
+    )
+
+
+def _charge_result(raw: _RawChargeResult) -> PravaMandateChargeResult:
+    credentials = (raw.token, raw.dynamic_cvv, raw.expiry_month, raw.expiry_year)
+    supplied = [value is not None for value in credentials]
+    if any(supplied) and not all(supplied):
+        raise ValueError("Prava returned incomplete mandate charge credentials")
+    credential: SensitivePaymentCredential | None = None
+    if all(supplied):
+        assert raw.token is not None
+        assert raw.dynamic_cvv is not None
+        assert raw.expiry_month is not None
+        assert raw.expiry_year is not None
+        credential = SensitivePaymentCredential(
+            token=raw.token,
+            dynamic_cvv=raw.dynamic_cvv,
+            expiry_month=raw.expiry_month,
+            expiry_year=raw.expiry_year,
+        )
+    if credential is not None and raw.status != "completed":
+        raise ValueError("Prava returned mandate credentials on a non-completed charge")
+    if raw.status == "completed" and credential is None:
+        raise ValueError("Prava completed a mandate charge without credentials")
+    return PravaMandateChargeResult(
+        mandate_id=raw.mandate_id,
+        charge_id=raw.charge_id,
+        status=raw.status,
+        credential=credential,
+        txn_ref_id=raw.txn_ref_id,
+        error_code=(raw.error.code if raw.error is not None else None),
     )
 
 

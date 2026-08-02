@@ -65,6 +65,8 @@ class EvidenceKind(StrEnum):
     HINT = "HINT"
     RELATIONSHIP = "RELATIONSHIP"
     OCCASION = "OCCASION"
+    PERSONALITY = "PERSONALITY"
+    AGE = "AGE"
 
 
 class ModelDecisionStatus(StrEnum):
@@ -450,7 +452,13 @@ def deterministic_ranking(package: RankingPackage) -> ValidatedRanking | None:
     usable_evidence = [
         evidence
         for evidence in package.evidence
-        if evidence.kind in {EvidenceKind.INTEREST, EvidenceKind.HINT}
+        if evidence.kind
+        in {
+            EvidenceKind.INTEREST,
+            EvidenceKind.HINT,
+            EvidenceKind.PERSONALITY,
+            EvidenceKind.AGE,
+        }
     ]
     for candidate in package.candidates:
         haystack = " ".join(
@@ -502,12 +510,19 @@ def _evidence_match_score(evidence: RankingEvidence, haystack: str) -> int:
         if len(word) >= 4 and word not in FALLBACK_STOP_WORDS
     }
     matches = sum(1 for word in words if word in haystack)
-    return min(matches, 3) if evidence.kind is EvidenceKind.HINT else matches * 2
+    # Hints and persona/age phrases are intentionally soft signals: cap them so a
+    # sparse profile still yields a grounded pick without overpowering a real
+    # interest (which scores 5 on an exact match, or matches*2 on word overlap).
+    if evidence.kind in {EvidenceKind.HINT, EvidenceKind.PERSONALITY, EvidenceKind.AGE}:
+        return min(matches, 3)
+    return matches * 2
 
 
 def _fallback_reason(evidence: RankingEvidence) -> str:
     if evidence.kind is EvidenceKind.INTEREST:
         return f"Matches the saved {evidence.value} interest."
+    if evidence.kind in {EvidenceKind.PERSONALITY, EvidenceKind.AGE}:
+        return f"Fits their {evidence.value} vibe."
     return "Connects directly to a saved gift clue."
 
 
@@ -802,6 +817,41 @@ async def _eligible_candidates(
     return eligible
 
 
+# Each personality axis maps to a catalog-flavored phrase so the ranker (model
+# or deterministic) can ground a partial profile that has no interests yet.
+_PERSONALITY_PHRASES: dict[str, dict[str, str]] = {
+    "energy": {
+        "competitive": "competitive games and strategy",
+        "chill": "relaxing cozy games",
+    },
+    "environment": {
+        "screens": "video games and streaming",
+        "outdoors": "outdoor adventure gear",
+    },
+    "style": {
+        "trendy": "newest trending games",
+        "nostalgic": "classic retro games",
+    },
+}
+
+_AGE_BAND_PHRASES: dict[str, str] = {
+    "child": "fun games for kids",
+    "teen": "popular teen games",
+    "young_adult": "modern young adult games",
+    "adult": "adult strategy and party games",
+    "senior": "classic easy to learn games",
+}
+
+
+def _personality_phrases(traits: dict[str, str] | None) -> dict[str, str]:
+    phrases: dict[str, str] = {}
+    for axis, value in (traits or {}).items():
+        by_value = _PERSONALITY_PHRASES.get(axis)
+        if by_value and value in by_value:
+            phrases[axis] = by_value[value]
+    return phrases
+
+
 async def _load_evidence_sources(
     session: AsyncSession,
     discovery: DiscoveryRunModel,
@@ -832,8 +882,6 @@ async def _load_evidence_sources(
             .order_by(RecipientPreferenceModel.position)
         )
     ).all()
-    if not preferences:
-        raise _context_changed()
     hints = (
         await session.scalars(
             select(HintModel)
@@ -861,6 +909,26 @@ async def _load_evidence_sources(
         )
         for item in preferences
     )
+    # Green-tile "Gift DNA" taps stand in for interests on partial profiles: each
+    # set axis becomes a catalog-flavored phrase the ranker can ground against.
+    sources.extend(
+        (
+            EvidenceKind.PERSONALITY,
+            f"recipient:{recipient.id}:personality:{axis}",
+            phrase,
+        )
+        for axis, phrase in _personality_phrases(recipient.personality_traits).items()
+    )
+    if recipient.age_band:
+        age_phrase = _AGE_BAND_PHRASES.get(recipient.age_band)
+        if age_phrase:
+            sources.append(
+                (
+                    EvidenceKind.AGE,
+                    f"recipient:{recipient.id}:age_band",
+                    age_phrase,
+                )
+            )
     sources.extend(
         (
             EvidenceKind.HINT,

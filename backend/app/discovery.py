@@ -254,14 +254,10 @@ class SqlDiscoveryStore:
                     )
                 )
             ).all()
+            # Interests are optional now: the green-tile personality taps plus
+            # relationship and occasion carry the first-pass ranking, so an empty
+            # interest list is a valid partial profile rather than an error.
             interests = [item.value for item in preferences if item.kind == "INTEREST"]
-            if not interests:
-                raise ApiError(
-                    status_code=409,
-                    code="DISCOVERY_CONTEXT_INCOMPLETE",
-                    message="Add at least one interest before finding a gift.",
-                    recoverable=True,
-                )
             return DiscoveryContext(
                 recipient_id=recipient.id,
                 occasion_id=occasion.id,
@@ -430,7 +426,10 @@ def _catalog_query(interests: list[str]) -> str:
     gaming_terms = {"game", "games", "gaming", "video games", "cozy gaming"}
     if any(interest.strip().casefold() in gaming_terms for interest in interests):
         return "gift card"
-    return interests[0].strip()
+    # No interests captured: fall back to the merchant's catalog anchor. Jackbox
+    # is a games merchant, so a partial profile still resolves to a gift card.
+    first = next((interest.strip() for interest in interests if interest.strip()), "")
+    return first or "gift card"
 
 
 def _not_found(code: str, message: str) -> ApiError:

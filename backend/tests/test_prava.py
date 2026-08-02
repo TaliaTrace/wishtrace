@@ -8,6 +8,10 @@ from pydantic import SecretStr, ValidationError
 from app.prava import (
     PravaGatewayError,
     PravaHttpGateway,
+    PravaMandateFrequency,
+    PravaMandateScope,
+    PravaMandateSessionRequest,
+    PravaMandateStatus,
     PravaPaymentStatus,
     PravaReportOutcome,
     PravaSessionRequest,
@@ -319,4 +323,250 @@ async def test_provider_path_identifier_rejects_path_injection() -> None:
     with pytest.raises(ValueError, match="session_id is invalid"):
         await _gateway(httpx.MockTransport(lambda request: httpx.Response(200))).get_payment_result(
             "../sessions/other"
+        )
+
+
+def _mandate_request() -> PravaMandateSessionRequest:
+    return PravaMandateSessionRequest(
+        user_id="user-123",
+        user_email="talia@example.com",
+        total_minor=500,
+        currency="USD",
+        merchant_name="Jackbox Games",
+        merchant_url="https://checkout.jackboxgames.com",
+        merchant_country="US",
+        product_description="The Jackbox Party Starter",
+        product_unit_minor=500,
+        external_product_id="variant-abc",
+        quantity=1,
+        callback_url="https://api.wishtrace.example/v1/prava/return",
+        external_order_ref="occasion-123",
+        recurring_frequency=PravaMandateFrequency.YEARLY,
+        merchant_scope=PravaMandateScope.LISTED,
+        max_charges=5,
+        valid_until="2031-08-01T00:00:00Z",
+    )
+
+
+async def test_create_mandate_session_sends_setup_block_and_discards_token() -> None:
+    observed: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == httpx.URL(f"{BASE_URL}/v1/sessions")
+        assert request.headers["Authorization"] == f"Bearer {FAKE_SECRET}"
+        observed.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            headers={
+                "Content-Type": "application/json",
+                "X-Response-ID": "response-mandate-create-1",
+            },
+            json={
+                "session_id": "session-m1",
+                "session_token": "provider-session-token-must-not-escape",
+                "iframe_url": "https://sandbox.collect.prava.space/checkout?session=m1",
+                "order_id": "order-m1",
+                "expires_at": "2026-08-01T16:00:00Z",
+            },
+        )
+
+    session = await _gateway(httpx.MockTransport(handler)).create_mandate_session(
+        _mandate_request()
+    )
+
+    assert observed["intent"] == "mandate_setup"
+    assert observed["authorize_only"] is True
+    assert observed["mandate_setup"] == {
+        "recurring_frequency": "yearly",
+        "merchant_scope": "listed",
+        "max_charges": 5,
+        "valid_until": "2031-08-01T00:00:00Z",
+    }
+    assert session.session_id == "session-m1"
+    assert session.hosted_url == "https://sandbox.collect.prava.space/checkout?session=m1"
+    assert "provider-session-token-must-not-escape" not in session.model_dump_json()
+
+
+async def test_create_mandate_session_rejects_untrusted_hosted_url() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/json"},
+            json={
+                "session_id": "session-m1",
+                "session_token": "token",
+                "iframe_url": "https://evil.example/checkout",
+                "order_id": "order-m1",
+                "expires_at": "2026-08-01T16:00:00Z",
+            },
+        )
+
+    with pytest.raises(PravaGatewayError) as captured:
+        await _gateway(httpx.MockTransport(handler)).create_mandate_session(_mandate_request())
+
+    assert captured.value.code == "PRAVA_OUTCOME_UNKNOWN"
+    assert captured.value.outcome_unknown is True
+
+
+async def test_get_mandate_parses_guardrails() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/mandates/mandate-1"
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/json"},
+            json={
+                "id": "mandate-1",
+                "status": "active",
+                "recurring_frequency": "yearly",
+                "merchant_scope": "listed",
+                "approved_amount": "5.00",
+                "currency": "USD",
+                "created_at": "2026-08-01T12:00:00Z",
+                "valid_until": "2031-08-01T00:00:00Z",
+                "total_charges": 5,
+                "remaining_charges": 5,
+            },
+        )
+
+    mandate = await _gateway(httpx.MockTransport(handler)).get_mandate("mandate-1")
+
+    assert mandate.status == PravaMandateStatus.ACTIVE
+    assert mandate.recurring_frequency == PravaMandateFrequency.YEARLY
+    assert mandate.merchant_scope == PravaMandateScope.LISTED
+    assert mandate.remaining_charges == 5
+
+
+async def test_charge_mandate_mints_memory_only_credentials() -> None:
+    observed: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/mandates/mandate-1/charge"
+        observed.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            headers={
+                "Content-Type": "application/json",
+                "X-Response-ID": "response-charge-1",
+            },
+            json={
+                "mandate_id": "mandate-1",
+                "charge_id": "charge-1",
+                "txn_ref_id": "line-1",
+                "status": "completed",
+                "token": "mandate-token-redacted",
+                "dynamic_cvv": "599",
+                "expiry_month": "12",
+                "expiry_year": "2027",
+            },
+        )
+
+    result = await _gateway(httpx.MockTransport(handler)).charge_mandate(
+        mandate_id="mandate-1",
+        amount_minor=500,
+        reference="occasion-123-charge-1",
+    )
+
+    assert observed == {"amount": "5.00", "reference": "occasion-123-charge-1"}
+    assert result.status == "completed"
+    assert result.credential is not None
+    assert result.credential.token.get_secret_value() == "mandate-token-redacted"
+    serialized = result.model_dump_json()
+    assert "mandate-token-redacted" not in serialized
+    assert "599" not in serialized
+
+
+async def test_charge_mandate_over_cap_declines_without_credentials() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/json"},
+            json={
+                "mandate_id": "mandate-1",
+                "charge_id": "charge-2",
+                "status": "failed",
+                "error": {"code": "THRESHOLD_EXCEEDED", "message": "over cap"},
+            },
+        )
+
+    result = await _gateway(httpx.MockTransport(handler)).charge_mandate(
+        mandate_id="mandate-1",
+        amount_minor=999999,
+        reference="occasion-123-charge-2",
+    )
+
+    assert result.status == "failed"
+    assert result.credential is None
+    assert result.error_code == "THRESHOLD_EXCEEDED"
+
+
+async def test_charge_mandate_rejects_credentials_on_failed_status() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/json"},
+            json={
+                "mandate_id": "mandate-1",
+                "charge_id": "charge-3",
+                "status": "failed",
+                "token": "leaked-token",
+                "dynamic_cvv": "599",
+                "expiry_month": "12",
+                "expiry_year": "2027",
+            },
+        )
+
+    with pytest.raises(PravaGatewayError) as captured:
+        await _gateway(httpx.MockTransport(handler)).charge_mandate(
+            mandate_id="mandate-1",
+            amount_minor=500,
+            reference="occasion-123-charge-3",
+        )
+
+    assert captured.value.code == "PRAVA_OUTCOME_UNKNOWN"
+
+
+async def test_report_mandate_charge_sends_documented_fields() -> None:
+    observed: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/mandates/mandate-1/charges/charge-1/report"
+        observed.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            headers={
+                "Content-Type": "application/json",
+                "X-Response-ID": "response-mandate-report-1",
+            },
+            json={
+                "status": "confirmed",
+                "charge_id": "charge-1",
+                "txn_ref_id": "line-1",
+                "txn_status": "DECLINED",
+                "visa_confirmation": "FAILURE",
+            },
+        )
+
+    result = await _gateway(httpx.MockTransport(handler)).report_mandate_charge(
+        mandate_id="mandate-1",
+        charge_id="charge-1",
+        outcome=PravaReportOutcome.DECLINED,
+    )
+
+    assert observed == {"txn_status": "DECLINED", "txn_type": "PURCHASE"}
+    assert result.status == "confirmed"
+    assert result.visa_confirmation == "FAILURE"
+    assert result.response_id == "response-mandate-report-1"
+
+
+async def test_mandate_charge_path_identifier_rejects_injection() -> None:
+    with pytest.raises(ValueError, match="mandate_id is invalid"):
+        await _gateway(
+            httpx.MockTransport(lambda request: httpx.Response(200))
+        ).charge_mandate(
+            mandate_id="../mandates/other",
+            amount_minor=500,
+            reference="occasion-123-charge-1",
         )

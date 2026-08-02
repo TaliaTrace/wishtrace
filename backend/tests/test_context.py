@@ -91,6 +91,8 @@ class MemoryContext(ContextOperations):
             initials="".join(part[0].upper() for part in body.display_name.split()[:2]),
             interests=body.interests,
             dislikes=body.dislikes,
+            personality_traits=body.personality_traits,
+            age_band=body.age_band,
             hints=(
                 [
                     HintResponse(
@@ -127,6 +129,7 @@ class MemoryContext(ContextOperations):
             time_zone=body.time_zone,
             budget_minor=body.budget_minor,
             currency=body.currency,
+            recurring_frequency=body.recurring_frequency,
             required_arrival_date=body.required_arrival_date,
         )
         return self.occasion

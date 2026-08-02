@@ -249,6 +249,7 @@ class MandatePravaOperations(Protocol):
 class MandateSetupFacts(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    setup_id: uuid.UUID
     recurring_frequency: PravaMandateFrequency
     merchant_scope: PravaMandateScope
     max_charges: int
@@ -789,7 +790,7 @@ class MandateService:
             external_product_id=str(occasion_id),
             quantity=1,
             callback_url=callback_url,
-            external_order_ref=str(occasion_id),
+            external_order_ref=f"mandate-{facts.setup_id.hex}",
             recurring_frequency=facts.recurring_frequency,
             merchant_scope=facts.merchant_scope,
             max_charges=facts.max_charges,
@@ -919,6 +920,7 @@ class SqlMandateStore:
             session.add(mandate)
             await session.flush()
             return MandateSetupFacts(
+                setup_id=mandate.id,
                 recurring_frequency=frequency,
                 merchant_scope=scope,
                 max_charges=max_charges,

@@ -142,6 +142,7 @@ class MemoryMandateStore:
     ) -> MandateSetupFacts:
         del user_id, occasion_id, candidate_id
         facts = MandateSetupFacts(
+            setup_id=self.mandate.id,
             recurring_frequency=self.mandate.recurring_frequency,
             merchant_scope=self.mandate.merchant_scope,
             max_charges=self.mandate.max_charges,
@@ -779,6 +780,7 @@ async def test_setup_creates_session_with_frequency_and_records_awaiting() -> No
     assert request.merchant_scope is PravaMandateScope.LISTED
     assert request.max_charges == 1
     assert request.total_minor == 500
+    assert request.external_order_ref == f"mandate-{store.mandate.id.hex}"
     # The callback routes Prava's approval redirect back through our return path.
     assert "/v1/prava/mandate-return" in request.callback_url
     assert f"occasion_id={store.mandate.occasion_id}" in request.callback_url

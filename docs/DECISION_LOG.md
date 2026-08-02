@@ -412,3 +412,23 @@ Record only decisions that change product, architecture, truth boundary, schedul
   escalate the safe failure evidence to Prava. Never choose between multiple enrollments or insert
   card credentials into WishTrace.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 00:25 PKT — Retire the failed enrollment and permit only one explicit clean retry
+
+- Context: The sole active saved enrollment returned `DEVICE_BINDING_FAILED` when explicitly
+  selected. After it was removed, the organizer-issued team card entered through the hosted Prava
+  surface returned `PROVISION_ERROR` and did not create a saved enrollment.
+- Evidence: Prava's official card API supports customer-scoped deletion and confirmed the failed
+  default enrollment was retired; the subsequent active-card list was empty. Both authoritative
+  payment results carried one failed transaction, zero credentials and no mandate. The organizer's
+  negative prompt classifies both failures as deterministic and forbids automatic retry.
+- Decision: Retire only the exact failed sandbox enrollment after verifying customer, last four and
+  failure state. Never put PAN/CVV in WishTrace. Permit one further session solely because the user
+  explicitly requested a corrected retry, with no saved card preselected and the phone inputs
+  checked manually. Do not retry again on provisioning/device failure.
+- Consequence: The final hosted session is pending with zero charges. If it activates, WishTrace can
+  run the single organizer-required merchant proof; if it fails, the remaining blocker is external
+  Prava card provisioning/device binding rather than an unverified WishTrace request payload.
+- Rollback/fallback: On another deterministic setup failure, reconcile it, preserve safe support
+  evidence and contact Prava. Do not recreate a session until Prava confirms the card/key binding.
+- Owner: WishTrace team / Codex

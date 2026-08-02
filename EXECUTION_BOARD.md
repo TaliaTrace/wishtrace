@@ -12,7 +12,7 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | LIVE APPROVAL PENDING — exact setup accepted; one active saved card is explicitly preselected; current session has zero charges and awaits user passkey approval | Codex/user | 2026-08-03 00:11 PKT |
+| Prava transaction path understood | session + authoritative status | LIVE USER ACTION — saved enrollment failed device binding and was retired; first clean team-card enrollment returned `PROVISION_ERROR`; one explicit no-preselection retry is pending with zero charges | Codex/user | 2026-08-03 00:25 PKT |
 | Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — real Jackbox $5 SKU + runtime quote + card form; Prava attempt pending | Codex | 2026-08-01 22:40 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
@@ -29,9 +29,9 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. User completes the fresh saved-card hosted approval manually before it expires; Codex performs no Chrome automation or card entry.
+1. User completes the final explicit no-preselection hosted approval with the organizer-issued team card; Codex performs no phone inspection, Chrome automation or card entry.
 2. Reconcile the mandate once and, only if it is `ACTIVE`, execute exactly one tokenized merchant attempt.
-3. If Prava still rejects device binding, retain the safe failure evidence and escalate without another blind retry.
+3. If Prava returns another provisioning/device failure, retain the safe evidence and escalate without another blind retry.
 
 ## Next
 
@@ -47,15 +47,20 @@ Update this file during the hackathon. Do not manage the project from memory.
   `card.card_id` only when one active default enrollment, or one unambiguous active enrollment,
   exists. It never chooses between multiple cards and never reads or persists PAN/CVV data.
 - The live sandbox returned exactly one active default enrollment for the current WishTrace user.
-  A single fresh mandate setup preselected it and returned `AWAITING_APPROVAL/pending`, with zero
-  charges and no setup error. The organizer card ending `2218` is not the enrollment returned for
-  this customer; WishTrace does not claim that it was pre-saved.
+  A single mandate setup preselected it, but the hosted result was authoritative
+  `DEVICE_BINDING_FAILED`, with no mandate, credential or charge. The enrollment was then retired
+  through the official `POST /v1/deleteCard` endpoint; Prava confirmed zero active cards remain.
+- A clean no-preselection setup then let the user enter the organizer-issued team card through
+  Prava's hosted surface. Its result was authoritative `PROVISION_ERROR`, with no saved enrollment,
+  mandate, credential or charge. At the user's explicit request, one final audited retry is pending;
+  it is not an automatic retry loop.
 - A prior untouched pending setup passed its provider expiry. Refresh now converts that state to
   `EXPIRED/SESSION_EXPIRED` instead of leaving the app waiting forever.
 - Quality: 143 backend tests, Ruff, strict mypy and Alembic head checks pass. ACR run `chc`
   succeeded; healthy Azure revision `wishtrace-api--savedcard1` serves 100% traffic and `/health`
   reports PostgreSQL 17.6 with TLS true.
-- Truth boundary: a real hosted approval is pending. No passkey approval, mandate activation,
+- Truth boundary: a real final hosted approval is pending after two safely reconciled provider
+  setup failures. No passkey approval, mandate activation,
   one-use credential, merchant attempt, Prava report, Visa confirmation or order is claimed.
 
 ### 2026-08-02 — Exact Prava request audit and deployed failure diagnostics

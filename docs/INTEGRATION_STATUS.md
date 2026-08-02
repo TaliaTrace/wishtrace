@@ -13,12 +13,14 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Session creation verified: LIVE SANDBOX — a real authorize-only mandate setup session was created
   by the deployed backend and its allowlisted hosted URL opened in an Android Custom Tab. Exact
   decimal money, response-ID handling and session-token discard also pass transport tests.
-- Hosted approval verified: LIVE APPROVAL PENDING — an earlier exact-contract hosted attempt
+- Hosted approval verified: LIVE PROVIDER SETUP FAILURES + FINAL USER RETRY — an earlier exact-contract hosted attempt
   returned authoritative `failed` with safe categories `PROVISION_ERROR` and
   `DEVICE_BINDING_FAILED` before creating a mandate or credential. A later abandoned session
-  expired with zero transactions/credentials. The production adapter then observed one active
-  default saved-card enrollment for the current customer and explicitly preselected it in one fresh
-  setup. That setup is `pending` with zero charges and no setup error; user passkey approval remains.
+  expired with zero transactions/credentials. The production adapter then observed and explicitly
+  preselected one active default saved-card enrollment; that setup also returned
+  `DEVICE_BINDING_FAILED`. WishTrace retired the failed enrollment through Prava's documented
+  delete-card endpoint. A clean team-card enrollment then returned `PROVISION_ERROR`. One final
+  no-preselection retry exists only because the user explicitly requested it; it remains pending.
 - App return verified: PARTIAL — the hosted failure remained in the Custom Tab, so no automatic
   Prava redirect was observed. A validated physical-phone app-link opened WishTrace and reconciled
   the exact backend failure into its terminal recovery UI.
@@ -50,15 +52,17 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   provider failure categories.
   The observed sandbox create response omitted documented `authorizeOnly`; omission is accepted only
   with explicit request intent, while an explicit `false` fails closed.
-- Saved-card fact: LIVE SANDBOX — exactly one active default Visa enrollment ending `7789` is scoped
-  to the current WishTrace customer. The organizer card ending `2218` is not returned for that
-  customer, so WishTrace does not claim it is enrolled or silently substitute it.
-- Known blockers: the user must complete the current hosted passkey approval manually. Only after a
+- Saved-card fact: LIVE SANDBOX — the failed default enrollment ending `7789` was the only active
+  card and was retired through the official API after `DEVICE_BINDING_FAILED`; Prava now returns
+  zero active cards. The organizer card ending `2218` did not survive the failed provisioning
+  attempt and is not claimed as enrolled.
+- Known blockers: the user must complete the final hosted approval manually. Only after a
   live mandate and one-use credential exist can WishTrace run the organizer-required merchant
-  attempt and report its result. If device binding still fails, Prava support must reset/verify it;
+  attempt and report its result. If provisioning/device binding still fails, Prava support must
+  verify that the organizer-issued card is provisioned for this sandbox key/customer;
   WishTrace will not create another blind retry. Staging permits the exact $5 stored-value path
   solely for this proof.
-- Last verified: 2026-08-03 00:11 PKT
+- Last verified: 2026-08-03 00:25 PKT
 - Evidence location: safe response ID above; migration `20260802_0012`; deployed revision
   `wishtrace-api--savedcard1`; 143 backend tests plus Android build/unit/lint. No credential, card
   data or provider payload retained.

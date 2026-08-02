@@ -237,7 +237,7 @@ private fun HomeContent(
                                     "Open ${recipient.displayName}'s autopilot"
 
                                 mandate?.lastChargeState != null ->
-                                    "Review payment status"
+                                    "Choose another gift"
 
                                 else -> "Find a gift for ${recipient.displayName}"
                             },
@@ -454,7 +454,7 @@ private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (statu
 
     MandateStatus.DECLINED -> if (lastChargeState != null) {
         AutopilotStatusPill(
-            label = "Payment blocked",
+            label = "Last attempt failed",
             icon = Icons.Rounded.Schedule,
             container = WarningSurface,
             content = Warning,

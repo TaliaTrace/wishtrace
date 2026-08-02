@@ -268,8 +268,8 @@ async def test_discovery_uses_saved_context_and_persists_only_evaluated_live_ids
         ),
     )
 
-    assert merchant.queries == [("gift card", 8000)]
-    assert store.search_query == "gift card"
+    assert merchant.queries == [("games", 8000)]
+    assert store.search_query == "games"
     assert store.user_ids == [user_id, user_id]
     assert len(response.candidates) == 3
     assert response.candidates[0].eligible is True

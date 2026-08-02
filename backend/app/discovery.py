@@ -425,11 +425,11 @@ def _candidate_response(
 def _catalog_query(interests: list[str]) -> str:
     gaming_terms = {"game", "games", "gaming", "video games", "cozy gaming"}
     if any(interest.strip().casefold() in gaming_terms for interest in interests):
-        return "gift card"
-    # No interests captured: fall back to the merchant's catalog anchor. Jackbox
-    # is a games merchant, so a partial profile still resolves to a gift card.
+        return "games"
+    # No interests captured: fall back to the merchant's broad catalog anchor so
+    # ranking receives distinct products instead of a single denomination.
     first = next((interest.strip() for interest in interests if interest.strip()), "")
-    return first or "gift card"
+    return first or "games"
 
 
 def _not_found(code: str, message: str) -> ApiError:

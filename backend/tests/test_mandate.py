@@ -493,6 +493,7 @@ class FakeMerchantCheckout:
         self.checkout_result = checkout_result
         self.checkout_error: MerchantBrowserError | None = None
         self.quote_error: MerchantBrowserError | None = None
+        self.quote_total_minor = 500
         self.quote_requests: list[MerchantQuoteRequest] = []
         self.checkout_calls = 0
 
@@ -503,8 +504,8 @@ class FakeMerchantCheckout:
         return MerchantQuote(
             item_minor=500,
             shipping_minor=0,
-            tax_minor=0,
-            total_minor=500,
+            tax_minor=self.quote_total_minor - 500,
+            total_minor=self.quote_total_minor,
             currency="USD",
             delivery_summary="Jackbox shop only",
             source="JACKBOX_SHOPIFY_BROWSER",
@@ -751,6 +752,26 @@ async def test_execute_requires_valid_idempotency_key() -> None:
     assert checkout.checkout_calls == 0
 
 
+async def test_execute_does_not_mint_when_live_total_changed() -> None:
+    store = MemoryMandateStore(_mandate())
+    prava = FakeMandatePrava()
+    checkout = FakeMerchantCheckout(_ok_checkout())
+    checkout.quote_total_minor = 550
+    service = _service(store, prava, checkout)
+
+    with pytest.raises(ApiError) as changed:
+        await service.execute(
+            _user(),
+            store.mandate.occasion_id,
+            MandateExecuteRequest(billing=_billing()),
+            "exec-total-change",
+        )
+
+    assert changed.value.code == "MERCHANT_TOTAL_CHANGED"
+    assert prava.charge_calls == []
+    assert store.failed_charges[0][1] == "MERCHANT_TOTAL_CHANGED"
+
+
 async def test_execute_merchant_checkout_unknown_returns_current_view() -> None:
     store = MemoryMandateStore(_mandate())
     prava = FakeMandatePrava()
@@ -841,6 +862,34 @@ async def test_setup_creates_session_with_frequency_and_records_awaiting() -> No
     # The callback routes Prava's approval redirect back through our return path.
     assert "/v1/prava/mandate-return" in request.callback_url
     assert f"occasion_id={store.mandate.occasion_id}" in request.callback_url
+
+
+async def test_setup_does_not_guess_when_multiple_active_cards_exist() -> None:
+    store = MemoryMandateStore(_mandate())
+    prava = FakeMandatePrava()
+    prava.listed_cards = [
+        PravaCardInfo(
+            card_id="card-default-but-unverified",
+            last4="7789",
+            status="active",
+            is_default=True,
+        ),
+        PravaCardInfo(
+            card_id="card-owner-choice",
+            last4="7912",
+            status="active",
+            is_default=False,
+        ),
+    ]
+    service = _service(store, prava, checkout=None)
+
+    await service.setup(
+        _user(),
+        store.mandate.occasion_id,
+        MandateSetupRequest(candidate_id=uuid.uuid4()),
+    )
+
+    assert prava.session_requests[0].card_id is None
 
 
 async def test_setup_prava_error_fails_mandate_and_raises() -> None:

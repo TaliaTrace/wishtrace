@@ -98,6 +98,8 @@ def _gateway(
     transport: httpx.AsyncBaseTransport,
     *,
     checkout_verified: bool = False,
+    checkout_product_ids: frozenset[str] | None = None,
+    digital_product_ids: frozenset[str] = frozenset(),
 ) -> UcpMerchantGateway:
     return UcpMerchantGateway(
         merchant_id="merchant-us",
@@ -106,6 +108,8 @@ def _gateway(
         allowed_endpoint_host="merchant-mcp.example",
         agent_profile_url=AGENT_PROFILE_URL,
         checkout_verified=checkout_verified,
+        checkout_product_ids=checkout_product_ids,
+        digital_product_ids=digital_product_ids,
         transport=transport,
     )
 
@@ -171,6 +175,15 @@ async def test_search_negotiates_profile_and_normalizes_exact_live_variant() -> 
         checkout_verified=True,
     ).search(query="gaming headset", budget_minor=8000)
     assert verified_result.candidates[0].checkout_supported is True
+
+    restricted_result = await _gateway(
+        httpx.MockTransport(handler),
+        checkout_verified=True,
+        checkout_product_ids=frozenset({"gid://shopify/Product/other"}),
+        digital_product_ids=frozenset({"gid://shopify/Product/100"}),
+    ).search(query="gaming headset", budget_minor=8000)
+    assert restricted_result.candidates[0].checkout_supported is False
+    assert restricted_result.candidates[0].product_kind is ProductKind.DIGITAL
 
 
 async def test_search_records_compliant_business_profile_cache_policy() -> None:

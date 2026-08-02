@@ -430,8 +430,9 @@ private fun ProofDeclined(state: MandateSetupUiState) {
         message = if (merchantAttempted) {
             "The real merchant declined the tokenized sandbox card, as expected. No order was created."
         } else {
-            "Prava did not issue the bounded sandbox card, so Jackbox was not contacted and no " +
-                "purchase occurred. Wait for Prava support before retrying."
+            "Prava did not issue a bounded sandbox card for this attempt, so the merchant was " +
+                "not contacted and no purchase occurred. Other gifts remain available, but a " +
+                "new approval may fail until Prava can issue the card."
         },
     )
 }

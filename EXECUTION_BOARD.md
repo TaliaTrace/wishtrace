@@ -7,16 +7,16 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260802_0012` | Codex | 2026-08-02 23:39 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS — 145 tests; exact merchant URL/state-code fixes deployed as `merchantfix1`; local terminal-failure contract hardened; database TLS true | Codex | 2026-08-03 01:25 PKT |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260803_0014` | Codex | 2026-08-03 01:54 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 149 tests; healthy Azure revision `wishtrace-api--cardchoice1` serves 100% traffic | Codex | 2026-08-03 02:04 PKT |
 | Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | LIVE PROVIDER MINT BLOCKER — both the active-mandate charge and standard hosted session failed inside Prava before credentials or merchant submission | Codex/user | 2026-08-03 01:22 PKT |
-| Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — fresh live Jackbox quote is exactly $5; checkout actor is ready, but Prava issued no credential | Codex | 2026-08-03 00:44 PKT |
+| Prava transaction path understood | session + authoritative status | LIVE RECOVERY FOUND — active mandate is valid, but live card list exposes two active enrollments and the broken `7789` default displaced working `7912`; new setup no longer guesses | Codex/user | 2026-08-03 01:54 PKT |
+| Primary merchant validated | search/product/quote/checkout facts | PARTIAL PASS — $5 card plus three distinct $9.99 digital games have exact live product/variant/cart evidence; Prava credential still required | Codex | 2026-08-03 01:54 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — terminal no-retry APK built, tested, linted and installed in place on the connected phone | Codex | 2026-08-03 01:25 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — selectable recommendation/recovery APK built, tested, linted and installed in place on the connected phone | Codex | 2026-08-03 01:54 PKT |
 | Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
 | Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
 | Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
@@ -29,17 +29,41 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Freeze all Prava charge/session retries and preserve the failed provider evidence.
-2. Ship the terminal no-retry Android state and keep the existing failed purchase intent immutable.
-3. Finish the strongest truthful UX/demo/submission package; do not claim a merchant attempt.
+1. Run one fresh mandate setup, explicitly choosing saved card `7912` in Prava.
+2. If credential minting succeeds, let the one-shot merchant harness record the expected sandbox decline.
+3. Preserve the exact result and move immediately to the UI/submission pass.
 
 ## Next
 
-1. Verify the revised payment-status copy and non-transactional `Done` action on the phone.
-2. Complete the UX and submission pass around the proven live auth/context/catalog/ranking flow.
-3. Keep production access gated; the required tokenized merchant attempt was not reached.
+1. Set Zaid's budget to at least `$10` to expose distinct live games, then verify manual selection.
+2. Capture the exact Prava/merchant result without claiming an order.
+3. Move immediately to the UX/submission pass after the single bounded payment proof.
 
 ## Milestone evidence
+
+### 2026-08-03 — Distinct digital gifts and saved-card recovery
+
+- Live UCP search returned distinct product identities. Exact cart probes verified the `$5` Jackbox
+  gift card plus Quiplash 2 InterLASHional, Drawful 2 and Quiplash at `$9.99`; every item is
+  `requires_shipping=false`. Only these exact product/variant pairs are checkout-eligible.
+- Gaming discovery now searches `games`, de-duplicates merchant product IDs and models verified
+  games as `DIGITAL`. Recommendation alternatives are selectable; a `$5` cap still truthfully has
+  only one eligible product, while `$10+` exposes multiple distinct options.
+- Official Prava docs identify failed mandate credential minting as `NO_TOKEN` and prescribe one
+  retry then support. The existing mandate is still provider `active`, `$5.00`, `$0.00` spent and
+  zero completed charges, so its request and guardrails are valid.
+- Read-only card audit found two active enrollments: old `7789` is default and working `7912` is
+  non-default. WishTrace previously selected the default. It now preselects only a sole active card;
+  with multiple cards, the hosted Prava surface must let the owner choose.
+- Failed mandate rows and charge evidence are now preserved when a user explicitly chooses another
+  gift. Charge amount is the exact unchanged live item total, never the larger budget cap.
+- Evidence: 149 backend tests, Ruff, strict mypy, Android assemble/unit/lint, Supabase migration
+  `20260803_0014`, and in-place physical-phone APK install all pass. ACR build `che` produced image
+  digest `sha256:f3e7cb7ddd3272109b6200f180d374f690e625511d132e2e41da78c9bc8e3081`;
+  healthy revision `wishtrace-api--cardchoice1` serves 100% traffic. Public `/health` reports
+  PostgreSQL 17.6 with TLS true and the UCP profile remains cache-compliant.
+- Truth boundary: no new Prava session, credential, merchant payment or order was created in this
+  milestone.
 
 ### 2026-08-03 — Standard-session fallback failed before merchant; retries frozen
 

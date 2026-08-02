@@ -15,8 +15,10 @@ Current official SDK/API contract verified on 2026-08-01:
   only;
 - `POST /v1/sessions/{sessionId}/report-status` must receive `APPROVED` or `DECLINED` after
   the merchant attempt;
-- the documented Browser Harness reconciles a Shopify checkout and returns a verified result, but
-  the public SDK/API reference currently exposes no callable Browser Harness endpoint or method.
+- the documented Browser Harness is a checkout executor after credentials exist; it does not mint
+  the one-time card. The public SDK/API reference currently exposes no callable Browser Harness
+  endpoint or method, so WishTrace uses its own exact-product Playwright actor for the organizer's
+  required browser-automation attempt.
 
 Do not invent that missing invocation. A support request is pending for the exact hackathon sandbox
 contract; implement only the documented session/poll/report boundary until it is answered.
@@ -113,9 +115,14 @@ result must say authorization/attempt rather than “Gift secured.”
 
 The active-mandate charge and one standard hosted session both failed inside Prava before a usable
 one-time credential was returned. The standard purchase intent is terminal `FAILED`, with no
-merchant outcome or order. Reopening its existing hosted URL did not create another session. All
-further payment retries are frozen; WishTrace shows this as a provider-stage failure, not a merchant
-decline or completed sandbox transaction.
+merchant outcome or order. Reopening its existing hosted URL did not create another session.
+
+A later read-only card audit superseded the assumption that the failed default enrollment had
+remained deleted: Prava listed both default card `7789` and non-default card `7912` as active.
+WishTrace previously selected that stale default automatically. The recovery now omits `card_id`
+whenever multiple active cards exist, forcing an explicit hosted choice without exposing card data.
+One fresh user-authorized setup selecting `7912` is permitted; if its charge still fails before
+credentials, retries stop and the result remains a provider-stage failure—not a merchant decline.
 
 ## Production access
 

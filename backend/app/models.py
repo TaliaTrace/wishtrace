@@ -290,7 +290,7 @@ class CandidateSnapshotModel(Base):
             name="ck_candidate_availability",
         ),
         CheckConstraint(
-            "product_kind IN ('PHYSICAL', 'STORED_VALUE')",
+            "product_kind IN ('PHYSICAL', 'DIGITAL', 'STORED_VALUE')",
             name="ck_candidate_product_kind",
         ),
         CheckConstraint("delivery_state = 'UNKNOWN'", name="ck_candidate_delivery"),
@@ -807,7 +807,6 @@ class MandateModel(Base):
             "('ORDER_VERIFIED', 'DECLINED', 'UNKNOWN')",
             name="ck_mandate_merchant_outcome",
         ),
-        UniqueConstraint("occasion_id", name="uq_mandate_occasion"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

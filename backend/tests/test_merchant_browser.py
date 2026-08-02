@@ -20,6 +20,11 @@ from app.merchant_browser import (
     _PlaywrightLoopThread,
 )
 
+QUIPLASH_2_URL = (
+    "https://checkout.jackboxgames.com/products/quiplash-2-interlashional"
+)
+QUIPLASH_2_VARIANT = "gid://shopify/ProductVariant/40190131404934"
+
 
 def _billing() -> BillingContact:
     return BillingContact(
@@ -54,6 +59,32 @@ def test_billing_details_are_absent_from_repr() -> None:
     assert "123 Test Street" not in repr(billing)
     assert "checkout-test" not in repr(request)
     assert "123 Test Street" not in repr(request)
+
+
+def test_quote_accepts_allowlisted_digital_game_pair() -> None:
+    request = MerchantQuoteRequest(
+        purchase_intent_id=uuid.uuid4(),
+        product_url=QUIPLASH_2_URL,
+        merchant_variant_id=QUIPLASH_2_VARIANT,
+        expected_item_minor=999,
+        currency="USD",
+        billing=_billing(),
+    )
+
+    assert request.product_url == QUIPLASH_2_URL
+    assert request.merchant_variant_id == QUIPLASH_2_VARIANT
+
+
+def test_quote_rejects_cross_product_variant_pair() -> None:
+    with pytest.raises(ValidationError, match="identify one product"):
+        MerchantQuoteRequest(
+            purchase_intent_id=uuid.uuid4(),
+            product_url=QUIPLASH_2_URL,
+            merchant_variant_id=JACKBOX_VARIANT_GID,
+            expected_item_minor=999,
+            currency="USD",
+            billing=_billing(),
+        )
 
 
 @pytest.mark.parametrize(

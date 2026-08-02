@@ -61,6 +61,65 @@ MAX_CART_RESPONSE_BYTES = 1_000_000
 T = TypeVar("T")
 
 
+@dataclass(frozen=True, slots=True)
+class JackboxProductSpec:
+    product_id: str
+    product_path: str
+    variant_gid: str
+    gift_card: bool
+    delivery_summary: str
+
+
+JACKBOX_PRODUCT_SPECS = (
+    JackboxProductSpec(
+        product_id="gid://shopify/Product/6734381809798",
+        product_path=JACKBOX_PRODUCT_PATH,
+        variant_gid=JACKBOX_VARIANT_GID,
+        gift_card=True,
+        delivery_summary=(
+            "Sent to the checkout contact email for manual forwarding; "
+            "Jackbox shop only, supported regions only, timing not guaranteed"
+        ),
+    ),
+    JackboxProductSpec(
+        product_id="gid://shopify/Product/6882537799814",
+        product_path="/products/quiplash-2-interlashional",
+        variant_gid="gid://shopify/ProductVariant/40190131404934",
+        gift_card=False,
+        delivery_summary=(
+            "Digital game code; supported regions only, delivery timing not confirmed"
+        ),
+    ),
+    JackboxProductSpec(
+        product_id="gid://shopify/Product/2549185675344",
+        product_path="/products/drawful-2",
+        variant_gid="gid://shopify/ProductVariant/21892043538512",
+        gift_card=False,
+        delivery_summary=(
+            "Digital game code; supported regions only, delivery timing not confirmed"
+        ),
+    ),
+    JackboxProductSpec(
+        product_id="gid://shopify/Product/2549174173776",
+        product_path="/products/quiplash",
+        variant_gid="gid://shopify/ProductVariant/21891973906512",
+        gift_card=False,
+        delivery_summary=(
+            "Digital game code; supported regions only, delivery timing not confirmed"
+        ),
+    ),
+)
+JACKBOX_PRODUCT_SPECS_BY_PATH = {
+    spec.product_path: spec for spec in JACKBOX_PRODUCT_SPECS
+}
+JACKBOX_CHECKOUT_PRODUCT_IDS = frozenset(
+    spec.product_id for spec in JACKBOX_PRODUCT_SPECS
+)
+JACKBOX_DIGITAL_PRODUCT_IDS = frozenset(
+    spec.product_id for spec in JACKBOX_PRODUCT_SPECS if not spec.gift_card
+)
+
+
 class MerchantCheckoutOutcome(StrEnum):
     ORDER_VERIFIED = "ORDER_VERIFIED"
     DECLINED = "DECLINED"
@@ -162,21 +221,30 @@ class MerchantQuoteRequest(BaseModel):
         if (
             parsed.scheme != "https"
             or (parsed.hostname or "").casefold() != JACKBOX_CHECKOUT_HOST
-            or parsed.path.rstrip("/") != JACKBOX_PRODUCT_PATH
+            or parsed.path.rstrip("/") not in JACKBOX_PRODUCT_SPECS_BY_PATH
             or parsed.username is not None
             or parsed.password is not None
             or parsed.port not in (None, 443)
+            or parsed.query
             or parsed.fragment
         ):
-            raise ValueError("product_url must be the allowlisted Jackbox gift card")
+            raise ValueError("product_url must be an allowlisted Jackbox digital product")
         return value
 
     @field_validator("merchant_variant_id")
     @classmethod
     def require_shopify_variant(cls, value: str) -> str:
-        if value != JACKBOX_VARIANT_GID:
-            raise ValueError("merchant_variant_id must be the allowlisted $5 variant")
+        if value not in {spec.variant_gid for spec in JACKBOX_PRODUCT_SPECS}:
+            raise ValueError("merchant_variant_id must be an allowlisted digital variant")
         return value
+
+    @model_validator(mode="after")
+    def require_matching_product_variant(self) -> "MerchantQuoteRequest":
+        path = urlsplit(self.product_url).path.rstrip("/")
+        spec = JACKBOX_PRODUCT_SPECS_BY_PATH[path]
+        if self.merchant_variant_id != spec.variant_gid:
+            raise ValueError("product_url and merchant_variant_id must identify one product")
+        return self
 
 
 class MerchantQuote(BaseModel):
@@ -310,7 +378,7 @@ class _PlaywrightLoopThread:
 
 
 class JackboxPlaywrightCheckoutGateway:
-    """One-cart Jackbox digital-gift checkout actor.
+    """One-cart Jackbox digital-product checkout actor.
 
     Billing values and card credentials exist only inside the short-lived browser
     context. They are never returned, logged, screenshotted, or persisted by this class.
@@ -343,6 +411,9 @@ class JackboxPlaywrightCheckoutGateway:
             )
             context = await browser.new_context(locale="en-US")
             page = await context.new_page()
+            product_spec = JACKBOX_PRODUCT_SPECS_BY_PATH[
+                urlsplit(request.product_url).path.rstrip("/")
+            ]
             await page.goto(
                 request.product_url,
                 wait_until="domcontentloaded",
@@ -366,6 +437,7 @@ class JackboxPlaywrightCheckoutGateway:
                 cart_response,
                 variant_id,
                 request.expected_item_minor,
+                expected_gift_card=product_spec.gift_card,
             )
             item_minor = cart["total_price"]
             await page.goto(
@@ -389,10 +461,7 @@ class JackboxPlaywrightCheckoutGateway:
                 tax_minor=tax_minor,
                 total_minor=total_minor,
                 currency="USD",
-                delivery_summary=(
-                    "Sent to the checkout contact email for manual forwarding; "
-                    "Jackbox shop only, supported regions only, timing not guaranteed"
-                ),
+                delivery_summary=product_spec.delivery_summary,
                 quoted_at=quoted_at,
                 expires_at=quoted_at + QUOTE_TTL,
             )
@@ -581,6 +650,8 @@ async def _validated_cart(
     response: APIResponse,
     variant_id: str,
     expected_item_minor: int,
+    *,
+    expected_gift_card: bool,
 ) -> dict[str, int]:
     if response.status != 200:
         raise _quote_unavailable("MERCHANT_CART_UNAVAILABLE")
@@ -601,7 +672,7 @@ async def _validated_cart(
         or len(items) != 1
         or not isinstance(items[0], dict)
         or str(items[0].get("variant_id")) != variant_id
-        or items[0].get("gift_card") is not True
+        or items[0].get("gift_card") is not expected_gift_card
         or items[0].get("requires_shipping") is not False
         or not isinstance(total_price, int)
         or total_price != expected_item_minor

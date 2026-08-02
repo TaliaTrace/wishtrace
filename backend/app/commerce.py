@@ -19,6 +19,7 @@ SHOPIFY_GIFT_CARD_CATEGORY = "gid://shopify/TaxonomyCategory/gc"
 
 class ProductKind(StrEnum):
     PHYSICAL = "PHYSICAL"
+    DIGITAL = "DIGITAL"
     STORED_VALUE = "STORED_VALUE"
 
 
@@ -246,6 +247,8 @@ class UcpMerchantGateway:
         allowed_endpoint_host: str,
         agent_profile_url: str,
         checkout_verified: bool,
+        checkout_product_ids: frozenset[str] | None = None,
+        digital_product_ids: frozenset[str] = frozenset(),
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         if not _is_public_https_url(agent_profile_url):
@@ -258,6 +261,8 @@ class UcpMerchantGateway:
         self._allowed_endpoint_host = allowed_endpoint_host.casefold()
         self._agent_profile_url = agent_profile_url
         self._checkout_verified = checkout_verified
+        self._checkout_product_ids = checkout_product_ids
+        self._digital_product_ids = digital_product_ids
         self._transport = transport
 
     async def search(self, *, query: str, budget_minor: int) -> MerchantSearchResult:
@@ -310,21 +315,35 @@ class UcpMerchantGateway:
             )
         content = _parse_search_response(search_response)
         timestamp = datetime.now(UTC)
+        candidates: list[LiveCandidate] = []
+        seen_product_ids: set[str] = set()
+        for product in content.products:
+            if product.id in seen_product_ids:
+                continue
+            seen_product_ids.add(product.id)
+            candidates.append(
+                _normalize_product(
+                    product,
+                    merchant_id=self._merchant_id,
+                    merchant_name=self._merchant_name,
+                    checkout_supported=(
+                        checkout_advertised
+                        and self._checkout_verified
+                        and (
+                            self._checkout_product_ids is None
+                            or product.id in self._checkout_product_ids
+                        )
+                    ),
+                    digital_product_ids=self._digital_product_ids,
+                    source_timestamp=timestamp,
+                )
+            )
         return MerchantSearchResult(
             merchant_id=self._merchant_id,
             merchant_name=self._merchant_name,
             request_id=search_response.headers.get("x-request-id"),
             profile_cache_compliant=profile_cache_compliant,
-            candidates=[
-                _normalize_product(
-                    product,
-                    merchant_id=self._merchant_id,
-                    merchant_name=self._merchant_name,
-                    checkout_supported=(checkout_advertised and self._checkout_verified),
-                    source_timestamp=timestamp,
-                )
-                for product in content.products
-            ],
+            candidates=candidates,
             source_timestamp=timestamp,
         )
 
@@ -493,6 +512,7 @@ def _normalize_product(
     merchant_id: str,
     merchant_name: str,
     checkout_supported: bool,
+    digital_product_ids: frozenset[str] = frozenset(),
     source_timestamp: datetime,
 ) -> LiveCandidate:
     available = [variant for variant in product.variants if variant.availability.available]
@@ -511,11 +531,12 @@ def _normalize_product(
         )
     price = variant.price if variant is not None else minimum
     categories = [category.value for category in product.categories]
-    kind = (
-        ProductKind.STORED_VALUE
-        if SHOPIFY_GIFT_CARD_CATEGORY in categories
-        else ProductKind.PHYSICAL
-    )
+    if SHOPIFY_GIFT_CARD_CATEGORY in categories:
+        kind = ProductKind.STORED_VALUE
+    elif product.id in digital_product_ids:
+        kind = ProductKind.DIGITAL
+    else:
+        kind = ProductKind.PHYSICAL
     image_url = _first_https_image(
         (variant.media if variant is not None else []) + product.media
     )

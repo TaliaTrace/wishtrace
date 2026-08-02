@@ -93,6 +93,21 @@ until Prava confirms stored-value eligibility. If Prava disallows it or the supp
 not fit the real cardholder/recipient, stop and select another observed digital SKU; do not fall back
 to an invented or uncontrolled card.
 
+## Exact digital expansion — 2026-08-03
+
+| Product | Product ID | Variant ID | Live cart | Runtime status |
+|---|---|---|---|---|
+| Jackbox Games Gift Card — $5 | `6734381809798` | `39783705149574` | $5.00; digital; no shipping | eligible at $5+ |
+| Quiplash 2 InterLASHional | `6882537799814` | `40190131404934` | $9.99; digital; no shipping | eligible at $10+ |
+| Drawful 2 | `2549185675344` | `21892043538512` | $9.99; digital; no shipping | eligible at $10+ |
+| Quiplash | `2549174173776` | `21891973906512` | $9.99; digital; no shipping | eligible at $10+ |
+
+The live catalog returned additional products, but they remain discovery-only and deterministically
+`UNSUPPORTED_CHECKOUT` until their exact product/variant cart behavior is proven. Merchant-wide UCP
+checkout advertising is not treated as product-level proof. Amazon Incentives remains gated behind
+partner onboarding and a prefunded account; Steam and Microsoft digital gifts remain account/region
+dependent and have no verified WishTrace checkout adapter. They are not runtime options.
+
 ## Fallback ladder
 
 1. One fixed Jackbox $5 live SKU with refreshed price and no-shipping checkout.

@@ -107,9 +107,14 @@ fun RecommendationScreen(
     onWriteMessage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val selectedCandidate = (state as? RecommendationUiState.Content)
+    val content = state as? RecommendationUiState.Content
+    val recommendedCandidateId = content?.decision?.selectedCandidateId
+    var chosenCandidateId by rememberSaveable(recommendedCandidateId) {
+        mutableStateOf<String?>(recommendedCandidateId)
+    }
+    val selectedCandidate = content
         ?.candidates
-        ?.firstOrNull { it.id == state.decision.selectedCandidateId }
+        ?.firstOrNull { it.id == chosenCandidateId }
 
     Scaffold(
         modifier = modifier.testTag(WishTraceTestTags.RecommendationScreen),
@@ -165,6 +170,7 @@ fun RecommendationScreen(
                         snapshot = snapshot,
                         selected = selectedCandidate,
                         state = state,
+                        onChoose = { chosenCandidateId = it },
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
@@ -447,12 +453,15 @@ private fun DecisionContent(
     snapshot: HomeSnapshot,
     selected: ProductCandidate,
     state: RecommendationUiState.Content,
+    onChoose: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val rationale = state.decision.rationales.first {
         it.candidateId == selected.id
     }
-    val alternatives = state.decision.alternativeCandidateIds.mapNotNull { id ->
+    val rankedIds = listOf(state.decision.selectedCandidateId) +
+        state.decision.alternativeCandidateIds
+    val alternatives = rankedIds.filterNot { it == selected.id }.mapNotNull { id ->
         state.candidates.firstOrNull { it.id == id }
     }
 
@@ -466,7 +475,11 @@ private fun DecisionContent(
         DecisionRecipientPill(snapshot)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = "This one fits best.",
+                text = if (selected.id == state.decision.selectedCandidateId) {
+                    "This one fits best."
+                } else {
+                    "Your pick."
+                },
                 modifier = Modifier.semantics { heading() },
                 color = Ink,
                 style = MaterialTheme.typography.headlineLarge,
@@ -486,7 +499,10 @@ private fun DecisionContent(
                 style = MaterialTheme.typography.titleMedium,
             )
             alternatives.forEach { candidate ->
-                AlternativeCard(candidate)
+                AlternativeCard(
+                    candidate = candidate,
+                    onChoose = { onChoose(candidate.id) },
+                )
             }
         }
 
@@ -604,8 +620,12 @@ private fun SourceStamp(candidate: ProductCandidate) {
 }
 
 @Composable
-private fun AlternativeCard(candidate: ProductCandidate) {
+private fun AlternativeCard(
+    candidate: ProductCandidate,
+    onChoose: () -> Unit,
+) {
     Surface(
+        onClick = onChoose,
         color = SurfaceWhite,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, OutlineCool),
@@ -643,11 +663,18 @@ private fun AlternativeCard(candidate: ProductCandidate) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            Text(
-                text = candidate.currentPrice.formatted(),
-                color = Ink,
-                style = MaterialTheme.typography.labelLarge,
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = candidate.currentPrice.formatted(),
+                    color = Ink,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = "Choose",
+                    color = BrandIndigoPressed,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
     }
 }

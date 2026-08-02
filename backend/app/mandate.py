@@ -105,6 +105,13 @@ _TERMINAL_MANDATE_STATES = {
     MandateState.FAILED,
 }
 
+_REPLACEABLE_MANDATE_STATES = {
+    MandateState.DECLINED,
+    MandateState.FAILED,
+    MandateState.CANCELLED,
+    MandateState.EXPIRED,
+}
+
 class MandateSetupRequest(BaseModel):
     """Yellow-tile input: which gift the autopilot should stand ready to buy.
 
@@ -630,7 +637,7 @@ class MandateService:
             user_id=user.id,
             occasion_id=occasion_id,
             reference=reference,
-            amount_minor=mandate.approved_amount_minor,
+            amount_minor=mandate.item_price_minor,
         )
         if charge.replayed:
             return await self._store.get(user_id=user.id, occasion_id=occasion_id)
@@ -638,7 +645,7 @@ class MandateService:
         # Open (and validate) the merchant quote first so the browser session is
         # ready; only then mint the single-use card so it lives the shortest time.
         try:
-            await self._merchant_checkout.quote(
+            quote = await self._merchant_checkout.quote(
                 MerchantQuoteRequest(
                     purchase_intent_id=charge.id,
                     product_url=mandate.merchant_url,
@@ -662,10 +669,24 @@ class MandateService:
                 message=error.safe_message,
                 recoverable=error.recoverable,
             ) from error
+        if quote.total_minor != mandate.item_price_minor:
+            await self._store.fail_charge(
+                user_id=user.id,
+                occasion_id=occasion_id,
+                charge_id=charge.id,
+                reason_code="MERCHANT_TOTAL_CHANGED",
+                outcome_unknown=False,
+            )
+            raise ApiError(
+                status_code=409,
+                code="MERCHANT_TOTAL_CHANGED",
+                message="The live merchant total changed. Review the gift before approving it.",
+                recoverable=True,
+            )
         try:
             charge_result = await self._prava.charge_mandate(
                 mandate_id=mandate.provider_mandate_id,
-                amount_minor=mandate.approved_amount_minor,
+                amount_minor=quote.total_minor,
                 reference=reference,
             )
         except PravaGatewayError as error:
@@ -923,13 +944,14 @@ class SqlMandateStore:
             existing = await session.scalar(
                 select(MandateModel)
                 .where(MandateModel.occasion_id == occasion_id)
+                .order_by(MandateModel.created_at.desc(), MandateModel.id.desc())
+                .limit(1)
                 .with_for_update()
             )
-            if existing is not None and MandateState(existing.state) not in {
-                MandateState.FAILED,
-                MandateState.CANCELLED,
-                MandateState.EXPIRED,
-            }:
+            if (
+                existing is not None
+                and MandateState(existing.state) not in _REPLACEABLE_MANDATE_STATES
+            ):
                 raise ApiError(
                     status_code=409,
                     code="MANDATE_ALREADY_EXISTS",
@@ -985,9 +1007,6 @@ class SqlMandateStore:
                 if frequency is PravaMandateFrequency.ONE_TIME
                 else _RECURRING_MAX_CHARGES
             )
-            if existing is not None:
-                await session.delete(existing)
-                await session.flush()
             mandate = MandateModel(
                 user_id=user_id,
                 recipient_id=discovery.recipient_id,
@@ -1372,9 +1391,6 @@ def _preferred_card_id(cards: list[PravaCardInfo]) -> str | None:
     """Reuse one unambiguous active enrollment; never guess between cards."""
 
     active = [card for card in cards if card.status == "active"]
-    defaults = [card for card in active if card.is_default]
-    if len(defaults) == 1:
-        return defaults[0].card_id
     if len(active) == 1:
         return active[0].card_id
     return None
@@ -1424,7 +1440,7 @@ async def _owned_mandate(
     query = select(MandateModel).where(
         MandateModel.occasion_id == occasion_id,
         MandateModel.user_id == user_id,
-    )
+    ).order_by(MandateModel.created_at.desc(), MandateModel.id.desc()).limit(1)
     if lock:
         query = query.with_for_update()
     mandate = await session.scalar(query)

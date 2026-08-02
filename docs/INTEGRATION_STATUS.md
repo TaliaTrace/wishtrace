@@ -65,24 +65,29 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   Prava facts must match the approved merchant origin and total.
 - Request sanitation: PASS — explicit mandate `intent` and `integration_type`, routable-email
   enforcement, delegated bare HTTPS merchant origin, exact decimal money, actual item price,
-  single user-triggered retry boundary, active saved-card preselection, Custom Tab handoff, and safe
+  single user-triggered retry boundary, unambiguous saved-card handling, Custom Tab handoff, and safe
   provider failure categories.
   The observed sandbox create response omitted documented `authorizeOnly`; omission is accepted only
   with explicit request intent, while an explicit `false` fails closed.
-- Saved-card fact: LIVE SANDBOX — the failed default enrollment ending `7789` was retired through
-  the official API after `DEVICE_BINDING_FAILED`. Public card ending `7912` subsequently completed
-  enrollment and mandate approval. Card metadata is used only to distinguish enrollments. The
-  organizer card ending `2218` did not survive its failed provisioning attempt and is not claimed
-  as enrolled.
-- Known blocker: Prava failed to mint a usable one-time credential through both the active mandate
-  charge and the standard hosted session. WishTrace will not create or reopen another payment
-  attempt. Merchant proof remains externally blocked and is not claimed.
-- Last verified: 2026-08-03 01:22 PKT
-- Evidence location: safe response ID above; migration `20260802_0012`; deployed revision
-  `wishtrace-api--merchantfix1`; 145 backend tests plus Android build/unit/lint. The installed
-  hackathon APK routes the failed payment to its recorded status and exposes no retry action.
-  No credential, card data or provider payload retained. The terminal-status backend wording is
-  locally verified and not claimed as a newer Azure revision.
+- Saved-card fact: LIVE SANDBOX, SUPERSEDING THE EARLIER DELETE ASSUMPTION — a fresh read-only
+  provider list showed two active enrollments. Card ending `7789` is again present and marked
+  default; card ending `7912`, which completed OTP/passkey enrollment, is active and non-default.
+  The current provider list is authoritative even though an earlier delete response appeared to
+  retire `7789`. WishTrace now preselects a card only when exactly one active enrollment exists;
+  with these two cards it omits `card_id` and requires the owner to choose in Prava's hosted UI.
+  Card metadata is used only to distinguish enrollments and no PAN/CVV is stored.
+- Known blocker: the existing mandate and hosted-session attempts both failed before credential
+  minting. The remaining code-side recovery is one fresh, user-authorized mandate that explicitly
+  selects the known enrolled card ending `7912`; the fix is deployed but the phone run is not yet
+  proven. If this returns
+  `NO_TOKEN`/`FETCH_AGENTIC_CREDS_ERROR`, stop and treat minting as a provider blocker.
+- Last verified: 2026-08-03 02:04 PKT
+- Evidence location: safe response ID above; migration `20260803_0014`; ACR build `che`, image
+  digest `sha256:f3e7cb7ddd3272109b6200f180d374f690e625511d132e2e41da78c9bc8e3081`, and healthy deployed
+  revision `wishtrace-api--cardchoice1` at 100% traffic. Public health reports PostgreSQL TLS true;
+  149 backend tests plus Android build/unit/lint pass. The updated APK is installed without clearing
+  the authenticated user. No credential, card data or provider payload is retained; the explicit-card
+  phone recovery is not yet claimed as live.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -90,22 +95,26 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 
 ## Commerce
 
-- Primary merchant/path: Jackbox Games official Shopify/UCP store, one fixed $5 digital gift card
+- Primary merchant/path: Jackbox Games official Shopify/UCP store, four exact cart-verified digital
+  products: the $5 store gift card plus Quiplash 2 InterLASHional, Drawful 2 and Quiplash
 - Backup merchant/path: none enabled; HyperX physical was retired because the user has no US
   shipping address, and Turtle Beach's digital card starts at $50
 - Mode: live only; no controlled/runtime fixture fallback
 - UCP profile verified: YES — `checkout.jackboxgames.com/.well-known/ucp` advertises UCP
   `2026-04-08`, Shopify catalog/cart/checkout/order, and card payment handlers. An app UCP search
   still requires the permanent public WishTrace profile URL after deployment.
-- Product detail verified: YES — official product `6734381809798`, variant `39783705149574`,
-  SKU `GC20221246`, title `Jackbox Games Gift Card - $5 USD`.
-- Price/availability verified: YES AT PRODUCT/CART LEVEL — official product JSON and a live cart
-  returned exactly 500 USD minor units for one available variant.
-- Shipping verified: NOT REQUIRED — the live cart returned `requires_shipping=false` and
-  `gift_card=true`; checkout showed billing fields and no shipping address.
+- Product detail verified: YES — each enabled product is bound to one exact official Shopify
+  product ID, product path and variant ID. The gift card is product `6734381809798`, variant
+  `39783705149574`, SKU `GC20221246`; the three enabled games are recorded in
+  `docs/MERCHANT_VALIDATION.md` and `backend/app/merchant_browser.py`.
+- Price/availability verified: YES AT PRODUCT/CART LEVEL — official UCP results and isolated live
+  carts returned the available $5 card at 500 USD minor units and each enabled game at 999 USD
+  minor units. Search de-duplicates repeated product IDs.
+- Shipping verified: NOT REQUIRED — all four live carts returned `requires_shipping=false`; the
+  store card returned `gift_card=true` and the games returned `gift_card=false`.
 - Delivery fact verified: PARTIAL — Jackbox states the purchaser receives the digital card by email
-  and forwards it to the recipient. Exact timing is not promised. Runtime copy identifies the
-  checkout contact and manual-forwarding step rather than claiming direct recipient delivery.
+  and forwards it to the recipient. The games are digital codes. Exact timing is not promised, so
+  runtime copy says timing is unconfirmed rather than claiming instant or direct delivery.
 - Quote/total verified: YES THROUGH THE RUNTIME ACTOR — after synthetic US billing in a non-payment
   probe, the same gateway wired into the API returned item 500, shipping 0, tax 0 and total 500 USD
   minor units, with a fresh 20-minute quote. No payment was submitted.
@@ -123,7 +132,8 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   separate program onboarding/credentials and cannot provide a truthful hackathon integration now.
 - Geography risk: Jackbox limits purchase/use to supported regions. A future real $5 gift remains
   conditional on the cardholder/recipient region and Prava's stored-value policy.
-- Last verified: 2026-08-01 22:40 PKT during the official window
+- Last verified: 2026-08-03 01:40 PKT during the official window; later repeated catalog probes were
+  rate-limited, so the recorded isolated cart evidence is retained rather than retried
 - Evidence location: `artifacts/backend/jackbox-digital-checkout-probe-2026-08-01.png`,
   `artifacts/backend/jackbox-runtime-quote-2026-08-01.json`,
   `backend/app/merchant_browser.py`, `backend/tests/test_merchant_browser.py`
@@ -163,20 +173,21 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Path: session pooler on port 5432 with SQLAlchemy async psycopg 3 and `NullPool`
 - Client TLS verified: YES via libpq `ssl_in_use`
 - Server version observed: PostgreSQL 17.6
-- Migration status: `20260802_0012 (head)`; Alembic model/schema drift check passes
+- Migration status: `20260803_0014 (head)`; Alembic model/schema drift check passes
 - Migration content: foundation; Google users/challenges/sessions; owned recipients, preferences,
   hints and occasions; one-recipient Gold uniqueness; owned immutable discovery runs, live candidate
   snapshots and deterministic rejection records; exact purchase snapshots, public Prava session
   identifiers, hashed idempotency operations and immutable transaction transitions; owned ranking
   runs, immutable evidence snapshots and ordered evidence-linked decisions; idempotent merchant
   quotes, merchant/Prava outcome evidence, one owned editable personal message per purchase, owned
-  mandate/charge audit rows, Gift-DNA personality/age evidence, explicit occasion recurrence and
-  normalized mandate-setup failure categories
+  mandate/charge audit rows, Gift-DNA personality/age evidence, explicit occasion recurrence,
+  normalized mandate-setup failure categories, explicit digital-product kind, and immutable mandate
+  history across user-authorized recovery attempts
 - Permanent ignored local `.env` contains `sslmode=require`: YES; a fresh settings load and read-only
   connection probe used that value directly and reported client TLS true
 - Stable local `SESSION_TOKEN_PEPPER`: YES; presence and minimum length were checked without printing
   the value
-- Last verified: 2026-08-02 23:39 PKT during official window
+- Last verified: 2026-08-03 01:45 PKT during official window
 
 ## Android
 
@@ -212,9 +223,13 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   user-authorized editable 2026-08-09 sandbox occasion, restored it after restart, retrieved the
   real Jackbox $5 candidate and rendered the grounded Azure ranking. The date is not claimed as the
   recipient's verified birthday.
-- Known blockers: Prava credential minting failed through both documented approval routes. The app
-  now keeps that state terminal, prevents another payment action, and routes Home to the recorded
-  status. Tokenized merchant attempt, Prava report, Visa confirmation and order remain unproven.
+- Current local recovery: PASS — recommendation alternatives are selectable, prior failed attempts
+  route back to discovery, and a newly selected product starts a fresh mandate while preserving all
+  earlier audit rows. Home distinguishes active autopilot, handled, awaiting approval and failed
+  attempt states. The updated APK assembled, passed unit/lint checks and installed in place.
+- Known blockers: the healthy Azure revision is deployed; the explicit-card recovery still needs one
+  fresh phone run selecting saved card `7912`. Tokenized merchant attempt, Prava report, Visa
+  confirmation and order remain unproven.
 
 ## Demo
 

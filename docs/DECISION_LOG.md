@@ -490,3 +490,21 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: Re-enable a payment action only after Prava supplies a verified credential-mint
   fix and the existing audit facts have been reviewed. Never create speculative retries.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 01:54 PKT — Never let a stale default card choose the mandate
+
+- Context: The provider mandate remained `active`, `$0.00` spent and zero completed charges after
+  `FETCH_AGENTIC_CREDS_ERROR`. A read-only live card list then showed two active enrollments: the
+  previously troublesome card ending `7789` was still marked default, while the card ending `7912`
+  that completed OTP/passkey enrollment was non-default.
+- Evidence: The request matches Prava's current documented mandate setup and `{amount, reference}`
+  charge contracts. Current error docs classify credential-mint failure as `NO_TOKEN`, with one
+  retry followed by support. WishTrace had already made that one bounded retry.
+- Decision: Preselect `card_id` only when exactly one active enrollment exists. With multiple active
+  cards, omit `card` and require the owner to choose in Prava's hosted surface. Preserve every prior
+  mandate/charge row, and bind checkout to an exact verified product/variant and unchanged live total.
+- Consequence: A fresh explicit mandate can select `7912` without hardcoding or exposing card data.
+  This is the remaining code-side recovery; minting and merchant proof remain unclaimed until observed.
+- Rollback/fallback: If a fresh `7912` mandate still returns `NO_TOKEN`, stop. The blocker is inside
+  Prava/card-network provisioning and requires the recorded X-Response-ID; do not generate retries.
+- Owner: WishTrace team / Codex

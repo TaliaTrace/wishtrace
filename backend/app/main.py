@@ -27,7 +27,11 @@ from app.mandate import (
     build_mandate_service,
 )
 from app.mandate_api import build_mandate_router
-from app.merchant_browser import JackboxPlaywrightCheckoutGateway
+from app.merchant_browser import (
+    JACKBOX_CHECKOUT_PRODUCT_IDS,
+    JACKBOX_DIGITAL_PRODUCT_IDS,
+    JackboxPlaywrightCheckoutGateway,
+)
 from app.message import MessageOperations, SqlMessageStore
 from app.message_api import build_message_router
 from app.observability import configure_logging, register_request_context
@@ -124,6 +128,8 @@ def create_app(
                 checkout_verified=(
                     merchant_checkout is not None and prava_checkout_ready
                 ),
+                checkout_product_ids=JACKBOX_CHECKOUT_PRODUCT_IDS,
+                digital_product_ids=JACKBOX_DIGITAL_PRODUCT_IDS,
             )
             resolved_discovery_operations = build_discovery_service(
                 session_factory=session_factory,

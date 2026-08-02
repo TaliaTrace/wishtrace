@@ -72,6 +72,18 @@ class MandateSetupViewModel(
         }
     }
 
+    /** Begins an explicit new gift selection without replaying the prior attempt. */
+    fun prepareSelection(occasionId: String) {
+        if (mutableState.value.busy) return
+        setupKey = null
+        executeKey = null
+        openedApprovalSessionId = null
+        mutableState.value = MandateSetupUiState(
+            step = MandateSetupStep.READY_TO_ARM,
+            occasionId = occasionId,
+        )
+    }
+
     /**
      * Arms the autopilot: POST /setup with the chosen candidate. The response carries
      * the Prava approval URL, which the caller hands to a CustomTab.

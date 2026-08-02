@@ -279,10 +279,7 @@ fun WishTraceApp(
                     onFindGift = {
                         val content = homeState as? HomeUiState.Content
                         val existingMandate = content?.mandate
-                        if (
-                            existingMandate?.isArmed == true ||
-                            existingMandate?.lastChargeState != null
-                        ) {
+                        if (existingMandate?.isArmed == true) {
                             mandateViewModel.start(content.snapshot.occasion.id)
                             navController.navigate(Destination.MandateSetup) {
                                 launchSingleTop = true
@@ -376,8 +373,16 @@ fun WishTraceApp(
                         onRetry = navController::popBackStack,
                         onSelect = { candidateId ->
                             selectedCandidateId = candidateId
-                            mandateViewModel.start(snapshot.occasion.id)
-                            navController.navigate(Destination.MandateSetup)
+                            val priorMandateAttempt =
+                                (homeState as? HomeUiState.Content)
+                                    ?.mandate
+                                    ?.lastChargeState != null
+                            if (priorMandateAttempt) {
+                                navController.navigate(Destination.Checkout)
+                            } else {
+                                mandateViewModel.start(snapshot.occasion.id)
+                                navController.navigate(Destination.MandateSetup)
+                            }
                         },
                         onWriteMessage = navController::popBackStack,
                     )

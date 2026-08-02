@@ -29,9 +29,9 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Send Prava support the active mandate, charge transaction and `FETCH_AGENTIC_CREDS_ERROR` evidence.
-2. Wait for Prava to repair/confirm sandbox credential minting; do not retry the failed charge meanwhile.
-3. After confirmation, refresh the still-active provider mandate and run one explicit tokenized Jackbox attempt.
+1. Run the documented one-time hosted session fallback from the installed Android app.
+2. If Prava issues a credential, let the existing backend make exactly one Jackbox attempt and report it.
+3. Preserve the active mandate and its two failed credential-mint transactions as separate evidence.
 
 ## Next
 
@@ -68,6 +68,15 @@ Update this file during the hackathon. Do not manage the project from memory.
 - Android recovery: the hackathon APK now enables the explicit “Run sandbox merchant proof” control.
   Home reopens an active mandate or prior proof attempt instead of routing back through discovery,
   and the corrected APK was installed over the existing physical-phone app without clearing data.
+  The provider-mint failure is labeled “One-time card unavailable” and explicitly distinguishes it
+  from the organizer-accepted merchant decline.
+- The only docs-sanctioned retry was user-authorized and guarded by provider `active`, `$0.00` spent,
+  zero counted charges, exact merchant facts and no prior merchant outcome. It returned the same
+  `FETCH_AGENTIC_CREDS_ERROR` with response ID `67174297-c74e-4f54-beb3-e5ac17f08660` and provider
+  transaction `txn_01KZ218YJV1NBFM3DZH9T54N7M`. No credential or merchant attempt occurred.
+- Recovery choice: the Android hero path now offers a one-time hosted Prava session after a failed
+  mandate charge. This is not a simulation or a second payment implementation: it reuses the same
+  purchase ledger, live quote, memory-only credentials, Jackbox actor and authoritative report path.
 
 ### 2026-08-03 — Reuse the enrolled card and expire abandoned approval sessions
 

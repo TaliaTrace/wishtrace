@@ -422,11 +422,16 @@ private fun ProofComplete(state: MandateSetupUiState) {
 private fun ProofDeclined(state: MandateSetupUiState) {
     val merchantAttempted = state.mandate?.merchantOutcome == MandateMerchantOutcome.DECLINED
     TerminalState(
-        title = if (merchantAttempted) "Sandbox merchant attempt recorded" else "Sandbox charge declined",
+        title = if (merchantAttempted) {
+            "Sandbox merchant attempt recorded"
+        } else {
+            "One-time card unavailable"
+        },
         message = if (merchantAttempted) {
             "The real merchant declined the tokenized sandbox card, as expected. No order was created."
         } else {
-            "Prava declined the delegated sandbox charge before a merchant order was created."
+            "Prava did not issue the bounded sandbox card, so Jackbox was not contacted and no " +
+                "purchase occurred. Wait for Prava support before retrying."
         },
     )
 }

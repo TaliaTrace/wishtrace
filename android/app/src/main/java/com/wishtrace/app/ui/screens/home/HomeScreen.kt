@@ -237,7 +237,7 @@ private fun HomeContent(
                                     "Open ${recipient.displayName}'s autopilot"
 
                                 mandate?.lastChargeState != null ->
-                                    "Review sandbox attempt"
+                                    "Try one-time approval"
 
                                 else -> "Find a gift for ${recipient.displayName}"
                             },

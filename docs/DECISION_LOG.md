@@ -456,3 +456,18 @@ Record only decisions that change product, architecture, truth boundary, schedul
   with explicit user approval and a recorded scope decision; never fabricate credentials or call
   the provider decline a merchant decline.
 - Owner: WishTrace team / Codex
+
+### 2026-08-03 01:09 PKT — Fall back from broken mandate minting to a standard hosted session
+
+- Context: The organizer accepts a Prava “session/mandate” approval before the one-time-card merchant
+  attempt. The active one-time mandate passed every negative-prompt invariant, but both its initial
+  charge and the single docs-sanctioned retry failed inside Prava with
+  `FETCH_AGENTIC_CREDS_ERROR`; both left spent `$0.00`, charge count zero and no merchant outcome.
+- Decision: Preserve the mandate as live approval evidence and stop charging it. Route the current
+  gift through the already-implemented standard hosted Prava session, while reusing the same live
+  quote, purchase ledger, memory-only credential boundary, one-attempt Jackbox actor and report API.
+- Consequence: The fallback can still satisfy the organizer's explicit session/mandate requirement
+  without fabricating a credential or weakening payment controls. It requires one user-controlled
+  hosted approval; success is claimed only if a real credential reaches the merchant actor.
+- Rollback: Remove the conditional fallback once Prava mandate credential minting is healthy.
+- Owner: WishTrace team / Codex

@@ -36,6 +36,9 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   `txn_01KZ1ZTD34T08SD7QPFS24XFJ1` and `failed / FETCH_AGENTIC_CREDS_ERROR`. No credential or
   reportable transaction reference was issued; no merchant submission followed. Current successful
   `mandateId`, `transactionId`, nested credentials and `awaiting_result` shapes remain transport-tested.
+  One explicit docs-sanctioned retry was guarded by provider `active`, `$0.00` spent and zero counted
+  charges. It failed identically as transaction `txn_01KZ218YJV1NBFM3DZH9T54N7M`, response
+  `67174297-c74e-4f54-beb3-e5ac17f08660`, again before credentials or merchant submission.
 - Mandate report verified: CURRENT CONTRACT + MOCK TRANSPORT — current completed/failed result,
   mandate/transaction identity and Visa confirmation are checked; no live charge has been reported.
 - Real-merchant browser attempt verified:
@@ -63,9 +66,9 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   organizer card ending `2218` did not survive its failed provisioning attempt and is not claimed
   as enrolled.
 - Known blocker: Prava must repair or explain `FETCH_AGENTIC_CREDS_ERROR` for the active sandbox
-  mandate. WishTrace will not retry the failed charge before provider confirmation. The Jackbox
-  actor has a fresh exact $5 quote and is ready to make the one organizer-required merchant attempt
-  once a one-use credential exists.
+  mandate. WishTrace will not retry that endpoint again. The Android flow now falls back to Prava's
+  documented standard hosted session, which shares the same exact $5 live quote and Jackbox actor;
+  merchant proof still requires that session to issue a one-use credential.
 - Last verified: 2026-08-03 00:57 PKT
 - Evidence location: safe response ID above; migration `20260802_0012`; deployed revision
   `wishtrace-api--merchantfix1`; 144 backend tests plus Android build/unit/lint. The installed

@@ -330,6 +330,21 @@ class PravaMandateInfo(BaseModel):
     remaining_charges: int = 0
     merchant_name: str = ""
     external_user_id: str | None = None
+    charges: list["PravaMandateChargeInfo"] = Field(default_factory=list)
+    response_id: str | None = None
+
+
+class PravaMandateChargeInfo(BaseModel):
+    """Non-sensitive charge history returned by GET /v1/mandates/{id}."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    transaction_id: str
+    amount_minor: int
+    currency: str
+    status: Literal["awaiting_result", "completed", "failed"]
+    reference: str | None
+    created_at: datetime
 
 
 class PravaCardInfo(BaseModel):
@@ -500,12 +515,36 @@ class _RawMandate(BaseModel):
         default=None,
         validation_alias=AliasChoices("externalUserId", "external_user_id"),
     )
+    charges: list["_RawMandateCharge"] = Field(default_factory=list)
 
     @field_validator("created_at", "valid_until")
     @classmethod
     def require_aware_mandate_time(cls, value: datetime | None) -> datetime | None:
         if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise ValueError("mandate timestamps must include a timezone")
+        return value
+
+
+class _RawMandateCharge(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    transaction_id: str = Field(
+        pattern=PROVIDER_ID_REGEX,
+        validation_alias=AliasChoices("transactionId", "transaction_id"),
+    )
+    amount: str = Field(pattern=r"^\d{1,12}\.\d{2}$")
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    status: Literal["awaiting_result", "completed", "failed"]
+    reference: str | None = None
+    created_at: datetime = Field(
+        validation_alias=AliasChoices("createdAt", "created_at")
+    )
+
+    @field_validator("created_at")
+    @classmethod
+    def require_aware_created_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("mandate charge timestamps must include a timezone")
         return value
 
 
@@ -783,7 +822,7 @@ class PravaHttpGateway:
             raw = _RawMandate.model_validate(response.json())
         except (ValueError, ValidationError) as error:
             raise _invalid_response(response) from error
-        return _mandate_info(raw)
+        return _mandate_info(raw, response_id=_response_id(response))
 
     async def list_mandates(self, customer_id: str) -> list[PravaMandateInfo]:
         _require_provider_id(customer_id, "customer_id")
@@ -991,7 +1030,11 @@ def _line_item(raw: _RawLineItem) -> PravaLineItemResult:
     )
 
 
-def _mandate_info(raw: _RawMandate) -> PravaMandateInfo:
+def _mandate_info(
+    raw: _RawMandate,
+    *,
+    response_id: str | None = None,
+) -> PravaMandateInfo:
     return PravaMandateInfo(
         mandate_id=raw.id,
         status=raw.status,
@@ -1005,6 +1048,18 @@ def _mandate_info(raw: _RawMandate) -> PravaMandateInfo:
         remaining_charges=raw.remaining_charges,
         merchant_name=raw.merchant_name,
         external_user_id=raw.external_user_id,
+        charges=[
+            PravaMandateChargeInfo(
+                transaction_id=charge.transaction_id,
+                amount_minor=_decimal_to_minor(charge.amount),
+                currency=charge.currency,
+                status=charge.status,
+                reference=charge.reference,
+                created_at=charge.created_at,
+            )
+            for charge in raw.charges
+        ],
+        response_id=response_id,
     )
 
 

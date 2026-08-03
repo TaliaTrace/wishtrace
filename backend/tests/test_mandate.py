@@ -35,6 +35,7 @@ from app.prava import (
     PravaGatewayError,
     PravaLineItemResult,
     PravaMandateCancelResult,
+    PravaMandateChargeInfo,
     PravaMandateChargeResult,
     PravaMandateFrequency,
     PravaMandateInfo,
@@ -420,7 +421,7 @@ class MemoryMandateStore:
         occasion_id: uuid.UUID,
         charge_id: uuid.UUID,
         merchant_outcome: MerchantCheckoutOutcome,
-        visa_confirmation: str,
+        visa_confirmation: str | None,
         response_id: str | None,
         recurring_frequency: PravaMandateFrequency,
     ) -> MandateResponse:
@@ -631,6 +632,28 @@ def _minted_credential() -> PravaMandateChargeResult:
         order_id="order-1",
         error_code=None,
     )
+
+
+def _provider_mandate_info(
+    *,
+    charges: list[PravaMandateChargeInfo] | None = None,
+) -> PravaMandateInfo:
+    return PravaMandateInfo(
+        mandate_id=_MANDATE_ID,
+        status=PravaMandateStatus.ACTIVE,
+        recurring_frequency=PravaMandateFrequency.ONE_TIME,
+        merchant_scope=PravaMandateScope.LISTED,
+        approved_amount="10.00",
+        currency="USD",
+        created_at=_NOW,
+        valid_until=datetime(2099, 8, 1, tzinfo=UTC),
+        total_charges=0,
+        remaining_charges=1,
+        charges=charges or [],
+        response_id="response-mandate-read-1",
+    )
+
+
 # ── Happy-path: one-time mandate executes → merchant verified → reported → consumed ──
 async def test_execute_one_time_mandate_reports_and_consumes() -> None:
     store = MemoryMandateStore(_mandate())
@@ -748,6 +771,37 @@ async def test_execute_prava_decline_records_and_never_checks_out() -> None:
     assert len(store.declined_charges) == 1
     assert checkout.checkout_calls == 0
     assert prava.report_calls == []
+
+
+async def test_execute_merchant_decline_reports_without_becoming_unknown() -> None:
+    store = MemoryMandateStore(_mandate())
+    prava = FakeMandatePrava()
+    prava.charge_result = _minted_credential()
+    checkout = FakeMerchantCheckout(
+        MerchantCheckoutResult(
+            outcome=MerchantCheckoutOutcome.DECLINED,
+            order_id=None,
+            amount_minor=500,
+            currency="USD",
+            reason_code="MERCHANT_PAYMENT_DECLINED",
+        )
+    )
+    service = _service(store, prava, checkout)
+
+    result = await service.execute(
+        _user(),
+        store.mandate.occasion_id,
+        MandateExecuteRequest(billing=_billing()),
+        "exec-key-declined",
+    )
+
+    assert result.state is MandateState.CONSUMED
+    assert result.merchant_outcome is MerchantCheckoutOutcome.DECLINED
+    assert result.visa_confirmation == "FAILURE"
+    assert prava.report_calls == [
+        (_MANDATE_ID, "charge-1", PravaReportOutcome.DECLINED)
+    ]
+    assert store.unknown_charges == []
 
 
 async def test_explicit_failed_mint_retry_reuses_active_approval_without_new_session() -> None:
@@ -1042,6 +1096,7 @@ async def test_execute_report_mismatch_marks_charge_unknown() -> None:
         visa_confirmation="SUCCESS",
         response_id="response-report-1",
     )
+    prava.mandate_info = _provider_mandate_info()
     checkout = FakeMerchantCheckout(_ok_checkout())
     service = _service(store, prava, checkout)
 
@@ -1056,6 +1111,59 @@ async def test_execute_report_mismatch_marks_charge_unknown() -> None:
     assert store.unknown_charges
     assert store.unknown_charges[0][1] == "PRAVA_REPORT_MISMATCH"
     assert checkout.checkout_calls == 1
+
+
+async def test_refresh_reconciles_exact_provider_failed_charge_without_retry() -> None:
+    charge_id = uuid.uuid4()
+    reference = "occ-existing-charge-1"
+    charge = MandateChargeView(
+        id=charge_id,
+        reference=reference,
+        amount_minor=999,
+        state=MandateChargeState.UNKNOWN,
+        provider_charge_id="charge-1",
+        failure_code="PRAVA_REPORT_MISMATCH",
+        merchant_order_id=None,
+        merchant_outcome=MerchantCheckoutOutcome.DECLINED,
+        visa_confirmation=None,
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+    store = MemoryMandateStore(
+        _mandate(
+            state=MandateState.UNKNOWN,
+            approved_amount_minor=1000,
+            item_price_minor=999,
+        ).model_copy(
+            update={
+                "merchant_outcome": MerchantCheckoutOutcome.DECLINED,
+                "charges": [charge],
+            }
+        )
+    )
+    prava = FakeMandatePrava()
+    prava.mandate_info = _provider_mandate_info(
+        charges=[
+            PravaMandateChargeInfo(
+                transaction_id="charge-1",
+                amount_minor=999,
+                currency="USD",
+                status="failed",
+                reference=reference,
+                created_at=_NOW,
+            )
+        ]
+    )
+    service = _service(store, prava, checkout=None)
+
+    result = await service.refresh(_user(), store.mandate.occasion_id)
+
+    assert result.state is MandateState.CONSUMED
+    assert result.merchant_outcome is MerchantCheckoutOutcome.DECLINED
+    assert result.visa_confirmation is None
+    assert store.settled_charges == [charge_id]
+    assert prava.charge_calls == []
+    assert prava.report_calls == []
 
 
 async def test_setup_creates_session_with_frequency_and_records_awaiting() -> None:

@@ -567,6 +567,16 @@ async def test_get_mandate_parses_guardrails() -> None:
                 "createdAt": "2026-08-01T12:00:00Z",
                 "validUntil": "2031-08-01T00:00:00Z",
                 "chargeCount": 5,
+                "charges": [
+                    {
+                        "transactionId": "charge-1",
+                        "amount": "9.99",
+                        "currency": "USD",
+                        "status": "failed",
+                        "reference": "occasion-1-charge-1",
+                        "createdAt": "2026-08-03T01:14:16.428Z",
+                    }
+                ],
             },
         )
 
@@ -576,6 +586,11 @@ async def test_get_mandate_parses_guardrails() -> None:
     assert mandate.recurring_frequency == PravaMandateFrequency.YEARLY
     assert mandate.merchant_scope == PravaMandateScope.LISTED
     assert mandate.total_charges == 5
+    assert mandate.response_id is None
+    assert len(mandate.charges) == 1
+    assert mandate.charges[0].transaction_id == "charge-1"
+    assert mandate.charges[0].amount_minor == 999
+    assert mandate.charges[0].status == "failed"
 
 
 async def test_list_mandates_uses_customer_scope_and_parses_current_shape() -> None:

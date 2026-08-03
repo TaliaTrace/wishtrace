@@ -25,7 +25,7 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -143,6 +143,7 @@ class MandateChargeView(BaseModel):
     reference: str
     amount_minor: int
     state: MandateChargeState
+    provider_charge_id: str | None = Field(default=None, exclude=True)
     failure_code: str | None
     merchant_order_id: str | None
     merchant_outcome: MerchantCheckoutOutcome | None
@@ -389,7 +390,7 @@ class ChargeStore(Protocol):
         occasion_id: uuid.UUID,
         charge_id: uuid.UUID,
         merchant_outcome: MerchantCheckoutOutcome,
-        visa_confirmation: Literal["SUCCESS", "FAILURE"],
+        visa_confirmation: Literal["SUCCESS", "FAILURE"] | None,
         response_id: str | None,
         recurring_frequency: PravaMandateFrequency,
     ) -> MandateResponse: ...
@@ -679,6 +680,14 @@ class MandateService:
                 message="Prava returned a mismatched mandate.",
                 recoverable=False,
             )
+        reconciled = await self._reconcile_confirmed_decline(
+            user=user,
+            occasion_id=occasion_id,
+            mandate=mandate,
+            info=info,
+        )
+        if reconciled is not None:
+            return reconciled
         return await self._store.record_activation(
             user_id=user.id,
             occasion_id=occasion_id,
@@ -977,18 +986,36 @@ class MandateService:
                 message=error.safe_message,
                 recoverable=error.recoverable,
             ) from error
-        expected_confirmation = (
-            "SUCCESS" if report_outcome is PravaReportOutcome.APPROVED else "FAILURE"
-        )
         expected_status = (
             "completed" if report_outcome is PravaReportOutcome.APPROVED else "failed"
+        )
+        confirmation_is_safe = (
+            report.visa_confirmation == "SUCCESS"
+            or report_outcome is PravaReportOutcome.DECLINED
         )
         if (
             report.mandate_id != provider_mandate_id
             or report.charge_id != provider_charge_id
             or report.status != expected_status
-            or report.visa_confirmation != expected_confirmation
+            # A failed network confirmation must never support a successful
+            # order claim. For a merchant decline, either explicit value is
+            # retained as provider evidence while the outcome stays declined.
+            or not confirmation_is_safe
         ):
+            current = await self._store.get(user_id=user.id, occasion_id=occasion_id)
+            try:
+                info = await self._prava.get_mandate(provider_mandate_id)
+            except PravaGatewayError:
+                info = None
+            if info is not None:
+                reconciled = await self._reconcile_confirmed_decline(
+                    user=user,
+                    occasion_id=occasion_id,
+                    mandate=current,
+                    info=info,
+                )
+                if reconciled is not None:
+                    return reconciled
             await self._store.mark_charge_unknown(
                 user_id=user.id,
                 occasion_id=occasion_id,
@@ -999,7 +1026,7 @@ class MandateService:
             raise ApiError(
                 status_code=502,
                 code="PRAVA_RESPONSE_MISMATCH",
-                message="Prava confirmed a different mandate charge outcome.",
+                message="The payment result needs verification. Refresh to reconcile it.",
                 recoverable=False,
             )
         return await self._store.settle_charge(
@@ -1010,6 +1037,60 @@ class MandateService:
             visa_confirmation=report.visa_confirmation,
             response_id=report.response_id,
             recurring_frequency=recurring_frequency,
+        )
+
+    async def _reconcile_confirmed_decline(
+        self,
+        *,
+        user: AuthenticatedUser,
+        occasion_id: uuid.UUID,
+        mandate: MandateResponse,
+        info: PravaMandateInfo,
+    ) -> MandateResponse | None:
+        """Resolve a locally unknown decline from Prava's read-only charge history.
+
+        This never issues another credential or repeats checkout. It accepts only
+        the exact provider transaction, amount, currency and idempotency reference
+        that already carries a merchant DECLINED result in the local ledger.
+        """
+
+        if info.mandate_id != mandate.provider_mandate_id:
+            return None
+        local = max(mandate.charges, key=lambda charge: charge.created_at, default=None)
+        if (
+            local is None
+            or local.provider_charge_id is None
+            or local.merchant_outcome is not MerchantCheckoutOutcome.DECLINED
+            or local.state not in {MandateChargeState.REPORTING, MandateChargeState.UNKNOWN}
+        ):
+            return None
+        if (
+            local.state is MandateChargeState.UNKNOWN
+            and local.failure_code
+            not in {"PRAVA_REPORT_MISMATCH", "PRAVA_REPORT_OUTCOME_UNKNOWN"}
+        ):
+            return None
+        matches = [
+            charge
+            for charge in info.charges
+            if charge.transaction_id == local.provider_charge_id
+            and charge.amount_minor == local.amount_minor
+            and charge.currency == mandate.currency
+            and charge.reference == local.reference
+            and charge.status == "failed"
+        ]
+        if len(matches) != 1:
+            return None
+        return await self._store.settle_charge(
+            user_id=user.id,
+            occasion_id=occasion_id,
+            charge_id=local.id,
+            merchant_outcome=MerchantCheckoutOutcome.DECLINED,
+            # GET /mandates confirms the failed charge but does not expose the
+            # original report's visaConfirmation field.
+            visa_confirmation=None,
+            response_id=info.response_id,
+            recurring_frequency=mandate.recurring_frequency,
         )
 
     def _setup_request(
@@ -1582,7 +1663,7 @@ class SqlMandateStore:
         occasion_id: uuid.UUID,
         charge_id: uuid.UUID,
         merchant_outcome: MerchantCheckoutOutcome,
-        visa_confirmation: Literal["SUCCESS", "FAILURE"],
+        visa_confirmation: Literal["SUCCESS", "FAILURE"] | None,
         response_id: str | None,
         recurring_frequency: PravaMandateFrequency,
     ) -> MandateResponse:
@@ -1864,6 +1945,7 @@ async def _mandate_response(
                 reference=charge.reference,
                 amount_minor=charge.amount_minor,
                 state=MandateChargeState(charge.state),
+                provider_charge_id=charge.provider_charge_id,
                 failure_code=charge.provider_error_code,
                 merchant_order_id=charge.merchant_order_id,
                 merchant_outcome=(

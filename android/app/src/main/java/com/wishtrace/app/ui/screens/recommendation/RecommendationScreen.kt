@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -52,6 +54,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.wishtrace.app.R
@@ -66,7 +69,6 @@ import com.wishtrace.app.ui.components.DimensionalAsset
 import com.wishtrace.app.ui.components.PrimaryAction
 import com.wishtrace.app.ui.components.RecipientAvatar
 import com.wishtrace.app.ui.components.ScreenTopBar
-import com.wishtrace.app.ui.components.SecondaryAction
 import com.wishtrace.app.ui.theme.BlueSurface
 import com.wishtrace.app.ui.theme.BrandBlue
 import com.wishtrace.app.ui.theme.BrandIndigo
@@ -121,7 +123,11 @@ fun RecommendationScreen(
         containerColor = Canvas,
         topBar = {
             ScreenTopBar(
-                title = "The decision",
+                title = if (state is RecommendationUiState.Content) {
+                    "Best fits for ${snapshot.recipient.displayName}"
+                } else {
+                    "Finding a gift"
+                },
                 onBack = onBack,
                 modifier = Modifier
                     .statusBarsPadding()
@@ -473,36 +479,31 @@ private fun DecisionContent(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         DecisionRecipientPill(snapshot)
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = if (selected.id == state.decision.selectedCandidateId) {
-                    "This one fits best."
-                } else {
-                    "Your pick."
-                },
-                modifier = Modifier.semantics { heading() },
-                color = Ink,
-                style = MaterialTheme.typography.headlineLarge,
-            )
-            Text(
-                text = rationale.reason,
-                color = InkMuted,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-        RecommendationHero(candidate = selected)
+        RecommendationBento(
+            candidate = selected,
+            rationale = rationale.reason,
+            isPrimary = selected.id == state.decision.selectedCandidateId,
+        )
 
         if (alternatives.isNotEmpty()) {
             Text(
-                text = "Other good fits",
-                color = Ink,
-                style = MaterialTheme.typography.titleMedium,
+                text = "OTHER GOOD FITS",
+                color = BrandIndigo,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
             )
-            alternatives.forEach { candidate ->
-                AlternativeCard(
-                    candidate = candidate,
-                    onChoose = { onChoose(candidate.id) },
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                alternatives.forEachIndexed { index, candidate ->
+                    AlternativeCard(
+                        candidate = candidate,
+                        containerColor = if (index == 0) LavenderSurface else BlueSurface,
+                        onChoose = { onChoose(candidate.id) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -513,166 +514,249 @@ private fun DecisionContent(
 }
 
 @Composable
-private fun RecommendationHero(candidate: ProductCandidate) {
-    Surface(
-        color = SurfaceWhite,
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, OutlineCool),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(
-                    modifier = Modifier.size(86.dp),
-                    color = LavenderSurface,
-                    contentColor = BrandIndigoPressed,
-                    shape = RoundedCornerShape(22.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.ShoppingBag,
-                            contentDescription = null,
-                            modifier = Modifier.size(36.dp),
-                        )
-                    }
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    Text(
-                        text = candidate.title,
-                        color = Ink,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = candidate.merchantName,
-                        color = InkMuted,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        text = candidate.currentPrice.formatted(),
-                        color = BrandIndigoPressed,
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                }
-            }
-            CandidateFact(
-                icon = Icons.Rounded.LocalShipping,
-                text = candidate.supportedDeliveryFact ?: "Delivery not confirmed",
-            )
-            candidate.selectedVariant?.let {
-                CandidateFact(
-                    icon = Icons.Rounded.Check,
-                    text = it,
-                )
-            }
-            SourceStamp(candidate)
-        }
-    }
-}
-
-@Composable
-private fun CandidateFact(
-    icon: ImageVector,
-    text: String,
+private fun RecommendationBento(
+    candidate: ProductCandidate,
+    rationale: String,
+    isPrimary: Boolean,
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = BrandBlue,
-            modifier = Modifier.size(20.dp),
-        )
-        Text(
-            text = text,
-            color = Ink,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-@Composable
-private fun SourceStamp(candidate: ProductCandidate) {
     val formatter = DateTimeFormatter.ofPattern("MMM d, h:mm a")
     val recorded = formatter.format(
         candidate.sourceTimestamp.atZone(ZoneId.systemDefault()),
     )
-    Surface(
-        color = BlueSurface,
-        contentColor = BrandIndigoPressed,
-        shape = RoundedCornerShape(14.dp),
-    ) {
-        Text(
-            text = "${candidate.sourceMode.displayName()} source · $recorded",
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelSmall,
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(238.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(
+                modifier = Modifier
+                    .weight(1.45f)
+                    .fillMaxHeight(),
+                color = LavenderSurface,
+                contentColor = Ink,
+                shape = RoundedCornerShape(28.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            color = SurfaceWhite,
+                            contentColor = BrandIndigo,
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.ShoppingBag,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(25.dp),
+                                )
+                            }
+                        }
+                        Text(
+                            text = if (isPrimary) "TOP MATCH" else "YOUR PICK",
+                            color = BrandIndigo,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(
+                            text = candidate.title,
+                            modifier = Modifier.semantics { heading() },
+                            color = Ink,
+                            style = MaterialTheme.typography.headlineMedium,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = candidate.merchantName,
+                            color = InkMuted,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(0.9f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    color = BrandIndigo,
+                    contentColor = SurfaceWhite,
+                    shape = RoundedCornerShape(24.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("PRICE", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            text = candidate.currentPrice.formatted(),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                        Text("USD", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    color = BlueSurface,
+                    contentColor = Ink,
+                    shape = RoundedCornerShape(24.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = BrandBlue,
+                        )
+                        Text(
+                            text = candidate.sourceMode.displayName().uppercase(),
+                            color = BrandBlue,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = recorded,
+                            color = InkMuted,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Ink,
+            contentColor = SurfaceWhite,
+            shape = RoundedCornerShape(24.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Lightbulb, contentDescription = null, tint = BrandBlue)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("WHY IT FITS", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        text = rationale,
+                        color = SurfaceWhite,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = SurfaceWhite,
+            contentColor = Ink,
+            shape = RoundedCornerShape(22.dp),
+            border = BorderStroke(1.dp, OutlineCool),
+        ) {
+            Row(
+                modifier = Modifier.padding(15.dp),
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.LocalShipping, contentDescription = null, tint = BrandBlue)
+                Text(
+                    text = candidate.supportedDeliveryFact ?: "Delivery not confirmed",
+                    modifier = Modifier.weight(1f),
+                    color = Ink,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun AlternativeCard(
     candidate: ProductCandidate,
+    containerColor: androidx.compose.ui.graphics.Color,
     onChoose: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onChoose,
-        color = SurfaceWhite,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, OutlineCool),
+        modifier = modifier.heightIn(min = 154.dp),
+        color = containerColor,
+        shape = RoundedCornerShape(24.dp),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(15.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                color = LavenderSurface,
-                contentColor = BrandIndigoPressed,
-                shape = RoundedCornerShape(14.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Rounded.ShoppingBag,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                    )
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    color = SurfaceWhite,
+                    contentColor = BrandIndigoPressed,
+                    shape = RoundedCornerShape(13.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.ShoppingBag,
+                            contentDescription = null,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
                 }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = candidate.title,
-                    color = Ink,
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    text = candidate.merchantName,
-                    color = InkMuted,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = candidate.currentPrice.formatted(),
                     color = Ink,
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = candidate.title,
+                    color = Ink,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Choose",
-                    color = BrandIndigoPressed,
+                    text = candidate.merchantName,
+                    color = InkMuted,
                     style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -848,11 +932,7 @@ private fun RecommendationActionBar(
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             when (state) {
-                RecommendationUiState.Loading -> SecondaryAction(
-                    text = "Back",
-                    onClick = onBack,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                RecommendationUiState.Loading -> Unit
 
                 RecommendationUiState.SourceNeeded -> {
                     PrimaryAction(
@@ -861,11 +941,6 @@ private fun RecommendationActionBar(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag(WishTraceTestTags.WriteMessage),
-                    )
-                    SecondaryAction(
-                        text = "Back to discovery",
-                        onClick = onBack,
-                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
 
@@ -877,11 +952,6 @@ private fun RecommendationActionBar(
                         onClick = onRetry,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    SecondaryAction(
-                        text = "Back",
-                        onClick = onBack,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
 
                 is RecommendationUiState.Content -> {
@@ -890,11 +960,6 @@ private fun RecommendationActionBar(
                         onClick = { selectedCandidateId?.let(onSelect) },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = selectedCandidateId != null,
-                    )
-                    SecondaryAction(
-                        text = "Back",
-                        onClick = onBack,
-                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }

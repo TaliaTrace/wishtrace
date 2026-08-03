@@ -8,21 +8,27 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,8 +50,6 @@ import com.wishtrace.app.domain.MandateMerchantOutcome
 import com.wishtrace.app.domain.MandateStatus
 import com.wishtrace.app.ui.HomeUiState
 import com.wishtrace.app.ui.WishTraceTestTags
-import com.wishtrace.app.ui.components.EditorialCard
-import com.wishtrace.app.ui.components.InterestChip
 import com.wishtrace.app.ui.components.PrimaryAction
 import com.wishtrace.app.ui.components.RecipientAvatar
 import com.wishtrace.app.ui.components.StaggeredEntrance
@@ -53,11 +57,13 @@ import com.wishtrace.app.ui.components.WishTraceWordmark
 import com.wishtrace.app.ui.theme.BlueSurface
 import com.wishtrace.app.ui.theme.BrandBlue
 import com.wishtrace.app.ui.theme.BrandIndigo
+import com.wishtrace.app.ui.theme.Ink
+import com.wishtrace.app.ui.theme.InkMuted
 import com.wishtrace.app.ui.theme.LavenderSurface
+import com.wishtrace.app.ui.theme.OutlineCool
+import com.wishtrace.app.ui.theme.SurfaceWhite
 import com.wishtrace.app.ui.theme.Success
 import com.wishtrace.app.ui.theme.SuccessSurface
-import com.wishtrace.app.ui.theme.Warning
-import com.wishtrace.app.ui.theme.WarningSurface
 import com.wishtrace.app.ui.theme.WishTraceTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -70,6 +76,7 @@ fun HomeScreen(
     giverDisplayName: String? = null,
     onRetry: () -> Unit,
     onFindGift: () -> Unit,
+    onFindAnotherGift: () -> Unit = onFindGift,
     onReviewRecipient: () -> Unit,
     onAddPerson: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -92,6 +99,7 @@ fun HomeScreen(
                 mandate = state.mandate,
                 giverDisplayName = giverDisplayName,
                 onFindGift = onFindGift,
+                onFindAnotherGift = onFindAnotherGift,
                 onReviewRecipient = onReviewRecipient,
             )
         }
@@ -104,6 +112,7 @@ private fun HomeContent(
     mandate: MandateDetails?,
     giverDisplayName: String?,
     onFindGift: () -> Unit,
+    onFindAnotherGift: () -> Unit,
     onReviewRecipient: () -> Unit,
 ) {
     val recipient = snapshot.recipient
@@ -120,160 +129,66 @@ private fun HomeContent(
             top = 16.dp,
             bottom = 32.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             StaggeredEntrance(index = 0) {
-                WishTraceWordmark(markSize = 30.dp)
-            }
-        }
-        item {
-            StaggeredEntrance(index = 1) {
-                Text(
-                    text = greetingFor(giverDisplayName),
-                    modifier = Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.headlineLarge,
-                )
-            }
-        }
-        item {
-            StaggeredEntrance(index = 2) {
-                EditorialCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            RecipientAvatar(
-                                initials = recipient.initials,
-                                photoUri = recipient.photoUri,
-                                size = 56.dp,
-                            )
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                Text(
-                                    text = "${recipient.displayName}'s ${occasion.kind.displayName}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.CalendarMonth,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = BrandBlue,
-                                    )
-                                    Text(
-                                        text = occasion.localDate.format(dateFormatter),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                }
-                            }
-                            Surface(
-                                color = LavenderSurface,
-                                contentColor = BrandIndigo,
-                                shape = RoundedCornerShape(16.dp),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Text(
-                                        text = snapshot.daysUntil.toString(),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                    Text(
-                                        text = "days",
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                }
-                            }
-                        }
-
-                        if (recipient.interests.isNotEmpty()) {
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(0.dp),
-                            ) {
-                                items(recipient.interests.take(3).size) { index ->
-                                    InterestChip(text = recipient.interests[index])
-                                }
-                            }
-                        }
-
-                        mandate?.autopilotStatus()?.let { status ->
-                            MandateStatusPill(status = status)
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "Gift budget",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Text(
-                                text = occasion.budget.formatted(Locale.US),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-
-                        PrimaryAction(
-                            text = when {
-                                mandate == null ->
-                                    "Find a gift for ${recipient.displayName}"
-
-                                mandate.status.requiresApproval ->
-                                    "Finish autopilot approval"
-
-                                mandate.lastChargeState != null ->
-                                    "View merchant proof"
-
-                                mandate.isArmed ->
-                                    "Open ${recipient.displayName}'s autopilot"
-
-                                else -> "Review ${recipient.displayName}'s autopilot"
-                            },
-                            onClick = onFindGift,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(WishTraceTestTags.FindGift),
-                            trailingContent = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            },
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        WishTraceWordmark(
+                            markSize = 34.dp,
+                            textStyle = MaterialTheme.typography.headlineMedium,
                         )
+                        Text(
+                            text = greetingFor(giverDisplayName),
+                            modifier = Modifier.semantics { heading() },
+                            color = Ink,
+                            style = MaterialTheme.typography.headlineMedium,
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier.size(52.dp),
+                        color = BlueSurface,
+                        contentColor = BrandBlue,
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.Favorite,
+                                contentDescription = "Thoughtful gifting",
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
                     }
                 }
             }
         }
+        item {
+            StaggeredEntrance(index = 1) {
+                OccasionBentoGrid(
+                    snapshot = snapshot,
+                    mandate = mandate,
+                    dateLabel = occasion.localDate.format(dateFormatter),
+                    onFindGift = onFindGift,
+                    onFindAnotherGift = onFindAnotherGift,
+                    onReviewRecipient = onReviewRecipient,
+                )
+            }
+        }
         if (recipient.hints.isNotEmpty()) {
             item {
-                StaggeredEntrance(index = 3) {
-                Surface(
+                StaggeredEntrance(index = 2) {
+                    Surface(
                     onClick = onReviewRecipient,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(WishTraceTestTags.ReviewRecipient),
-                    color = BlueSurface,
-                    shape = RoundedCornerShape(20.dp),
+                        color = SurfaceWhite,
+                        shape = RoundedCornerShape(22.dp),
                     border = BorderStroke(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outline,
@@ -298,18 +213,18 @@ private fun HomeContent(
                                 )
                             }
                         }
-                        Column(
+                            Column(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            Text(
-                                text = "Saved clue",
+                                Text(
+                                    text = "CLUE",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 text = recipient.hints.first().text,
-                                maxLines = 2,
+                                    maxLines = 1,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                             )
@@ -326,6 +241,288 @@ private fun HomeContent(
             }
         }
     }
+}
+
+@Composable
+private fun OccasionBentoGrid(
+    snapshot: HomeSnapshot,
+    mandate: MandateDetails?,
+    dateLabel: String,
+    onFindGift: () -> Unit,
+    onFindAnotherGift: () -> Unit,
+    onReviewRecipient: () -> Unit,
+) {
+    val recipient = snapshot.recipient
+    val occasion = snapshot.occasion
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(228.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(
+                onClick = onReviewRecipient,
+                modifier = Modifier
+                    .weight(1.45f)
+                    .fillMaxHeight()
+                    .testTag(WishTraceTestTags.ReviewRecipient),
+                color = LavenderSurface,
+                contentColor = Ink,
+                shape = RoundedCornerShape(28.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "NEXT MOMENT",
+                        color = BrandIndigo,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Surface(
+                        modifier = Modifier.size(78.dp),
+                        color = SurfaceWhite,
+                        shape = CircleShape,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            RecipientAvatar(
+                                initials = recipient.initials,
+                                photoUri = recipient.photoUri,
+                                size = 66.dp,
+                            )
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = recipient.displayName,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = occasion.kind.displayName,
+                            color = InkMuted,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.CalendarMonth,
+                                contentDescription = null,
+                                tint = BrandBlue,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = dateLabel,
+                                color = InkMuted,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(0.9f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    color = BrandIndigo,
+                    contentColor = SurfaceWhite,
+                    shape = RoundedCornerShape(24.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("COUNTDOWN", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            text = snapshot.daysUntil.toString(),
+                            style = MaterialTheme.typography.displayLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text("days", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    color = BlueSurface,
+                    contentColor = Ink,
+                    shape = RoundedCornerShape(24.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "GIFT CAP",
+                            color = BrandBlue,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = occasion.budget.formatted(Locale.US),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                        Text("USD", color = InkMuted, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+
+        val interests = recipient.interests.take(2)
+        if (interests.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 100.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                interests.forEachIndexed { index, interest ->
+                    InterestBentoTile(
+                        interest = interest,
+                        modifier = Modifier.weight(1f),
+                        container = if (index == 0) BlueSurface else LavenderSurface,
+                    )
+                }
+                if (interests.size == 1) {
+                    InterestBentoTile(
+                        interest = occasion.kind.displayName,
+                        modifier = Modifier.weight(1f),
+                        container = LavenderSurface,
+                    )
+                }
+            }
+        }
+
+        mandate?.autopilotStatus()?.let { status ->
+            MandateStatusTile(
+                status = status,
+                onClick = onFindGift,
+            )
+        }
+
+        PrimaryAction(
+            text = when {
+                mandate == null -> "Find ${recipient.displayName}'s gift"
+                mandate.status.requiresApproval -> "Finish approval"
+                mandate.lastChargeState != null -> "Find another gift"
+                mandate.isArmed -> "Open autopilot"
+                else -> "Review autopilot"
+            },
+            onClick = if (mandate?.lastChargeState != null) onFindAnotherGift else onFindGift,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(WishTraceTestTags.FindGift),
+            trailingContent = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(19.dp),
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun InterestBentoTile(
+    interest: String,
+    container: Color,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.heightIn(min = 100.dp),
+        color = container,
+        contentColor = Ink,
+        shape = RoundedCornerShape(22.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(15.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(
+                imageVector = interestIcon(interest),
+                contentDescription = null,
+                tint = BrandIndigo,
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                text = interest,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MandateStatusTile(
+    status: AutopilotStatusPill,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        color = status.container,
+        contentColor = status.content,
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(1.dp, OutlineCool),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                color = SurfaceWhite,
+                contentColor = status.content,
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(status.icon, contentDescription = null, modifier = Modifier.size(21.dp))
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("PRAVA", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    status.label,
+                    color = Ink,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = "Open Prava status",
+                modifier = Modifier.size(19.dp),
+            )
+        }
+    }
+}
+
+private fun interestIcon(interest: String): ImageVector = when {
+    interest.contains("game", ignoreCase = true) -> Icons.Rounded.SportsEsports
+    interest.contains("gym", ignoreCase = true) ||
+        interest.contains("fitness", ignoreCase = true) -> Icons.Rounded.FitnessCenter
+    interest.contains("music", ignoreCase = true) -> Icons.Rounded.Headphones
+    interest.contains("book", ignoreCase = true) -> Icons.AutoMirrored.Rounded.MenuBook
+    else -> Icons.Rounded.Favorite
 }
 
 @Composable
@@ -435,8 +632,8 @@ private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (statu
         AutopilotStatusPill(
             label = if (lastChargeState == "UNKNOWN") "Result unknown" else "Needs attention",
             icon = Icons.Rounded.Schedule,
-            container = WarningSurface,
-            content = Warning,
+            container = BlueSurface,
+            content = BrandBlue,
         )
     } else {
         AutopilotStatusPill(
@@ -465,8 +662,8 @@ private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (statu
         AutopilotStatusPill(
             label = "Attempt recorded",
             icon = Icons.Rounded.Schedule,
-            container = WarningSurface,
-            content = Warning,
+            container = BlueSurface,
+            content = BrandBlue,
         )
     }
 
@@ -478,16 +675,16 @@ private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (statu
     -> AutopilotStatusPill(
         label = "Awaiting approval",
         icon = Icons.Rounded.Schedule,
-        container = WarningSurface,
-        content = Warning,
+        container = BlueSurface,
+        content = BrandBlue,
     )
 
     MandateStatus.DECLINED -> if (lastChargeState != null) {
         AutopilotStatusPill(
             label = "Last attempt failed",
             icon = Icons.Rounded.Schedule,
-            container = WarningSurface,
-            content = Warning,
+            container = BlueSurface,
+            content = BrandBlue,
         )
     } else {
         null
@@ -495,32 +692,6 @@ private fun MandateDetails.autopilotStatus(): AutopilotStatusPill? = when (statu
 
     // CANCELLED, EXPIRED, FAILED, PAUSED, UNKNOWN — muted; no pill.
     else -> null
-}
-
-@Composable
-private fun MandateStatusPill(status: AutopilotStatusPill) {
-    Surface(
-        color = status.container,
-        contentColor = status.content,
-        shape = RoundedCornerShape(14.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = status.icon,
-                contentDescription = null,
-                modifier = Modifier.size(15.dp),
-            )
-            Text(
-                text = status.label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
 }
 
 private fun greetingFor(displayName: String?): String {

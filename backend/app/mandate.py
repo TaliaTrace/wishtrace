@@ -1233,9 +1233,30 @@ class SqlMandateStore:
                         else None
                     ),
                 )
+                replacing_consumed_decline = _is_consumed_decline_replacement(
+                    existing_state=existing_state,
+                    existing_merchant_outcome=(
+                        MerchantCheckoutOutcome(existing.merchant_outcome)
+                        if existing.merchant_outcome is not None
+                        else None
+                    ),
+                    existing_merchant_order_id=existing.merchant_order_id,
+                    latest_charge_state=(
+                        MandateChargeState(latest_charge.state)
+                        if latest_charge is not None
+                        else None
+                    ),
+                    latest_charge_merchant_outcome=(
+                        MerchantCheckoutOutcome(latest_charge.merchant_outcome)
+                        if latest_charge is not None
+                        and latest_charge.merchant_outcome is not None
+                        else None
+                    ),
+                )
                 if (
                     existing_state not in _REPLACEABLE_MANDATE_STATES
                     and not replacing_locked_unknown
+                    and not replacing_consumed_decline
                 ):
                     raise ApiError(
                         status_code=409,
@@ -2092,4 +2113,29 @@ def _is_sandbox_unknown_replacement(
         and latest_charge_state is MandateChargeState.UNKNOWN
         and latest_provider_charge_id is not None
         and replacement_product_id != existing_product_id
+    )
+
+
+def _is_consumed_decline_replacement(
+    *,
+    existing_state: MandateState,
+    existing_merchant_outcome: MerchantCheckoutOutcome | None,
+    existing_merchant_order_id: str | None,
+    latest_charge_state: MandateChargeState | None,
+    latest_charge_merchant_outcome: MerchantCheckoutOutcome | None,
+) -> bool:
+    """Allow a new explicit approval after a settled merchant decline.
+
+    A one-time Prava mandate becomes ``CONSUMED`` after its single settled attempt even when the
+    merchant declined it. That terminal audit record must remain immutable, but it must not trap
+    the occasion forever. Requiring matching decline evidence on both the mandate and latest charge,
+    plus the absence of an order ID, keeps successful or ambiguous purchases non-replaceable.
+    """
+
+    return (
+        existing_state is MandateState.CONSUMED
+        and existing_merchant_outcome is MerchantCheckoutOutcome.DECLINED
+        and existing_merchant_order_id is None
+        and latest_charge_state is MandateChargeState.DECLINED
+        and latest_charge_merchant_outcome is MerchantCheckoutOutcome.DECLINED
     )

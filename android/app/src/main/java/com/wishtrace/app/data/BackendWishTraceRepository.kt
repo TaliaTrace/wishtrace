@@ -17,12 +17,13 @@ import org.json.JSONObject
 class BackendWishTraceRepository(
     private val api: WishTraceApiClient,
     private val sessionStore: SessionStore,
+    private val recipientPhotoStore: RecipientPhotoStore? = null,
 ) : WishTraceRepository, PeopleRepository, OccasionRepository {
     override suspend fun getHome(): HomeSnapshot? = authenticated { token ->
         val body = api.get(path = "/v1/home", accessToken = token)
         if (body.isNull("recipient") || body.isNull("occasion")) return@authenticated null
         HomeSnapshot(
-            recipient = body.getJSONObject("recipient").toRecipient(),
+            recipient = body.getJSONObject("recipient").toRecipient(recipientPhotoStore),
             occasion = body.getJSONObject("occasion").toOccasion(),
             today = LocalDate.parse(body.requiredString("today")),
             sourceMode = SourceMode.LIVE,
@@ -59,7 +60,16 @@ class BackendWishTraceRepository(
                 accessToken = token,
             )
         }
-        response.toRecipient()
+        response.toRecipient(recipientPhotoStore)
+    }
+
+    override suspend fun listRecipients(): List<Recipient> = authenticated { token ->
+        val body = api.getArray(path = "/v1/recipients", accessToken = token)
+        buildList {
+            for (index in 0 until body.length()) {
+                add(body.getJSONObject(index).toRecipient(recipientPhotoStore))
+            }
+        }
     }
 
     override suspend fun saveOccasion(input: OccasionInput): Occasion = authenticated { token ->
@@ -91,6 +101,17 @@ class BackendWishTraceRepository(
         response.toOccasion()
     }
 
+    override suspend fun listOccasions(recipientId: String?): List<Occasion> =
+        authenticated { token ->
+            val path = recipientId?.let { "/v1/occasions?recipient_id=$it" } ?: "/v1/occasions"
+            val body = api.getArray(path = path, accessToken = token)
+            buildList {
+                for (index in 0 until body.length()) {
+                    add(body.getJSONObject(index).toOccasion())
+                }
+            }
+        }
+
     private suspend fun <T> authenticated(block: suspend (String) -> T): T {
         val token = sessionStore.current()?.accessToken
             ?: throw WishTraceApiException(
@@ -109,7 +130,7 @@ class BackendWishTraceRepository(
     }
 }
 
-private fun JSONObject.toRecipient(): Recipient {
+private fun JSONObject.toRecipient(photoStore: RecipientPhotoStore? = null): Recipient {
     val interests = getJSONArray("interests").toStrings()
     val dislikes = getJSONArray("dislikes").toStrings()
     val hintsJson = getJSONArray("hints")
@@ -136,7 +157,7 @@ private fun JSONObject.toRecipient(): Recipient {
         displayName = requiredString("display_name"),
         relationship = requiredString("relationship"),
         initials = requiredString("initials"),
-        photoUri = null,
+        photoUri = photoStore?.photoUri(requiredString("id")),
         interests = interests,
         dislikes = dislikes,
         personalityTraits = personality?.takeUnless(PersonalityTraits::isEmpty),

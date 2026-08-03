@@ -39,9 +39,9 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   One explicit docs-sanctioned retry was guarded by provider `active`, `$0.00` spent and zero counted
   charges. It failed identically as transaction `txn_01KZ218YJV1NBFM3DZH9T54N7M`, response
   `67174297-c74e-4f54-beb3-e5ac17f08660`, again before credentials or merchant submission.
-- Mandate report verified: CURRENT CONTRACT + MOCK TRANSPORT — current completed/failed result,
-  mandate/transaction identity and Visa confirmation are checked; the live merchant attempt remained
-  unknown, so WishTrace correctly did not report an invented approval or decline.
+- Mandate report verified: LIVE SANDBOX PASS — after one bounded Jackbox checkout returned the
+  processor's explicit payment decline, WishTrace reported `DECLINED` once and reconciliation
+  preserved the same Prava/merchant outcome without another checkout attempt.
 - Standard hosted-session fallback: LIVE PROVIDER FAILURE — one real hosted session was created for
   purchase intent `36e40790-751f-451d-9b45-6f3e7b59338c` and the same exact `$5.00` Jackbox quote.
   Prava displayed that identity was verified but payment could not complete. Authoritative
@@ -50,14 +50,16 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   `FETCH_AGENTIC_CREDS_ERROR`. Reopening the same existing hosted URL created no new session; the
   provider page recorded transaction `txn_01KZ21X8G8RRP5CNYM535W5NMK` with
   `FIDO_START_FAILED`. No usable credential was issued in either attempt.
-- Real-merchant browser attempt verified: LIVE SANDBOX PARTIAL PASS — the newest mandate produced a
-  one-time credential and the allowlisted Jackbox actor clicked Pay once for exact Drawful 2 at
-  `$9.99`. The page exposed neither a verified order nor a recognized explicit decline within 45
-  seconds, so the immutable result is `UNKNOWN`; no report or retry followed.
-- Authoritative success verified:
+- Real-merchant browser attempt verified: LIVE SANDBOX PASS — a fresh owner-approved mandate
+  produced a one-time credential, the allowlisted Jackbox actor submitted it once to the exact
+  Shopify checkout, and the processor returned the organizer-expected sandbox decline. Earlier
+  retired Drawful 2/Quiplash 2 pages remain immutable `UNKNOWN`; they were not reclassified.
+- Authoritative success verified: NOT CLAIMED — the strongest supported state is a reconciled
+  sandbox processor decline. No merchant order ID or real-money success exists.
 - Decline/cancel/unknown tested: create timeout, server error, unsafe redirect and malformed success
   freeze as `UNKNOWN`; replay refusal and invalid provider facts pass automated tests. A live hosted
-  provisioning failure now becomes retryable `FAILED`; live merchant decline and cancel remain pending.
+  provisioning failure becomes bounded `FAILED`, and the real sandbox merchant decline now
+  reconciles to the precise terminal proof state. Cancellation remains covered by automated tests.
 - Production access requested: NO — intentionally gated behind organizer-required sandbox evidence
 - Backend boundary: purchase ledger, peppered quote/session idempotency, exact state transitions,
   fixed app return, authoritative polling, one-attempt Shopify automation and report-status are
@@ -95,10 +97,10 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
 - Sandbox browser-automation contract: ORGANIZER-CONFIRMED — Prava's hosted Browser Harness is not
   available in sandbox. Teams must build their own automation and call report-status themselves.
   WishTrace's exact-product Playwright actor is therefore the correct post-mint implementation.
-- Known blocker: the older Drawful 2 and Quiplash 2 post-mint merchant results remain locked
-  `UNKNOWN`; the latest Quiplash run is blocked by Prava credential minting before payment
-  submission. Its one explicit retry returned the same failure, so WishTrace has stopped permanently
-  and recorded the provider boundary.
+- Core proof status: COMPLETE IN SANDBOX — prior post-mint `UNKNOWN` attempts remain immutable, but
+  a later independent mandate reached credential mint, one merchant submission, explicit processor
+  decline, Prava decline reporting and app reconciliation. No additional payment attempt is needed
+  for the submission proof.
 - Conflict recovery: DEPLOYED — Android automatically refreshes an existing mandate after a setup
   conflict. An explicit different-gift sandbox recovery must name the exact latest locked mandate,
   prove its post-mint charge is `UNKNOWN`, and select a different live product. The old mandate is
@@ -111,21 +113,27 @@ Update this with observed facts, IDs and dates. Do not leave a successful spike 
   unavailable. Safe response IDs: `3282c85d-cb92-4b4b-8a0d-6a4381be7272` and
   `ce11dddc-e591-4196-977a-d718d42de574`.
 - Dashboard correlation: USER-OBSERVED — timestamps supplied by the user are IST, not PKT. The
-  latest 04:37–04:40 IST sequence shows `Creds_Generated`, `Authorized`, then two `Failed` rows at
-  the expected amounts. These labels corroborate provider stages only; they do not prove merchant
-  contact, decline, Visa confirmation or an order.
+  earlier 04:37–04:40 IST sequence shows credential, authorization and failure stages. The newest
+  fresh-card sequence shows `$10.00 Authorized` at 05:54 IST and `$9.99 Creds_Generated` at 05:56
+  IST. These labels corroborate provider stages only; they do not prove a merchant decline, Visa
+  confirmation or an order.
 - Exhausted-card recovery: INSTALLED — after the second pre-credential failure, Android offers a
   fresh live-gift path only under sandbox tools and no third mint retry. After restart, Home renders
   `Last attempt failed` and `View merchant proof`, which reopens the recovery. A new attempt requires
   a fresh owner-approved Prava setup and a different approved sandbox card; WishTrace never inserts
   card data itself.
-- Last verified: 2026-08-03 04:39 PKT (05:09 IST)
-- Evidence location: migration `20260803_0014`; ACR build `chk`, image digest
-  `sha256:c34d7a774e94bc0be78f13dc04563e6453d5d96f045670e861d0b2705269f49a`, and healthy deployed
-  revision `wishtrace-api--mintretry1` at 100% traffic. Public health reports PostgreSQL 17.6 over
-  TLS; the UCP profile returns 200 with `public, max-age=300`; 160 backend tests plus Android
-  build/unit/lint pass; the matching APK installed in place. No credential, card data or provider
-  payload is retained.
+- Exhaustion meaning: ORGANIZER-CONFIRMED — at 04:40 on 2026-08-03, Shubham Kukreti answered a
+  participant report with the same post-identity `FETCH_AGENTIC_CREDS_ERROR / Visa 400 — Fetching
+  cryptogram failed` and stated that it means the sandbox card is exhausted; Prava supplied that
+  team a fresh card by email. This supersedes the earlier “possible provider outage” hypothesis.
+  It does not authorize WishTrace to retry an exhausted enrollment or to treat shared public cards
+  as fresh. A new card must come from Prava and must be selected by the owner in a new hosted setup.
+- Last verified: 2026-08-03 06:08 PKT (06:38 IST)
+- Evidence location: commit `d93b93c`; ACR build `chp`, image digest
+  `sha256:2ffea3b56418fe16e1d19f896ffe71a30fd2f06553f43c5057338d937491e746`, and healthy deployed
+  revision `wishtrace-api--completion1` at 100% traffic. Public health reports PostgreSQL 17.6 over
+  TLS; 185 backend tests plus Android build/unit/lint pass. No credential, card data, checkout body,
+  screenshot or provider payload is retained.
 
 Organizer truth boundary: production access requires the sandbox integration to work end to end in
 the Android app and a tokenized test-card transaction to be attempted through browser automation
@@ -160,13 +168,15 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Quote/total verified: YES THROUGH THE RUNTIME ACTOR — after synthetic US billing in a non-payment
   probe, the same gateway wired into the API returned item 500, shipping 0, tax 0 and total 500 USD
   minor units, with a fresh 20-minute quote. No payment was submitted.
-- Checkout compatibility verified: LIVE QUOTE + FORM + ONE-CLICK BOUNDARY — the exact Shopify card
-  form and PCI iframes were observed. On Windows, Playwright runs on a dedicated Proactor loop beside
-  psycopg's Selector loop; the production gateway passed live with this boundary. No credential or
-  payment was submitted.
-- Prava compatibility: CONTRACT/TESTED BOUNDARY ONLY — code accepts one matching in-memory
-  credential, makes one merchant attempt, reports `APPROVED`/`DECLINED`, and re-polls. Stored-value
-  permission and the live sandbox attempt remain pending.
+- Checkout compatibility verified: LIVE TOKENIZED ONE-CLICK BOUNDARY — the exact Shopify form and
+  PCI iframes were observed, two Prava credentials were separately filled only in browser memory,
+  and Pay was clicked once per approved attempt. Both pages lacked a captured final receipt and stay
+  `UNKNOWN`. The deployed observer now consumes structured Shopify completion/receipt responses as
+  well as explicit UI evidence without treating processing, fields or network errors as proof.
+- Prava compatibility: LIVE MINT + MERCHANT ATTEMPT, REPORT PENDING — code accepts one matching
+  in-memory credential, makes one merchant attempt, reports `APPROVED`/`DECLINED`, and re-polls. A
+  fresh mandate and credential mint are proven; one new explicit failure capture is still needed to
+  prove the live mandate report boundary.
 - Runtime gate: checkout and stored value remain disabled by code default. Both explicit flags are
   enabled only on the Azure staging revision for the organizer-required sandbox attempt. This does
   not claim production stored-value support.
@@ -174,8 +184,8 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   separate program onboarding/credentials and cannot provide a truthful hackathon integration now.
 - Geography risk: Jackbox limits purchase/use to supported regions. A future real $5 gift remains
   conditional on the cardholder/recipient region and Prava's stored-value policy.
-- Last verified: 2026-08-03 01:40 PKT during the official window; later repeated catalog probes were
-  rate-limited, so the recorded isolated cart evidence is retained rather than retried
+- Last verified: 2026-08-03 06:08 PKT; two owner-approved tokenized attempts remain locked `UNKNOWN`,
+  and the structured completion observer is deployed but has not received a post-deployment charge
 - Evidence location: `artifacts/backend/jackbox-digital-checkout-probe-2026-08-01.png`,
   `artifacts/backend/jackbox-runtime-quote-2026-08-01.json`,
   `backend/app/merchant_browser.py`, `backend/tests/test_merchant_browser.py`
@@ -215,7 +225,7 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Path: session pooler on port 5432 with SQLAlchemy async psycopg 3 and `NullPool`
 - Client TLS verified: YES via libpq `ssl_in_use`
 - Server version observed: PostgreSQL 17.6
-- Migration status: `20260803_0014 (head)`; Alembic model/schema drift check passes
+- Migration status: `20260803_0015 (head)`; Alembic model/schema drift check passes
 - Migration content: foundation; Google users/challenges/sessions; owned recipients, preferences,
   hints and occasions; one-recipient Gold uniqueness; owned immutable discovery runs, live candidate
   snapshots and deterministic rejection records; exact purchase snapshots, public Prava session
@@ -224,7 +234,8 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   quotes, merchant/Prava outcome evidence, one owned editable personal message per purchase, owned
   mandate/charge audit rows, Gift-DNA personality/age evidence, explicit occasion recurrence,
   normalized mandate-setup failure categories, explicit digital-product kind, and immutable mandate
-  history across user-authorized recovery attempts
+  history across user-authorized recovery attempts; the obsolete one-recipient-per-user uniqueness
+  constraint has been removed so real additional recipients can be persisted
 - Permanent ignored local `.env` contains `sslmode=require`: YES; a fresh settings load and read-only
   connection probe used that value directly and reported client TLS true
 - Stable local `SESSION_TOKEN_PEPPER`: YES; presence and minimum length were checked without printing
@@ -242,12 +253,20 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Google auth client: Credential Manager `1.6.0` and Google ID `1.2.0` compiled; `WISHTRACE_GOOGLE_WEB_CLIENT_ID` resource injection compiled
 - Google account validation: VERIFIED on the physical phone through a real nonce-bound Google
   exchange; one backend user, active session and consumed challenge observed without capturing tokens
+- Logout/re-sign-in recovery: VERIFIED IN APP — logout now finishes before Welcome navigation, a
+  changed bearer token refreshes Home and People even from an existing error route, and the sign-in
+  UI prevents simultaneous automatic/manual exchanges. The rebuilt APK restored the authenticated
+  Home after installation and process restart on `RMX3201`.
 - API connection verified: YES over public Azure HTTPS on the physical phone; the existing real
   Google session reopened an authenticated, genuinely empty Home after the public-URL APK update.
   The user then created one real runtime recipient/occasion context and a force-stop/relaunch restored
   it from the backend.
+- Multi-recipient read verified: YES — after migration `20260803_0015`, Android's dedicated People
+  state fetched the authenticated `/v1/recipients` collection and rendered two separately persisted
+  recipients (`Zaid` and `Ana`) on the physical phone. Home remains intentionally focused on the
+  single next-up occasion and is no longer reused as the People data source.
 - Azure runtime packaging: DEPLOYED — the frozen Python/Playwright image runs in Azure Container
-  Apps behind managed HTTPS; healthy revision `wishtrace-api--mintretry1` receives 100% traffic
+  Apps behind managed HTTPS; healthy revision `wishtrace-api--giftreset1` receives 100% traffic
 - Custom tab/hosted approval verified: LIVE SANDBOX PASS — AndroidX Browser `1.10.0` opened the real
   Prava sandbox collection host, the user completed approval, the app return reconciled an active
   `$10` mandate, and Prava later issued one one-time credential to the backend-only merchant path.
@@ -274,6 +293,13 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
   mandate, Home and recipient actions reopen and refresh that Autopilot state instead of silently
   restarting discovery. Home distinguishes active, handled, awaiting-approval and failed-attempt
   states. The updated APK assembled, passed unit/lint checks and installed in place.
+- Post-decline fresh discovery: DEPLOYED, USER TRIGGER PENDING — the read-only production ledger
+  confirms Zaid's latest one-time mandate is `CONSUMED` with matching mandate/charge `DECLINED`
+  evidence and no order. That exact safe terminal shape may now yield to a new explicit candidate;
+  successful and unknown results remain locked. Android clears its prior ranked result before every
+  **Find another gift** journey. Revision `wishtrace-api--giftreset1` is healthy at 100% traffic,
+  public health reports PostgreSQL TLS true, and the matching APK is installed. The reset itself
+  created no Prava session, credential, charge or merchant request.
 - Current recovery UX: passkey start/authentication/cancellation failures name the exact pre-mandate
   boundary and expose one explicit `Retry Prava approval` action. The latest pre-credential mint
   failure instead exposes one `Try card again` action under the same active approval; it never opens
@@ -284,6 +310,15 @@ against a real merchant. The expected sandbox merchant failure is accepted; it i
 - Known blockers: the latest provider credential retry is exhausted after the same mint failure. The
   older post-mint `UNKNOWN` remains non-retryable. Prava report, Visa confirmation and merchant order
   remain unproven; the app exposes no further action against the exhausted charge.
+- Fresh-card replacement is DEPLOYED, NOT YET LIVE-TRIGGERED — the prior UI incorrectly reconciled
+  Zaid's still-`ACTIVE` card-bound mandate after a new gift selection, so it could not create a new
+  hosted approval. Revision `wishtrace-api--freshcard1` now exposes the documented provider
+  `POST /v1/mandates/{id}/cancel` through an ownership-checked backend route, refuses cancellation
+  for unresolved or completed merchant attempts, retains every audit row, and omits saved-card
+  selection from the next setup so Prava must collect an owner-chosen fresh card. The revision is
+  healthy at 100% traffic with PostgreSQL TLS true; the matching APK is installed in place. No
+  cancellation, new Prava session, new credential or merchant attempt is claimed until the user
+  triggers this recovery on the phone.
 
 ## Demo
 

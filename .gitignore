@@ -11,6 +11,11 @@ android/local.properties
 *.iml
 captures/
 
+# Local physical-device evidence can contain real contact/profile data.
+artifacts/screenshots/*.png
+artifacts/screenshots/*.xml
+artifacts/audio/
+
 # Python / backend
 backend/.venv/
 backend/.pytest_cache/

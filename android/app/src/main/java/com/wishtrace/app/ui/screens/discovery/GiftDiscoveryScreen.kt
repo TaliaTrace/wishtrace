@@ -119,7 +119,7 @@ fun GiftDiscoveryScreen(
         containerColor = Canvas,
         topBar = {
             ScreenTopBar(
-                title = snapshot?.recipient?.displayName?.let { "For $it" } ?: "Gift discovery",
+                title = "Finding a gift",
                 onBack = onBack,
                 modifier = Modifier
                     .statusBarsPadding()
@@ -189,44 +189,14 @@ private fun DiscoveryContent(
         is DiscoveryUiState.ReadyForRanking -> DiscoveryStage.entries.size
         else -> 0
     }
-    val headline = when (state) {
-        is DiscoveryUiState.ReadyForRanking -> "Ready for a grounded match."
-        DiscoveryUiState.Cancelled -> "Paused right where you left it."
-        is DiscoveryUiState.Error -> "That search did not finish."
-        else -> "Finding a gift that fits."
-    }
-    val supporting = when (state) {
-        DiscoveryUiState.Idle ->
-            "Bringing ${snapshot.recipient.displayName}’s clues into focus."
-        is DiscoveryUiState.Running -> state.activeStage.detail(snapshot)
-        is DiscoveryUiState.ReadyForRanking ->
-            "Product facts stay hidden until their source can be verified."
-
-        DiscoveryUiState.Cancelled -> "The date, budget and clues are still here."
-        is DiscoveryUiState.Error -> "Nothing was selected or purchased. Try again safely."
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         RecipientContextPill(snapshot = snapshot)
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = headline,
-                modifier = Modifier.semantics { heading() },
-                color = Ink,
-                style = MaterialTheme.typography.headlineLarge,
-            )
-            Text(
-                text = supporting,
-                color = InkMuted,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
 
         when (state) {
             DiscoveryUiState.Cancelled -> RecoveryVisual(
@@ -708,7 +678,7 @@ private fun DiscoveryActionBar(
                 )
 
                 is DiscoveryUiState.ReadyForRanking -> PrimaryAction(
-                    text = "See the decision",
+                    text = "See the matches",
                     onClick = onContinue,
                     modifier = Modifier
                         .fillMaxWidth()

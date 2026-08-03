@@ -37,9 +37,13 @@ data class OccasionInput(
 )
 
 interface PeopleRepository {
+    suspend fun listRecipients(): List<Recipient>
+
     suspend fun saveRecipient(input: RecipientInput): Recipient
 }
 
 interface OccasionRepository {
+    suspend fun listOccasions(recipientId: String? = null): List<Occasion>
+
     suspend fun saveOccasion(input: OccasionInput): Occasion
 }

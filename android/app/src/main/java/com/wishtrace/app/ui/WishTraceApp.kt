@@ -1,6 +1,8 @@
 package com.wishtrace.app.ui
 
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.fadeIn
@@ -33,6 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.wishtrace.app.AppContainer
 import com.wishtrace.app.R
+import com.wishtrace.app.data.importChosenContact
 import com.wishtrace.app.ui.components.ShellDestination
 import com.wishtrace.app.ui.components.WishTraceBottomBar
 import com.wishtrace.app.ui.screens.auth.SignInRoute
@@ -94,8 +97,12 @@ fun WishTraceApp(
     val discoveryFactory = remember(container) {
         viewModelFactory { DiscoveryViewModel(container.discoveryGateway) }
     }
+    val peopleFactory = remember(container) {
+        viewModelFactory { PeopleViewModel(container.peopleRepository) }
+    }
     val homeViewModel: HomeViewModel = viewModel(factory = homeFactory)
     val discoveryViewModel: DiscoveryViewModel = viewModel(factory = discoveryFactory)
+    val peopleViewModel: PeopleViewModel = viewModel(factory = peopleFactory)
     val checkoutFactory = remember(container) {
         viewModelFactory { CheckoutViewModel(container.purchaseFlowGateway) }
     }
@@ -107,21 +114,43 @@ fun WishTraceApp(
 
     val navController = rememberNavController()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
+    val peopleState by peopleViewModel.state.collectAsStateWithLifecycle()
     val discoveryState by discoveryViewModel.state.collectAsStateWithLifecycle()
     val checkoutState by checkoutViewModel.state.collectAsStateWithLifecycle()
     val mandateState by mandateViewModel.state.collectAsStateWithLifecycle()
     val session by container.authRepository.session.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val initialDestination = remember(container) {
+        if (container.authRepository.session.value == null) {
+            Destination.Welcome
+        } else {
+            ShellDestination.Home.route
+        }
+    }
     val shellRoutes = remember { ShellDestination.entries.map { it.route }.toSet() }
     val publicRoutes = remember { setOf(Destination.Welcome, Destination.SignIn) }
     val showShell = currentRoute in shellRoutes
     val scope = rememberCoroutineScope()
     val googleWebClientId = stringResource(R.string.google_web_client_id)
     var selectedCandidateId by rememberSaveable { mutableStateOf<String?>(null) }
+    var photoRecipientId by rememberSaveable { mutableStateOf<String?>(null) }
+    val existingContactPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickContact(),
+    ) { contactUri ->
+        val recipientId = photoRecipientId
+        photoRecipientId = null
+        if (contactUri != null && recipientId != null) {
+            scope.launch {
+                val imported = importChosenContact(context, contactUri)
+                container.recipientPhotoStore.remember(recipientId, imported?.localPhotoUri)
+                homeViewModel.retry()
+                peopleViewModel.retry()
+            }
+        }
+    }
 
     fun enterApp() {
-        homeViewModel.retry()
         navController.navigate(ShellDestination.Home.route) {
             popUpTo(Destination.Welcome) { inclusive = true }
             launchSingleTop = true
@@ -138,6 +167,14 @@ fun WishTraceApp(
         }
     }
 
+    fun startFreshDiscovery() {
+        discoveryViewModel.reset()
+        selectedCandidateId = null
+        navController.navigate(Destination.Discovery) {
+            launchSingleTop = true
+        }
+    }
+
     fun openGiftJourney() {
         val content = homeState as? HomeUiState.Content
         val existingMandate = content?.mandate
@@ -147,7 +184,7 @@ fun WishTraceApp(
                 launchSingleTop = true
             }
         } else {
-            navController.navigate(Destination.Discovery)
+            startFreshDiscovery()
         }
     }
 
@@ -159,6 +196,13 @@ fun WishTraceApp(
                     popUpTo(navController.graph.id) { inclusive = true }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(session?.accessToken) {
+        if (session != null) {
+            homeViewModel.retry()
+            peopleViewModel.retry()
         }
     }
 
@@ -238,13 +282,14 @@ fun WishTraceApp(
                 WishTraceBottomBar(
                     currentRoute = currentRoute,
                     onNavigate = ::navigateTopLevel,
+                    onAdd = { navController.navigate(Destination.GiftDna) },
                 )
             }
         },
     ) { scaffoldPadding ->
         NavHost(
             navController = navController,
-            startDestination = Destination.Welcome,
+            startDestination = initialDestination,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding),
@@ -290,17 +335,16 @@ fun WishTraceApp(
                     giverDisplayName = session?.user?.displayName,
                     onRetry = homeViewModel::retry,
                     onFindGift = ::openGiftJourney,
+                    onFindAnotherGift = ::startFreshDiscovery,
                     onReviewRecipient = { navController.navigate(Destination.Recipient) },
                     onAddPerson = { navController.navigate(Destination.GiftDna) },
                 )
             }
             composable(ShellDestination.People.route) {
                 PeopleScreen(
-                    state = homeState,
-                    onRetry = homeViewModel::retry,
-                    onOpenRecipient = { navController.navigate(Destination.Recipient) },
-                    onAddPerson = { navController.navigate(Destination.AddPerson) },
-                    onEditPerson = { navController.navigate(Destination.EditPerson) },
+                    state = peopleState,
+                    onRetry = peopleViewModel::retry,
+                    onAddPerson = { navController.navigate(Destination.GiftDna) },
                 )
             }
             composable(ShellDestination.Occasions.route) {
@@ -321,9 +365,10 @@ fun WishTraceApp(
                             runCatching {
                                 container.googleCredentialClient.clearCredentialState()
                             }
-                        }
-                        navController.navigate(Destination.Welcome) {
-                            popUpTo(navController.graph.id) { inclusive = true }
+                            navController.navigate(Destination.Welcome) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     },
                 )
@@ -335,6 +380,16 @@ fun WishTraceApp(
                     onRetry = homeViewModel::retry,
                     onFindGift = ::openGiftJourney,
                     onEdit = { navController.navigate(Destination.EditPerson) },
+                    onChooseContact = {
+                        val recipientId = (homeState as? HomeUiState.Content)
+                            ?.snapshot
+                            ?.recipient
+                            ?.id
+                        if (recipientId != null) {
+                            photoRecipientId = recipientId
+                            existingContactPicker.launch(null)
+                        }
+                    },
                 )
             }
             composable(Destination.Discovery) {
@@ -414,6 +469,7 @@ fun WishTraceApp(
                             peopleRepository = container.peopleRepository,
                             occasionRepository = container.occasionRepository,
                             today = today,
+                            recipientPhotoStore = container.recipientPhotoStore,
                         )
                     }
                 }
@@ -427,6 +483,7 @@ fun WishTraceApp(
                     onSaved = {
                         navController.popBackStack()
                         homeViewModel.retry()
+                        peopleViewModel.retry()
                     },
                 )
             }
@@ -449,8 +506,11 @@ fun WishTraceApp(
                         verifiedEmail = session?.user?.email,
                         onBack = navController::popBackStack,
                         onChooseAnotherGift = {
+                            discoveryViewModel.reset()
+                            selectedCandidateId = null
                             navController.navigate(Destination.Discovery) {
                                 popUpTo(Destination.MandateSetup) { inclusive = true }
+                                launchSingleTop = true
                             }
                         },
                         onArmed = {
@@ -487,6 +547,7 @@ fun WishTraceApp(
                     onSaved = {
                         navController.popBackStack()
                         homeViewModel.retry()
+                        peopleViewModel.retry()
                     },
                 )
             }
@@ -519,6 +580,7 @@ fun WishTraceApp(
                         onSaved = {
                             navController.popBackStack()
                             homeViewModel.retry()
+                            peopleViewModel.retry()
                         },
                     )
                 }

@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +72,7 @@ import kotlinx.coroutines.withContext
 fun WishTraceWordmark(
     modifier: Modifier = Modifier,
     markSize: Dp = 34.dp,
+    textStyle: TextStyle = MaterialTheme.typography.titleLarge,
 ) {
     Row(
         modifier = modifier.semantics(mergeDescendants = true) {
@@ -93,7 +95,7 @@ fun WishTraceWordmark(
                     append("Trace")
                 }
             },
-            style = MaterialTheme.typography.titleLarge,
+            style = textStyle,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.45).sp,
         )

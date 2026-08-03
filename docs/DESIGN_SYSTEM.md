@@ -107,6 +107,9 @@ Onboarding compositions combine those focal assets with code-native supporting e
 
 Supporting elements should explain the current moment or strengthen its emotion. They remain non-interactive unless semantics and behavior are explicitly provided.
 
+Each onboarding page is capped at one headline, one short sentence and two icon-led cue labels.
+Additional meaning belongs in motion and composition, not another explanatory text card.
+
 ## Components
 
 - `OccasionHeroCard`

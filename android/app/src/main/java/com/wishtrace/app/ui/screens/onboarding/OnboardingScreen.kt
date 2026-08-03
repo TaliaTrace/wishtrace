@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -54,6 +55,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -102,28 +104,28 @@ private data class OnboardingPage(
 
 private val onboardingPages = listOf(
     OnboardingPage(
-        title = "Thoughtfulness feels different.",
-        supportingText = "Especially when it arrives at the right moment.",
+        title = "Thoughtful, right on time.",
+        supportingText = "Remember the moment. Find the gift.",
         moment = OnboardingMoment.PROMISE,
     ),
     OnboardingPage(
-        title = "Keep the moments that matter.",
-        supportingText = "Birthdays and celebrations stay close.",
+        title = "Never miss their moment.",
+        supportingText = "Keep important dates close.",
         moment = OnboardingMoment.DATE,
     ),
     OnboardingPage(
-        title = "Hold onto the little clues.",
-        supportingText = "Save what they love—and what they don't.",
+        title = "The little clues matter.",
+        supportingText = "Save what lights them up—and what doesn't.",
         moment = OnboardingMoment.CLUES,
     ),
     OnboardingPage(
-        title = "Let the clues come together.",
-        supportingText = "See one choice shaped around them.",
+        title = "Watch the right gift emerge.",
+        supportingText = "Weak matches fall away.",
         moment = OnboardingMoment.GIFT,
     ),
     OnboardingPage(
         title = "You make the final call.",
-        supportingText = "Review every detail before anything moves.",
+        supportingText = "Review every detail. Stay in control.",
         moment = OnboardingMoment.CONTROL,
     ),
 )
@@ -230,8 +232,11 @@ private fun OnboardingPageContent(
     BoxWithConstraints(
         modifier = modifier.padding(horizontal = 24.dp, vertical = 10.dp),
     ) {
-        val compactHeight = maxHeight < 560.dp
-        if (compactHeight) {
+        // A short portrait handset is still a vertical canvas. The previous
+        // height-only check treated common phones as landscape and squeezed
+        // the scene and copy into two half-width columns.
+        val useWideLayout = maxWidth >= 700.dp && maxWidth > maxHeight
+        if (useWideLayout) {
             Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -332,7 +337,49 @@ private fun MomentScene(
     )
     val floatOffset = if (motionEnabled && active) idleOffset else 0f
 
-    Box(
+    val heroDrawable = when (moment) {
+        OnboardingMoment.PROMISE, OnboardingMoment.GIFT, OnboardingMoment.CONTROL ->
+            R.drawable.wishtrace_gift_3d
+        OnboardingMoment.DATE -> R.drawable.wishtrace_calendar_3d
+        OnboardingMoment.CLUES -> R.drawable.wishtrace_message_3d
+    }
+    val heroEyebrow = when (moment) {
+        OnboardingMoment.PROMISE -> "THOUGHTFUL"
+        OnboardingMoment.DATE -> "NEXT MOMENT"
+        OnboardingMoment.CLUES -> "GIFT DNA"
+        OnboardingMoment.GIFT -> "THE MATCH"
+        OnboardingMoment.CONTROL -> "YOUR CALL"
+    }
+    val firstIcon = when (moment) {
+        OnboardingMoment.PROMISE -> Icons.Rounded.Favorite
+        OnboardingMoment.DATE -> Icons.Rounded.CalendarMonth
+        OnboardingMoment.CLUES -> Icons.Rounded.SportsEsports
+        OnboardingMoment.GIFT -> Icons.Rounded.Lightbulb
+        OnboardingMoment.CONTROL -> Icons.Rounded.Shield
+    }
+    val firstValue = when (moment) {
+        OnboardingMoment.PROMISE -> "For them"
+        OnboardingMoment.DATE -> "Saved"
+        OnboardingMoment.CLUES -> "Loves"
+        OnboardingMoment.GIFT -> "Best fit"
+        OnboardingMoment.CONTROL -> "Approve"
+    }
+    val secondIcon = when (moment) {
+        OnboardingMoment.PROMISE -> Icons.Rounded.CalendarMonth
+        OnboardingMoment.DATE -> Icons.Rounded.Favorite
+        OnboardingMoment.CLUES -> Icons.Rounded.Shield
+        OnboardingMoment.GIFT -> Icons.Rounded.Shield
+        OnboardingMoment.CONTROL -> Icons.Rounded.CheckCircle
+    }
+    val secondValue = when (moment) {
+        OnboardingMoment.PROMISE -> "On time"
+        OnboardingMoment.DATE -> "Close"
+        OnboardingMoment.CLUES -> "Avoids"
+        OnboardingMoment.GIFT -> "Live facts"
+        OnboardingMoment.CONTROL -> "Verified"
+    }
+
+    Column(
         modifier = modifier
             .graphicsLayer {
                 alpha = entrance
@@ -357,21 +404,123 @@ private fun MomentScene(
                         "A reviewed gift with a clear approval check"
                 }
             },
-        contentAlignment = Alignment.Center,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        SceneBackdrop(moment = moment, active = active)
-        when (moment) {
-            OnboardingMoment.PROMISE -> PromiseMoment(
-                active = active,
-                floatOffset = floatOffset,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(
+                modifier = Modifier
+                    .weight(1.28f)
+                    .fillMaxHeight(),
+                color = LavenderSurface,
+                contentColor = Ink,
+                shape = RoundedCornerShape(30.dp),
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = BrandIndigo.copy(alpha = 0.07f),
+                            radius = size.minDimension * 0.34f,
+                            center = Offset(size.width * 0.5f, size.height * 0.53f),
+                        )
+                        drawCircle(
+                            color = BrandBlue.copy(alpha = 0.12f),
+                            radius = size.minDimension * 0.42f,
+                            center = Offset(size.width * 0.5f, size.height * 0.53f),
+                            style = Stroke(width = 2.dp.toPx()),
+                        )
+                    }
+                    Text(
+                        text = heroEyebrow,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(18.dp),
+                        color = BrandIndigo,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    DimensionalAsset(
+                        drawableRes = heroDrawable,
+                        description = null,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(188.dp)
+                            .graphicsLayer {
+                                translationY = floatOffset
+                            },
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(0.82f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OnboardingInfoTile(
+                    icon = firstIcon,
+                    value = firstValue,
+                    containerColor = BrandIndigo,
+                    contentColor = SurfaceWhite,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                )
+                OnboardingInfoTile(
+                    icon = secondIcon,
+                    value = secondValue,
+                    containerColor = BlueSurface,
+                    contentColor = Ink,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingInfoTile(
+    icon: ImageVector,
+    value: String,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = containerColor,
+        contentColor = contentColor,
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Box(modifier = Modifier.padding(14.dp)) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(76.dp),
             )
-            OnboardingMoment.DATE -> DateMoment(
-                active = active,
-                floatOffset = floatOffset,
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(28.dp),
             )
-            OnboardingMoment.CLUES -> ClueMoment(active = active, floatOffset = floatOffset)
-            OnboardingMoment.GIFT -> GiftMoment(active = active, floatOffset = floatOffset)
-            OnboardingMoment.CONTROL -> ControlMoment(active = active, floatOffset = floatOffset)
+            Text(
+                text = value,
+                modifier = Modifier.align(Alignment.BottomStart),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
         }
     }
 }

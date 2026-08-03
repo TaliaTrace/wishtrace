@@ -47,6 +47,25 @@ Record only decisions that change product, architecture, truth boundary, schedul
 - Rollback/fallback: Keep an exact disclosure and enumerate later judged-window changes; never relabel the prototype as hackathon-built.
 - Owner: WishTrace team / Codex
 
+### 2026-08-03 07:29 PKT — Freeze on occasion-first bento UX and truthful sandbox proof
+
+- Context: The real sandbox path is complete through Prava mandate authorization, one-time
+  credential minting, one Jackbox Shopify submission and the expected processor decline. The
+  remaining presentation problem was visual hierarchy: returning sessions flashed onboarding,
+  several profile surfaces left dead space, and the month grid read as a generic calendar.
+- Decision: Freeze the product on a cool indigo/blue/white bento system. Every tile must expose a
+  real recipient, occasion, constraint, source or payment state; bento is composition, not invented
+  analytics. Start authenticated sessions directly at Home, keep onboarding to first-entry only,
+  make the occasion and countdown lead the calendar, and reserve red for semantic failures.
+- Consequence: the 60–90 second story reads person → moment → Gift DNA → grounded choice → bounded
+  Prava action → exact sandbox result. Selected Android contact photos remain local, opt-in and
+  permissionless through the system picker.
+- Evidence: final debug assembly, unit tests and lint pass; the APK is installed on `RMX3201` and
+  physical-phone captures cover the top-level shell and recipient setup/detail surfaces.
+- Truth boundary: visual polish does not upgrade the sandbox decline into an order. “Gift secured”
+  remains reserved for a verified merchant order receipt.
+- Owner: WishTrace team / Codex
+
 ### 2026-07-30 15:22 PKT — Warm editorial Compose system
 
 - Context: Generated concepts overuse lavender, fake products and decorative dashboard patterns.
@@ -679,4 +698,156 @@ Record only decisions that change product, architecture, truth boundary, schedul
   `artifacts/screenshots/prava-exhausted-card-recovery-2026-08-03.png`.
 - Rollback/fallback: Hide the sandbox recovery control and retain `Done`. Do not weaken the immutable
   ledger, add another retry, or claim a merchant decline without merchant evidence.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 04:40 PKT — Treat FETCH_AGENTIC_CREDS_ERROR as an exhausted sandbox card
+
+- Context: Prava support received another participant's identical sequence—card, OTP and passkey
+  succeeded, followed by `FETCH_AGENTIC_CREDS_ERROR / Visa 400 — Fetching cryptogram failed`—and
+  Shubham Kukreti stated that the card was exhausted and arranged a fresh card by email.
+- Decision: Classify this exact sandbox error as card exhaustion at the provider credential-mint
+  boundary. Do not change merchants, repeat the same mandate charge, reuse a shared public test card,
+  or alter the documented request body in response. Recovery requires a fresh Prava-issued card and
+  a new owner-approved hosted setup.
+- Consequence: The WishTrace charge contract remains unchanged and the terminal no-third-retry UI is
+  correct. Existing failures remain pre-merchant; they are not merchant declines, card charges or
+  orders. UI work can proceed without pretending a software change can mint against an exhausted
+  sandbox card.
+- Rollback/fallback: Revisit only if Prava supplies contradictory account-specific evidence tied to
+  a safe response ID. Keep the immutable ledger and fail-closed behavior either way.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 05:20 PKT — Revoke old card-bound authority before a fresh-card setup
+
+- Context: Selecting another recommendation did not open Prava. The backend correctly rejected a
+  second setup because the latest Zaid mandate remained `ACTIVE`; Android then reconciled that old
+  card-bound mandate and returned to `Checkout stopped safely`. A fresh card therefore could never
+  enter the flow.
+- Decision: On explicit replacement, call Prava's documented no-body
+  `POST /v1/mandates/{id}/cancel`, then persist `CANCELLED` without deleting the mandate or charge
+  ledger. Permit this only for owned `ACTIVE`, `DECLINED` or `PAUSED` mandates with no unresolved,
+  successful or merchant-result-bearing charge. Mark the next setup as requiring a fresh card and
+  omit any stored `card_id`, forcing Prava's hosted owner-choice surface.
+- Consequence: The old exhausted enrollment cannot be silently reused, and an ambiguous merchant
+  attempt still cannot be discarded. A successful provider cancellation makes the normal
+  `CANCELLED` state replaceable by a new candidate-specific approval.
+- Evidence: commit `c9c9b67`; 166 backend tests, Ruff and strict mypy pass; Android unit tests,
+  assembly and lint pass; ACR run `chm` produced digest
+  `sha256:fd514172a7e48fdd4db5e354a220218f5b34aae05a07fa5c31049ba590d163e0`;
+  healthy revision `wishtrace-api--freshcard1` serves 100% traffic and its public OpenAPI exposes
+  both cancellation and `require_fresh_card`. The APK installed without clearing app data.
+- Truth boundary: deployment is verified; the user has not yet invoked the new cancellation or
+  created the fresh hosted approval. No new payment or merchant result is claimed.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 05:45 PKT — Classify only explicit Shopify payment failure across trusted frames
+
+- Context: A fresh card completed Prava mandate authorization and one-time credential minting, and
+  the Jackbox actor clicked Pay once. Its 45-second observer did not match an order or one of five
+  decline phrases, leaving the exact charge `UNKNOWN`. A later no-card/no-Pay checkout probe showed
+  Shopify's visible alert region, cross-origin payment frames and current `Payment failed` locale
+  label. The old browser page no longer exists, so its exact rendered message cannot be recovered.
+- Decision: Preserve that immutable `UNKNOWN`. For future attempts, normalize punctuation and accept
+  only explicit payment-level failure/decline language from the main Jackbox checkout or exact
+  allowlisted Shopify payment hosts. Do not classify card-field validation, generic connection text
+  or a timeout as decline, and do not automatically retry Pay.
+- Consequence: A future observed Shopify payment failure can be reported once to Prava as
+  `DECLINED`, while ambiguous outcomes remain locked. The observer waits up to 60 seconds to cover a
+  slow sandbox response without repeating the money-moving click.
+- Evidence: commit `220a42c`; backend pytest 178/178, Ruff and strict mypy; Android debug assembly,
+  unit tests and lint; ACR run `chn` digest
+  `sha256:aa251e05bf1fafc30ed26a46ea3744e38fa5efe4f0c859caf69e6ff07e074fb3`;
+  healthy Azure revision `wishtrace-api--shopifyfail1` at 100% traffic with PostgreSQL TLS true.
+- Truth boundary: classifier and deployment are verified. No post-deployment credential, merchant
+  attempt, decline report, Visa confirmation or order is claimed.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 06:08 PKT — Consume Shopify's structured completion receipt in memory
+
+- Context: The next user-approved Quiplash 2 run executed on the UI-failure observer revision and
+  still ended `UNKNOWN` after 82.7 seconds. The immutable ledger proves a fresh mandate, one Prava
+  credential and one Pay click. Current Shopify Checkout One code shows that completion is resolved
+  asynchronously through `SubmitForCompletion` and `PollForReceipt`; a processing receipt need not
+  expose final failure copy within 60 seconds.
+- Decision: Observe only allowlisted checkout-host fetch/XHR responses after the single Pay click.
+  Parse at most 2 MB in browser memory, retain only `DECLINED`/`PROCESSING`, and never log or persist
+  the response. Accept only explicit submit failure, failed payment receipt or a current payment
+  failure code. Continue UI evidence in parallel and extend the receipt boundary to 120 seconds,
+  below Android's existing 180-second read timeout.
+- Consequence: The next run can report the merchant's own structured decline even when the rendered
+  error is delayed or lives outside the top document. A processing, challenge, malformed response,
+  HTTP failure or non-payment validation still stops safely as `UNKNOWN`; Pay is never retried.
+- Evidence: commit `d93b93c`; backend pytest 185/185, Ruff and strict mypy; Android debug assembly,
+  unit tests and lint; ACR run `chp` digest
+  `sha256:2ffea3b56418fe16e1d19f896ffe71a30fd2f06553f43c5057338d937491e746`;
+  healthy Azure revision `wishtrace-api--completion1` at 100% traffic with PostgreSQL TLS true.
+- Truth boundary: deployment is verified; no post-deployment credential, merchant attempt, decline
+  report, Visa confirmation or order is claimed.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 08:08 PKT — A settled decline may start a fresh explicit gift journey
+
+- Context: Zaid's organizer-proof attempt correctly settled the one-time mandate as `CONSUMED`
+  after the merchant declined it. The backend treated every consumed mandate as non-replaceable,
+  while Android retained the previous `ReadyForRanking` state, so **Find another gift** could reopen
+  the same recommendation and then fail to create a fresh Prava approval.
+- Decision: Preserve the entire mandate and charge ledger. Permit replacement only when the latest
+  mandate is `CONSUMED`, both mandate and latest charge carry `DECLINED`, and no merchant order ID
+  exists. Clear Android's in-memory discovery and selected candidate before a user-requested fresh
+  journey. Keep explicit gift selection and **Arm autopilot** before hosted approval.
+- Consequence: A proven failed purchase no longer traps the occasion, while success and uncertainty
+  remain fail-closed. The next journey retrieves new live candidates and can open a fresh Prava
+  hosted approval without deleting or falsifying the completed sandbox evidence.
+- Evidence: read-only TLS database inspection; 188 backend tests; Ruff; strict mypy; Android focused
+  and full unit tests, assembly and lint; ACR run `chr` digest
+  `sha256:23a78c8c41888a3ab60527483f47d482518c38be71094f328624cdb91ae5c8c1`;
+  healthy `wishtrace-api--giftreset1` at 100% traffic; APK installed on `RMX3201`.
+- Truth boundary: deployment and state reset behavior are verified. No new Prava session, credential,
+  merchant submission or transaction result is claimed until the user explicitly runs the flow.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 08:20 PKT — Apply the multi-recipient schema gate before accepting Add Person
+
+- Context: Android reached the final Gift DNA save action but showed “We couldn't save this.” The
+  deployed API supported multiple recipients, while Supabase was still on `20260803_0014` and kept
+  the earlier `uq_recipients_user_id` constraint.
+- Decision: Apply the existing `20260803_0015` migration transactionally. Drop only the obsolete
+  unique constraint; do not delete or rewrite any recipient, occasion or transaction history.
+- Consequence: the same authenticated owner can persist another real person and occasion through
+  the existing API. The prior Zaid data and completed sandbox evidence are unchanged.
+- Evidence: Alembic current is `20260803_0015 (head)`; schema drift check is clean; seven context
+  tests pass; the database probe reports PostgreSQL 17.6 over TLS.
+- Truth boundary: migration behavior is verified, while a post-migration physical-phone save still
+  awaits the user's real input.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 08:39 PKT — Give People its own collection state
+
+- Context: a second recipient saved successfully after the schema migration but could not appear in
+  People because that route consumed Home's one-recipient upcoming snapshot.
+- Decision: load the owned recipient collection through a dedicated immutable People state and
+  refresh it on sign-in, contact-photo update and person save/edit. Do not broaden Home's focused
+  snapshot or fabricate an occasion summary for a recipient card.
+- Consequence: all persisted people are visible immediately, while Home keeps its five-second
+  next-occasion hierarchy. Recipient cards remain informational until a recipient-ID detail route is
+  implemented rather than navigating every card to the wrong Home recipient.
+- Evidence: focused ViewModel tests; full Android unit, assembly and lint gates; physical-device UI
+  hierarchy and screenshot showing two distinct saved people.
+- Truth boundary: recipient identity and preference cues are backend-backed; no product or payment
+  state is implied by the list.
+- Owner: WishTrace team / Codex
+
+### 2026-08-03 08:47 PKT — Serialize logout and refresh context on session identity changes
+
+- Context: after an in-process logout and Google re-sign-in, Home could retain “We lost the thread”
+  even though Azure returned successful authentication and context responses. A process restart
+  loaded the same real data, proving a client lifecycle race rather than lost persistence.
+- Decision: complete logout and credential clearing before Welcome navigation; make bearer-token
+  change the refresh trigger for Home and People; set sign-in working state synchronously before
+  launching account discovery.
+- Consequence: old-session navigation can no longer pull the app back into Home during logout, and
+  a new verified session always invalidates stale context UI without requiring a restart.
+- Evidence: 43 Android unit tests, debug assembly, lint, in-place physical-device installation and
+  post-install Home content verification.
+- Truth boundary: backend data was never missing or recreated; this is client session recovery.
 - Owner: WishTrace team / Codex

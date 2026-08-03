@@ -13,10 +13,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.People
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,39 +32,41 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wishtrace.app.R
-import com.wishtrace.app.domain.HomeSnapshot
-import com.wishtrace.app.ui.HomeUiState
+import com.wishtrace.app.domain.Recipient
+import com.wishtrace.app.ui.PeopleUiState
 import com.wishtrace.app.ui.components.DimensionalAsset
-import com.wishtrace.app.ui.components.InterestChip
 import com.wishtrace.app.ui.components.PrimaryAction
 import com.wishtrace.app.ui.components.RecipientAvatar
+import com.wishtrace.app.ui.theme.BlueSurface
 import com.wishtrace.app.ui.theme.BrandBlue
 import com.wishtrace.app.ui.theme.BrandIndigo
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.wishtrace.app.ui.theme.Ink
+import com.wishtrace.app.ui.theme.InkMuted
+import com.wishtrace.app.ui.theme.LavenderSurface
+import com.wishtrace.app.ui.theme.OutlineCool
+import com.wishtrace.app.ui.theme.SurfaceWhite
 
 @Composable
 fun PeopleScreen(
-    state: HomeUiState,
+    state: PeopleUiState,
     onRetry: () -> Unit,
-    onOpenRecipient: () -> Unit,
     onAddPerson: () -> Unit,
-    onEditPerson: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (state) {
-        HomeUiState.Loading -> LoadingState(modifier)
-        HomeUiState.Empty -> EmptyPeople(onAddPerson, modifier)
-        is HomeUiState.Error -> ErrorState(state.message, onRetry, modifier)
-        is HomeUiState.Content -> PeopleContent(
-            snapshot = state.snapshot,
-            onOpenRecipient = onOpenRecipient,
-            onEditPerson = onEditPerson,
+        PeopleUiState.Loading -> LoadingState(modifier)
+        PeopleUiState.Empty -> EmptyPeople(onAddPerson, modifier)
+        is PeopleUiState.Error -> ErrorState(state.message, onRetry, modifier)
+        is PeopleUiState.Content -> PeopleContent(
+            recipients = state.recipients,
+            onAddPerson = onAddPerson,
             modifier = modifier,
         )
     }
@@ -66,109 +74,111 @@ fun PeopleScreen(
 
 @Composable
 private fun PeopleContent(
-    snapshot: HomeSnapshot,
-    onOpenRecipient: () -> Unit,
-    onEditPerson: () -> Unit,
-    modifier: Modifier,
+    recipients: List<Recipient>,
+    onAddPerson: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val recipient = snapshot.recipient
-    val occasion = snapshot.occasion
-    val formatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
-
-    LazyColumn(
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding(),
         contentPadding = PaddingValues(
             start = 20.dp,
             end = 20.dp,
-            top = 20.dp,
+            top = 18.dp,
             bottom = 32.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "People",
-                    modifier = Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.headlineLarge,
-                )
-                TextButton(onClick = onEditPerson) {
-                    Text(text = "Edit")
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "People",
+                        modifier = Modifier.semantics { heading() },
+                        color = Ink,
+                        style = MaterialTheme.typography.headlineLarge,
+                    )
+                    Text(
+                        text = "${recipients.size} remembered",
+                        color = InkMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                TextButton(
+                    onClick = onAddPerson,
+                    modifier = Modifier.height(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(19.dp),
+                    )
+                    Text("Add")
                 }
             }
         }
-        item {
-            Surface(
-                onClick = onOpenRecipient,
+
+        itemsIndexed(
+            items = recipients,
+            key = { _, recipient -> recipient.id },
+        ) { index, recipient ->
+            PersonTile(
+                recipient = recipient,
+                index = index,
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface,
-                shape = MaterialTheme.shapes.large,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            )
+        }
+
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Surface(
+                onClick = onAddPerson,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                color = SurfaceWhite,
+                contentColor = BrandIndigo,
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, OutlineCool),
             ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        color = LavenderSurface,
+                        contentColor = BrandIndigo,
+                        shape = CircleShape,
                     ) {
-                        RecipientAvatar(
-                            initials = recipient.initials,
-                            photoUri = recipient.photoUri,
-                            size = 58.dp,
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(
-                                text = recipient.displayName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                text = recipient.relationship,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium,
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = null,
                             )
                         }
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowForward,
-                            contentDescription = "Open ${recipient.displayName}'s profile",
-                            tint = BrandIndigo,
-                        )
                     }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.CalendarMonth,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = BrandBlue,
+                    Column {
+                        Text(
+                            text = "Remember someone else",
+                            color = Ink,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = "${occasion.kind.displayName} · ${occasion.localDate.format(formatter)}",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "Add their next important moment",
+                            color = InkMuted,
+                            style = MaterialTheme.typography.bodySmall,
                         )
-                        Text(
-                            text = "· ${snapshot.daysUntil} days",
-                            color = BrandIndigo,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        recipient.interests.take(2).forEach { interest ->
-                            InterestChip(text = interest)
-                        }
                     }
                 }
             }
@@ -177,7 +187,107 @@ private fun PeopleContent(
 }
 
 @Composable
-private fun EmptyPeople(onAddPerson: () -> Unit, modifier: Modifier) {
+private fun PersonTile(
+    recipient: Recipient,
+    index: Int,
+    modifier: Modifier = Modifier,
+) {
+    val container = when (index % 3) {
+        0 -> LavenderSurface
+        1 -> BlueSurface
+        else -> SurfaceWhite
+    }
+    val accent = if (index % 2 == 0) BrandIndigo else BrandBlue
+    val cue = recipient.interests.firstOrNull()
+        ?: recipient.personalityTraits?.asChips()?.firstOrNull()
+        ?: "Gift profile saved"
+
+    Surface(
+        modifier = modifier
+            .height(202.dp)
+            .semantics {
+                contentDescription = buildString {
+                    append(recipient.displayName)
+                    append(", ")
+                    append(recipient.relationship)
+                    append(", ")
+                    append(cue)
+                }
+            },
+        color = container,
+        contentColor = Ink,
+        shape = RoundedCornerShape(26.dp),
+        border = if (container == SurfaceWhite) BorderStroke(1.dp, OutlineCool) else null,
+    ) {
+        Column(
+            modifier = Modifier.padding(15.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                RecipientAvatar(
+                    initials = recipient.initials,
+                    photoUri = recipient.photoUri,
+                    size = 66.dp,
+                )
+                Surface(
+                    modifier = Modifier.size(34.dp),
+                    color = SurfaceWhite.copy(alpha = 0.82f),
+                    contentColor = accent,
+                    shape = CircleShape,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.Favorite,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = recipient.displayName,
+                    color = Ink,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = recipient.relationship,
+                    color = InkMuted,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Surface(
+                    color = SurfaceWhite.copy(alpha = 0.78f),
+                    contentColor = accent,
+                    shape = CircleShape,
+                ) {
+                    Text(
+                        text = cue,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyPeople(
+    onAddPerson: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -193,14 +303,15 @@ private fun EmptyPeople(onAddPerson: () -> Unit, modifier: Modifier) {
         )
         Spacer(modifier = Modifier.height(14.dp))
         Text(
-            text = "Who are you gifting?",
+            text = "Who matters to you?",
             modifier = Modifier.semantics { heading() },
+            color = Ink,
             style = MaterialTheme.typography.headlineMedium,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Start with one person and their next occasion.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = "Add their next important moment.",
+            color = InkMuted,
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(modifier = Modifier.height(20.dp))
@@ -213,7 +324,7 @@ private fun EmptyPeople(onAddPerson: () -> Unit, modifier: Modifier) {
 }
 
 @Composable
-private fun LoadingState(modifier: Modifier) {
+private fun LoadingState(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -226,7 +337,7 @@ private fun LoadingState(modifier: Modifier) {
 private fun ErrorState(
     message: String,
     onRetry: () -> Unit,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
@@ -235,11 +346,31 @@ private fun ErrorState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(text = "People could not load.", style = MaterialTheme.typography.headlineMedium)
+        Surface(
+            modifier = Modifier.size(82.dp),
+            color = BlueSurface,
+            contentColor = BrandBlue,
+            shape = CircleShape,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Rounded.People,
+                    contentDescription = null,
+                    modifier = Modifier.size(38.dp),
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(18.dp))
+        Text(
+            text = "People couldn't load",
+            modifier = Modifier.semantics { heading() },
+            color = Ink,
+            style = MaterialTheme.typography.headlineMedium,
+        )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = message,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = InkMuted,
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(modifier = Modifier.height(20.dp))

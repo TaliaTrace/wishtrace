@@ -85,6 +85,24 @@ class DiscoveryViewModelTest {
         assertTrue((state as DiscoveryUiState.Error).message.contains("No purchase"))
     }
 
+    @Test
+    fun resetClearsCompletedResultAndNextStartFetchesFreshCandidates() = runTest(dispatcher) {
+        val gateway = CountingGateway()
+        val viewModel = DiscoveryViewModel(gateway)
+
+        viewModel.start(request)
+        advanceUntilIdle()
+        viewModel.reset()
+
+        assertEquals(DiscoveryUiState.Idle, viewModel.state.value)
+
+        viewModel.start(request)
+        advanceUntilIdle()
+
+        assertEquals(2, gateway.invocationCount)
+        assertTrue(viewModel.state.value is DiscoveryUiState.ReadyForRanking)
+    }
+
     private inner class CountingGateway : GiftDiscoveryGateway {
         var invocationCount: Int = 0
 

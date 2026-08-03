@@ -91,8 +91,10 @@ fun SignInRoute(
             }
             return
         }
+        // Claim the attempt before launching the coroutine so an automatic account
+        // lookup and a fast button tap cannot create two challenges/exchanges.
+        state = SignInState.Working
         scope.launch {
-            state = SignInState.Working
             try {
                 val challenge = authRepository.createGoogleChallenge().getOrThrow()
                 val token = if (isAutomatic) {

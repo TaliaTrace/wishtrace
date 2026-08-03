@@ -2,15 +2,22 @@ package com.wishtrace.app.ui.screens.profile
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.Icon
@@ -29,6 +36,10 @@ import com.wishtrace.app.ui.components.SecondaryAction
 import com.wishtrace.app.ui.theme.BlueSurface
 import com.wishtrace.app.ui.theme.BrandBlue
 import com.wishtrace.app.ui.theme.BrandIndigo
+import com.wishtrace.app.ui.theme.Ink
+import com.wishtrace.app.ui.theme.InkMuted
+import com.wishtrace.app.ui.theme.LavenderSurface
+import com.wishtrace.app.ui.theme.SurfaceWhite
 
 @Composable
 fun ProfileScreen(
@@ -58,51 +69,96 @@ fun ProfileScreen(
             )
         }
         item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface,
-                shape = MaterialTheme.shapes.large,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(286.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                Surface(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight(),
+                    color = LavenderSurface,
+                    contentColor = Ink,
+                    shape = RoundedCornerShape(30.dp),
                 ) {
-                    Surface(
-                        color = BlueSurface,
-                        contentColor = BrandBlue,
-                        shape = MaterialTheme.shapes.medium,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Person,
-                            contentDescription = null,
-                            modifier = Modifier.padding(14.dp),
-                        )
-                    }
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = displayName,
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "YOUR SPACE",
+                            color = BrandIndigo,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                         )
-                        Text(
-                            text = session?.user?.email ?: "Google account",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        Surface(
+                            modifier = Modifier.size(82.dp),
+                            color = SurfaceWhite,
+                            contentColor = BrandIndigo,
+                            shape = CircleShape,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(38.dp),
+                                )
+                            }
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = displayName,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                            )
+                            Text(
+                                text = session?.user?.email ?: "Google account",
+                                color = InkMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                            )
+                        }
                     }
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(0.8f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    ProfileFactTile(
+                        eyebrow = "STATUS",
+                        value = if (session == null) "Signed out" else "Connected",
+                        icon = Icons.Rounded.CheckCircle,
+                        container = BrandIndigo,
+                        content = SurfaceWhite,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    )
+                    ProfileFactTile(
+                        eyebrow = "SIGN-IN",
+                        value = "Google",
+                        icon = Icons.Rounded.Security,
+                        container = BlueSurface,
+                        content = Ink,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    )
                 }
             }
         }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = BlueSurface,
-                shape = MaterialTheme.shapes.large,
+                color = SurfaceWhite,
+                contentColor = Ink,
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -112,21 +168,18 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Rounded.Security,
                         contentDescription = null,
-                        tint = BrandIndigo,
+                        tint = BrandBlue,
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = if (session == null) "Session ended" else "Account connected",
-                            style = MaterialTheme.typography.labelLarge,
+                            text = "Private by design",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = if (session == null) {
-                                "Sign in again to continue."
-                            } else {
-                                "Your plans can sync across devices."
-                            },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Payment credentials stay off this phone.",
+                            color = InkMuted,
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }
@@ -138,6 +191,48 @@ fun ProfileScreen(
                 onClick = onSignOut,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+}
+
+@Composable
+private fun ProfileFactTile(
+    eyebrow: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = container,
+        contentColor = content,
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(15.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = eyebrow,
+                    color = content.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                )
+            }
         }
     }
 }

@@ -7,20 +7,20 @@ Update this file during the hackathon. Do not manage the project from memory.
 | Gate | Evidence required | Status | Owner | Last checked |
 |---|---|---|---|---|
 | Official-window baseline frozen | secret scan + preexisting commit | PASS — `283f5be` | Codex | 2026-08-01 14:29 PKT |
-| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260803_0014` | Codex | 2026-08-03 01:54 PKT |
-| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 160 tests; healthy Azure revision `wishtrace-api--mintretry1` serves 100% traffic | Codex | 2026-08-03 04:21 PKT |
-| Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real session reopened empty Home through Azure | Codex/user | 2026-08-02 00:36 PKT |
+| Supabase TLS + migration | client TLS true + Alembic head | PASS — TLS, PostgreSQL 17.6, `20260803_0015` | Codex | 2026-08-03 08:20 PKT |
+| Backend foundation | pytest + Ruff + mypy + health/UCP tests | PASS PUBLICLY — 188 tests; healthy Azure revision `wishtrace-api--giftreset1` serves 100% traffic | Codex | 2026-08-03 08:08 PKT |
+| Google authentication | nonce-bound exchange + real physical-phone account | PASS PUBLICLY — real sign-in plus logout/re-sign-in Home refresh are verified against Azure | Codex/user | 2026-08-03 08:47 PKT |
 | Recipient persistence | owned create + close/reopen recovery | PASS PUBLICLY — user-created context survived a physical-phone force-stop/relaunch | Codex/user | 2026-08-02 01:04 PKT |
 | Prava auth works | smallest official sandbox request | PASS — authenticated `NOT_FOUND`, response ID recorded | Codex/user | 2026-08-01 |
-| Prava transaction path understood | session + authoritative status | PARTIAL LIVE PASS — the IST dashboard corroborates approval, credential-generation and failure stages; an earlier tokenized Jackbox attempt is locked `UNKNOWN`, while the newest approval and its one explicit retry both failed at Prava credential mint before payment submission | Codex/user | 2026-08-03 04:34 PKT |
-| Primary merchant validated | search/product/quote/checkout facts | PARTIAL LIVE PASS — four exact products have live facts; a tokenized Drawful 2 Pay attempt occurred, with no confirmed order or decline | Codex | 2026-08-03 03:17 PKT |
+| Prava transaction path understood | session + authoritative status | PASS SANDBOX — mandate authorized, one-time credential minted, Jackbox checkout attempted once, and Prava recorded the expected processor decline | Codex/user | 2026-08-03 07:00 PKT |
+| Primary merchant validated | search/product/quote/checkout facts | PASS SANDBOX — live Jackbox facts reached a real Shopify checkout and the tokenized test-card attempt produced an explicit decline; no order is claimed | Codex/user | 2026-08-03 07:00 PKT |
 | Backup merchant validated | documented fallback | NONE ENABLED — honest unavailable if Jackbox policy/region fails | Codex | 2026-08-01 22:34 PKT |
 | OpenAI structured output works | valid live candidate IDs returned | PASS PUBLICLY — validated Azure decision returned the eligible live Jackbox candidate on the phone | Codex/user | 2026-08-02 01:05 PKT |
-| Android Compose foundation builds | debug APK + unit tests + lint | PASS — exhausted-card recovery built, tested, linted, installed and rendered on the physical phone | Codex | 2026-08-03 04:39 PKT |
-| Android onboarding + home build | routed screens + state handling + build evidence | PASS — UI MILESTONE 2 | Codex | 2026-07-30 17:36 PKT |
-| Android recipient context build | editable recipient + occasion + validation + tests | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
-| Android grounded decision build | discovery + recommendation + message + recovery | PASS — public live discovery/ranking and owned message API wired | Codex | 2026-08-02 00:36 PKT |
-| Android device UX evidence | API 31 route tests + screenshots + text scale + contrast | PASS — UI MILESTONE 3 | Codex | 2026-07-30 19:02 PKT |
+| Android Compose foundation builds | debug APK + unit tests + lint | PASS — scan-first bento build assembled, unit-tested, linted and installed in place on the physical phone | Codex | 2026-08-03 07:46 PKT |
+| Android onboarding + home build | routed screens + state handling + build evidence | PASS — five visual onboarding moments, branded launch, and scan-first Home verified in the final build | Codex | 2026-08-03 07:46 PKT |
+| Android recipient context build | editable recipient + occasion + validation + tests | PASS — multi-person schema and a dedicated live People list are verified; two persisted recipients render on the physical phone | Codex | 2026-08-03 08:39 PKT |
+| Android grounded decision build | discovery + recommendation + message + recovery | PASS — “Find another gift” now clears stale in-memory ranking, fetches a new live discovery, and can create a new approval after a proven consumed decline | Codex | 2026-08-03 08:08 PKT |
+| Android device UX evidence | API 31 route tests + screenshots + text scale + contrast | PASS — physical-phone Home, People, Profile, Gift DNA, recipient, occasion, prior five-page geometry, and final onboarding entry captured | Codex | 2026-08-03 07:46 PKT |
 | Android return flow works | approval → app → reconciled state | PASS — hosted approval returned through the app link and the backend observed the active Prava mandate | Codex/user | 2026-08-03 02:55 PKT |
 | Bronze flow repeats twice | full device demo | NOT STARTED | | |
 | Five-second UX understood | fresh viewer explanation | NOT STARTED | | |
@@ -29,20 +29,167 @@ Update this file during the hackathon. Do not manage the project from memory.
 
 ## Now
 
-1. Freeze backend behavior. The official Prava skills audit matches the implemented mandate charge
-   and report contracts; do not create a third charge or imply a merchant decline.
-2. If one final sandbox attempt is necessary, start a fresh owner-approved setup and choose a
-   different approved test card. Never reuse the exhausted charge or silently repeat checkout.
-3. Move immediately to the red/blue/green/yellow bento-question UX and submission pass.
+1. Freeze backend and payment behavior; the organizer-required sandbox decline proof is captured.
+2. Record the final 60–90 second physical-phone journey with the exact sandbox truth boundary.
+3. Submit the APK, video and track copy without introducing another integration or payment attempt.
 
 ## Next
 
 1. Confirm a new discovery run rotates past both prior purchases and prior primary recommendations
    while another eligible live product remains.
-2. Reduce discovery and Autopilot narration to visual state, exact facts and one primary action.
+2. Record the reduced-copy discovery and recommendation journey in the submission video.
 3. Treat another merchant as future adapter work; it cannot repair a pre-merchant Prava mint failure.
 
 ## Milestone evidence
+
+### 2026-08-03 — Logout/re-sign-in recovery and packaged APKs
+
+- Cause: logout navigated to Welcome before the old session was cleared. A stale Home request could
+  win that race, and the next Google token did not refresh Home if navigation had already returned
+  to its error route. Automatic and manual sign-in could also start within the same frame.
+- Fix: await local/backend logout before navigating, refresh Home and People whenever the bearer
+  token changes, and claim the Google sign-in working state before launching its coroutine.
+- Evidence: Azure recorded successful exchange and context responses; a cold control loaded the
+  real Home. The corrected build passes 43 unit tests, assembly and lint, installs in place on
+  `RMX3201`, and a post-install force-stop/relaunch renders `Hi, Talia` and `Zaid` rather than the
+  stale error.
+- Artifacts: `Desktop/wishapk/WishTrace-Appetize.apk` and `WishTrace-Emulator.apk`, both SHA-256
+  `61F9461F0B2B56507A48574966487392D54D475CBAA953CAAE9049DD6609DB62`.
+- Truth boundary: this verifies session/context recovery and packaging. It does not create another
+  Google identity, Prava transaction or merchant order.
+
+### 2026-08-03 — Every saved recipient is visible in People
+
+- Cause: the People route rendered `HomeSnapshot.recipient`, which intentionally contains only the
+  single next-up occasion owner, even though `GET /v1/recipients` returned every saved person.
+- Fix: added an immutable `PeopleUiState`/`PeopleViewModel`, bound the screen to
+  `PeopleRepository.listRecipients()`, and refresh it after authentication and recipient save/edit.
+- UX: every saved person now has a scan-first bento card with identity, relationship and one real
+  saved preference; loading, empty, error and add-another states remain explicit.
+- Evidence: focused People ViewModel tests, full Android unit tests, debug assembly and lint pass.
+  The corrected APK was installed on `RMX3201`; physical-device semantics show `2 remembered`,
+  `Zaid` and `Ana` as separate persisted recipients. Rendered evidence is
+  `artifacts/screenshots/wishtrace_people_multi_recipient.png`.
+- Truth boundary: the People list reads authenticated backend records. A card is informational in
+  this slice; it does not pretend to open a recipient-specific transaction route.
+
+### 2026-08-03 — Add Person persistence unblocked
+
+- Cause: the multi-person Android/API code was deployed while Supabase remained on migration
+  `20260803_0014`, whose legacy `uq_recipients_user_id` constraint rejected a second recipient.
+- Fix: applied the existing transactional `20260803_0015` migration. It drops only that obsolete
+  unique constraint; Zaid and every existing occasion, discovery, mandate and charge remain intact.
+- Evidence: Alembic reports `20260803_0015 (head)`, `alembic check` reports no schema drift, all seven
+  context tests pass, and the read-only database probe reports PostgreSQL 17.6 with TLS true.
+- Truth boundary: the schema fix and a post-migration second real recipient are now verified. No
+  product, payment or order is inferred from adding that person.
+
+### 2026-08-03 — Fresh gift journey after the proven sandbox decline
+
+- Read-only ledger check: Zaid's latest one-time mandate is `CONSUMED`; its mandate outcome and
+  latest charge are both authoritative `DECLINED`, with no merchant order. No audit row was deleted
+  or rewritten.
+- Backend correction: a new explicit candidate may replace only that exact terminal decline shape.
+  A consumed success, order-bearing result, or ambiguous/unknown attempt remains locked.
+- Android correction: **Find another gift** clears the long-lived discovery ViewModel and selected
+  candidate before navigation, so the old ranked result cannot reopen from memory.
+- Verification: 188 backend tests, Ruff, strict mypy, focused Android discovery tests, full Android
+  unit tests, assembly, and lint pass. ACR run `chr` produced
+  `sha256:23a78c8c41888a3ab60527483f47d482518c38be71094f328624cdb91ae5c8c1`;
+  healthy revision `wishtrace-api--giftreset1` serves 100% traffic and the matching APK is installed.
+- Truth boundary: the recovery is deployed but no new approval session, credential, merchant attempt
+  or transaction has been created by this reset. The user still explicitly chooses a gift and taps
+  **Arm autopilot** before Prava opens.
+
+### 2026-08-03 — End-to-end sandbox proof and final mobile UX freeze
+
+- Real-path proof: live recipient context selected a live Jackbox product; Prava authorized the
+  bounded mandate, minted a one-time credential, and WishTrace submitted it once to the real Shopify
+  checkout. The merchant processor declined the sandbox card as expected, and Prava recorded the
+  failed order outcome. This is integration proof, not a purchased gift or merchant order.
+- UI freeze: onboarding is a five-part emotional bento journey; Home, People, Profile, Gift DNA,
+  recipient detail, Occasions, discovery, recommendation, message and Prava proof use the fixed
+  indigo/blue/white system. The center Add action starts the visual Gift DNA flow, and a chosen
+  Android contact can contribute only its selected name/photo without full contacts permission.
+- Scan-first correction: a phone-height breakpoint that incorrectly forced a two-column onboarding
+  page was replaced with a true wide-screen check. Each moment now uses one headline, one sentence,
+  two icon-led cues and no explanatory footer. Discovery uses its animated trace and stage tiles
+  instead of a repeated paragraph; recommendation alternatives are direct tappable bento cards.
+- Startup: saved sessions now start directly at Home instead of briefly composing Welcome. The old
+  warm prototype launcher was replaced by the code-native indigo/blue mark and branded launch
+  background.
+- Compose-skill audit: semantic Material components, 48dp actions, heading structure, parent-owned
+  spacing, theme tokens, graphics-layer motion and reduced-motion fallbacks are retained.
+- Evidence: `:app:assembleDebug`, `:app:testDebugUnitTest`, and `:app:lintDebug` pass; the APK installs
+  in place on physical device `RMX3201`. Final onboarding evidence is
+  `artifacts/screenshots/wishtrace_onboarding_final_scan_first.png`; other captures live under
+  `artifacts/screenshots/wishtrace_final_*`.
+- Truth boundary: sandbox merchant decline is the strongest result. No successful order, real-money
+  charge, delivery promise or production payment is claimed.
+
+### 2026-08-03 — Structured Shopify completion observer deployed
+
+- The post-copy-fix Quiplash 2 run was new, not stale UI: setup returned 201 at 00:50:24 UTC,
+  hosted approval returned at 00:51:08, and execute returned after 82.7 seconds at 00:52:34. Prava
+  supplied a provider charge ID; WishTrace recorded no transaction reference, Visa confirmation or
+  order and correctly kept the result `UNKNOWN`.
+- Root cause: Shopify Checkout One resolves card attempts through structured
+  `SubmitForCompletion`/receipt polling. A payment can remain on `ProcessingReceipt` without
+  rendering a failure phrase inside the prior observation window.
+- Fix: commit `d93b93c` observes only same-checkout HTTPS fetch/XHR responses, parses them in memory,
+  and keeps only a safe enum. Explicit `SubmitFailed`, failed payment receipts and current Shopify
+  payment failure codes map to decline; processing, action-required, field validation, HTTP failure
+  and malformed/oversize payloads do not. Raw payloads, addresses and payment data are never logged
+  or persisted. Pay is still clicked exactly once, with a 120-second receipt boundary.
+- Evidence: backend pytest 185/185, Ruff and strict mypy pass; Android debug assembly, unit tests and
+  lint pass. ACR run `chp` produced digest
+  `sha256:2ffea3b56418fe16e1d19f896ffe71a30fd2f06553f43c5057338d937491e746`;
+  healthy revision `wishtrace-api--completion1` serves 100% traffic and public health reports
+  PostgreSQL 17.6 with TLS true.
+- Truth boundary: deployment is proven. The two existing post-mint attempts remain `UNKNOWN` and
+  cannot be reclassified. No post-deployment credential, merchant attempt or Prava report exists.
+
+### 2026-08-03 — Shopify payment-failure observer deployed
+
+- Live provider evidence: the fresh owner-approved mandate reached `Authorized` at 05:54 IST and
+  its `$9.99` invocation reached `Creds_Generated` at 05:56 IST. WishTrace then filled the one-time
+  credential and clicked Jackbox Pay exactly once. This proves setup and credential minting; it does
+  not itself prove a merchant decline or order.
+- Root cause: the retired checkout page did not match the observer's five phrases before timeout.
+  A later no-card/no-Pay live checkout probe confirmed Shopify's visible `role="alert"` region,
+  trusted payment frames, and current locale bundle label `Payment failed`, which the old observer
+  omitted. The past page is gone, so its exact message is not reconstructed or guessed.
+- Fix: commit `220a42c` normalizes punctuation, recognizes explicit current Shopify payment-failure
+  language, reads visible text from only the main checkout plus allowlisted Shopify payment frames,
+  and still rejects field-validation, processing and generic network text as proof. It makes no
+  automatic payment retry.
+- Evidence: backend pytest 178/178, Ruff and strict mypy pass; Android debug assembly, unit tests and
+  lint pass. ACR run `chn` produced digest
+  `sha256:aa251e05bf1fafc30ed26a46ea3744e38fa5efe4f0c859caf69e6ff07e074fb3`;
+  healthy revision `wishtrace-api--shopifyfail1` serves 100% traffic and public health reports
+  PostgreSQL 17.6 with TLS true.
+- Truth boundary: deployment is proven, but no credential or merchant attempt was created after the
+  fix. The existing Drawful 2 result remains correctly `UNKNOWN`; only a separate explicit approval
+  can provide the final decline proof.
+
+### 2026-08-03 — Fresh-card mandate reset deployed
+
+- Root cause: the new gift path hit `MANDATE_ALREADY_EXISTS` because Zaid's latest mandate remained
+  provider-`active`; Android refreshed the old approval and showed `Checkout stopped safely`
+  instead of opening a new hosted card flow.
+- Recovery: an explicit replacement now revokes only a safe owned provider mandate through Prava's
+  official no-body cancel endpoint, persists `CANCELLED` without deleting history, and carries a
+  fresh-card requirement into the next setup so no saved exhausted card ID is submitted.
+- Safety: unknown, in-flight, successful or merchant-result-bearing attempts cannot be cancelled by
+  this route. Network ambiguity does not mark the local mandate cancelled.
+- Evidence: commit `c9c9b67`; backend pytest 166/166, Ruff and strict mypy pass; Android debug unit,
+  assembly and lint pass. ACR run `chm`, digest
+  `sha256:fd514172a7e48fdd4db5e354a220218f5b34aae05a07fa5c31049ba590d163e0`;
+  healthy `wishtrace-api--freshcard1` at 100% traffic; public health reports PostgreSQL TLS true;
+  OpenAPI exposes cancellation and `require_fresh_card`; updated APK installed in place.
+- Truth boundary: code and deployment are proven. The owner has not yet invoked cancellation or
+  completed the fresh hosted approval, so no new session, credential, merchant decline or order is
+  claimed.
 
 ### 2026-08-03 — Exhausted sandbox-card recovery verified
 

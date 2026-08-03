@@ -63,6 +63,14 @@ def build_context_router() -> APIRouter:
     ) -> OccasionResponse:
         return await context.save_occasion(user.id, body)
 
+    @router.get("/occasions", response_model=list[OccasionResponse])
+    async def list_occasions(
+        user: Annotated[AuthenticatedUser, Depends(require_user)],
+        context: Annotated[ContextOperations, Depends(get_context_operations)],
+        recipient_id: uuid.UUID | None = None,
+    ) -> list[OccasionResponse]:
+        return await context.list_occasions(user.id, recipient_id)
+
     @router.put("/occasions/{occasion_id}", response_model=OccasionResponse)
     async def update_occasion(
         occasion_id: uuid.UUID,

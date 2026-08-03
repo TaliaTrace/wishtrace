@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import delete, select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.errors import ApiError
@@ -176,6 +175,12 @@ class ContextOperations(Protocol):
         occasion_id: uuid.UUID | None = None,
     ) -> OccasionResponse: ...
 
+    async def list_occasions(
+        self,
+        user_id: uuid.UUID,
+        recipient_id: uuid.UUID | None = None,
+    ) -> list[OccasionResponse]: ...
+
     async def get_home(self, user_id: uuid.UUID) -> HomeResponse: ...
 
 
@@ -211,29 +216,15 @@ class SqlContextStore:
     ) -> RecipientResponse:
         async with self._session_factory() as session, session.begin():
             if recipient_id is None:
-                now = datetime.now(UTC)
-                recipient_result = await session.execute(
-                    insert(RecipientModel)
-                    .values(
-                        user_id=user_id,
-                        display_name=body.display_name,
-                        relationship=body.relationship,
-                        personality_traits=body.personality_traits.as_storage(),
-                        age_band=body.age_band,
-                    )
-                    .on_conflict_do_update(
-                        index_elements=[RecipientModel.user_id],
-                        set_={
-                            "display_name": body.display_name,
-                            "relationship": body.relationship,
-                            "personality_traits": body.personality_traits.as_storage(),
-                            "age_band": body.age_band,
-                            "updated_at": now,
-                        },
-                    )
-                    .returning(RecipientModel)
+                recipient = RecipientModel(
+                    user_id=user_id,
+                    display_name=body.display_name,
+                    relationship=body.relationship,
+                    personality_traits=body.personality_traits.as_storage(),
+                    age_band=body.age_band,
                 )
-                recipient = recipient_result.scalar_one()
+                session.add(recipient)
+                await session.flush()
             else:
                 recipient = await _owned_recipient(session, user_id, recipient_id, lock=True)
                 recipient.display_name = body.display_name
@@ -279,7 +270,25 @@ class SqlContextStore:
                 )
             await session.flush()
             response = await _recipient_response(session, recipient)
-        return response
+            return response
+
+    async def list_occasions(
+        self,
+        user_id: uuid.UUID,
+        recipient_id: uuid.UUID | None = None,
+    ) -> list[OccasionResponse]:
+        async with self._session_factory() as session:
+            if recipient_id is not None:
+                await _owned_recipient(session, user_id, recipient_id)
+            statement = select(OccasionModel).where(OccasionModel.user_id == user_id)
+            if recipient_id is not None:
+                statement = statement.where(OccasionModel.recipient_id == recipient_id)
+            occasions = (
+                await session.scalars(
+                    statement.order_by(OccasionModel.local_date, OccasionModel.created_at)
+                )
+            ).all()
+            return [_occasion_response(occasion) for occasion in occasions]
 
     async def save_occasion(
         self,

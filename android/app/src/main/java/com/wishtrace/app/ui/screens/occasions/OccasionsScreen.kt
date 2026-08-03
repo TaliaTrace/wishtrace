@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CardGiftcard
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -33,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -46,7 +49,12 @@ import com.wishtrace.app.ui.HomeUiState
 import com.wishtrace.app.ui.components.PrimaryAction
 import com.wishtrace.app.ui.components.RecipientAvatar
 import com.wishtrace.app.ui.theme.BrandIndigo
+import com.wishtrace.app.ui.theme.BlueSurface
+import com.wishtrace.app.ui.theme.Ink
+import com.wishtrace.app.ui.theme.InkMuted
 import com.wishtrace.app.ui.theme.LavenderSurface
+import com.wishtrace.app.ui.theme.OutlineCool
+import com.wishtrace.app.ui.theme.SurfaceWhite
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -123,6 +131,12 @@ private fun OccasionsContent(
             }
         }
         item {
+            UpcomingOccasionBento(
+                snapshot = snapshot,
+                onClick = onOpenOccasion,
+            )
+        }
+        item {
             MonthCalendar(
                 month = month,
                 selectedDate = selectedDate,
@@ -157,6 +171,88 @@ private fun OccasionsContent(
 }
 
 @Composable
+private fun UpcomingOccasionBento(
+    snapshot: HomeSnapshot,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(132.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Surface(
+            onClick = onClick,
+            modifier = Modifier
+                .weight(1.45f)
+                .fillMaxHeight(),
+            color = LavenderSurface,
+            contentColor = Ink,
+            shape = RoundedCornerShape(26.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RecipientAvatar(
+                    initials = snapshot.recipient.initials,
+                    photoUri = snapshot.recipient.photoUri,
+                    size = 56.dp,
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(
+                        text = "NEXT",
+                        color = BrandIndigo,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = snapshot.recipient.displayName,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = snapshot.occasion.kind.displayName,
+                        color = InkMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+        Surface(
+            modifier = Modifier
+                .weight(0.82f)
+                .fillMaxHeight(),
+            color = BrandIndigo,
+            contentColor = SurfaceWhite,
+            shape = RoundedCornerShape(26.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(15.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "COUNTDOWN",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = snapshot.daysUntil.toString(),
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(text = "days", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+@Composable
 private fun MonthCalendar(
     month: YearMonth,
     selectedDate: LocalDate,
@@ -175,9 +271,9 @@ private fun MonthCalendar(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        color = BlueSurface,
+        contentColor = Ink,
+        shape = RoundedCornerShape(30.dp),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -194,11 +290,18 @@ private fun MonthCalendar(
                 ) {
                     Icon(Icons.Rounded.ChevronLeft, contentDescription = null)
                 }
-                Text(
-                    text = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
+                Surface(
+                    color = SurfaceWhite,
+                    contentColor = Ink,
+                    shape = CircleShape,
+                ) {
+                    Text(
+                        text = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)),
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
                 IconButton(
                     onClick = onNextMonth,
                     modifier = Modifier.semantics { contentDescription = "Next month" },
@@ -269,11 +372,11 @@ private fun CalendarDay(
                     contentDescription = description
                     role = Role.Button
                 },
-            color = if (selected) BrandIndigo else MaterialTheme.colorScheme.surface,
+            color = if (selected) BrandIndigo else Color.Transparent,
             contentColor = if (selected) {
                 MaterialTheme.colorScheme.onPrimary
             } else {
-                MaterialTheme.colorScheme.onSurface
+                Ink
             },
             shape = CircleShape,
         ) {
@@ -316,8 +419,9 @@ private fun OccasionAgendaCard(
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        color = LavenderSurface,
-        shape = MaterialTheme.shapes.large,
+        color = SurfaceWhite,
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, OutlineCool),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

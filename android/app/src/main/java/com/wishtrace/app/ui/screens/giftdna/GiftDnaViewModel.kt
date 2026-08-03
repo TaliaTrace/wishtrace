@@ -6,6 +6,7 @@ import com.wishtrace.app.data.OccasionInput
 import com.wishtrace.app.data.OccasionRepository
 import com.wishtrace.app.data.PeopleRepository
 import com.wishtrace.app.data.RecipientInput
+import com.wishtrace.app.data.RecipientPhotoStore
 import com.wishtrace.app.domain.Money
 import com.wishtrace.app.domain.OccasionKind
 import com.wishtrace.app.domain.PersonalityTraits
@@ -81,15 +82,27 @@ enum class StyleChoice(val wire: String, val label: String, val emoji: String) {
     NOSTALGIC("nostalgic", "Nostalgic", "📻"),
 }
 
+/** Concrete interests are multi-select because liking games does not exclude liking fitness. */
+enum class InterestChoice(val label: String) {
+    GAMING("Gaming"),
+    FITNESS("Fitness"),
+    MUSIC("Music"),
+    BOOKS("Books"),
+    TECH("Tech"),
+    FOOD("Food"),
+}
+
 data class GiftDnaUiState(
     val tile: GiftDnaTile = GiftDnaTile.RED,
     // Red
     val displayName: String = "",
+    val photoUri: String? = null,
     val relationship: String = "",
     val ageBand: AgeBandChoice? = null,
     // Blue
     val occasionDate: LocalDate? = null,
     // Green
+    val interests: Set<InterestChoice> = emptySet(),
     val energy: EnergyChoice? = null,
     val environment: EnvironmentChoice? = null,
     val style: StyleChoice? = null,
@@ -125,12 +138,22 @@ class GiftDnaViewModel(
     private val peopleRepository: PeopleRepository,
     private val occasionRepository: OccasionRepository,
     private val today: LocalDate,
+    private val recipientPhotoStore: RecipientPhotoStore? = null,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(GiftDnaUiState())
     val state: StateFlow<GiftDnaUiState> = mutableState.asStateFlow()
 
     fun updateName(value: String) = update {
         copy(displayName = value, nameError = null, saveError = null)
+    }
+
+    fun importContact(displayName: String, photoUri: String?) = update {
+        copy(
+            displayName = displayName,
+            photoUri = photoUri,
+            nameError = null,
+            saveError = null,
+        )
     }
 
     fun selectRelationship(choice: RelationshipChoice) = update {
@@ -144,6 +167,15 @@ class GiftDnaViewModel(
 
     fun updateDate(value: LocalDate) = update {
         copy(occasionDate = value, dateError = null, saveError = null)
+    }
+
+    fun toggleInterest(choice: InterestChoice) = update {
+        val next = when {
+            choice in interests -> interests - choice
+            interests.size < MAX_INTERESTS -> interests + choice
+            else -> interests
+        }
+        copy(interests = next, saveError = null)
     }
 
     fun selectEnergy(choice: EnergyChoice) = update {
@@ -228,8 +260,7 @@ class GiftDnaViewModel(
                         id = null,
                         displayName = current.displayName.trim(),
                         relationship = current.relationship.trim(),
-                        // Green replaces the interests form — send none.
-                        interests = emptyList(),
+                        interests = current.interests.map(InterestChoice::label),
                         dislikes = emptyList(),
                         personalityTraits = current.personalityTraits
                             .takeUnless { it.isEmpty },
@@ -237,6 +268,7 @@ class GiftDnaViewModel(
                         hint = null,
                     ),
                 )
+                recipientPhotoStore?.remember(recipient.id, current.photoUri)
                 occasionRepository.saveOccasion(
                     OccasionInput(
                         id = null,
@@ -274,6 +306,8 @@ class GiftDnaViewModel(
     }
 
     companion object {
+        const val MAX_INTERESTS = 3
+
         fun datePickerUtcMillisToLocalDate(utcMillis: Long): LocalDate =
             Instant.ofEpochMilli(utcMillis)
                 .atZone(ZoneOffset.UTC)

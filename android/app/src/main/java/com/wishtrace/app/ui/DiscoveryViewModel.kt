@@ -38,9 +38,11 @@ class DiscoveryViewModel(
     val state: StateFlow<DiscoveryUiState> = mutableState.asStateFlow()
 
     private var activeJob: Job? = null
+    private var runGeneration: Long = 0
 
     fun start(request: GiftDiscoveryRequest) {
         if (activeJob?.isActive == true) return
+        val generation = ++runGeneration
 
         val newJob = viewModelScope.launch {
             val completedStages = mutableListOf<DiscoveryStage>()
@@ -59,7 +61,9 @@ class DiscoveryViewModel(
                     preparation = preparation,
                 )
             } catch (_: CancellationException) {
-                mutableState.value = DiscoveryUiState.Cancelled
+                if (generation == runGeneration) {
+                    mutableState.value = DiscoveryUiState.Cancelled
+                }
             } catch (error: Exception) {
                 mutableState.value = DiscoveryUiState.Error(
                     message = (error as? WishTraceApiException)?.message
@@ -83,5 +87,13 @@ class DiscoveryViewModel(
 
         mutableState.value = DiscoveryUiState.Cancelled
         runningJob.cancel()
+    }
+
+    /** Clears a completed or abandoned journey before the user explicitly asks for new gifts. */
+    fun reset() {
+        runGeneration += 1
+        activeJob?.cancel()
+        activeJob = null
+        mutableState.value = DiscoveryUiState.Idle
     }
 }

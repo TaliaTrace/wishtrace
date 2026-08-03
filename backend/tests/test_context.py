@@ -55,11 +55,13 @@ class MemoryContext(ContextOperations):
     def __init__(self) -> None:
         self.recipient: RecipientResponse | None = None
         self.occasion: OccasionResponse | None = None
+        self.recipients: list[RecipientResponse] = []
+        self.occasions: list[OccasionResponse] = []
         self.user_ids: list[uuid.UUID] = []
 
     async def list_recipients(self, user_id: uuid.UUID) -> list[RecipientResponse]:
         self.user_ids.append(user_id)
-        return [self.recipient] if self.recipient is not None else []
+        return self.recipients
 
     async def get_recipient(
         self,
@@ -67,14 +69,15 @@ class MemoryContext(ContextOperations):
         recipient_id: uuid.UUID,
     ) -> RecipientResponse:
         self.user_ids.append(user_id)
-        if self.recipient is None or self.recipient.id != recipient_id:
+        recipient = next((item for item in self.recipients if item.id == recipient_id), None)
+        if recipient is None:
             raise ApiError(
                 status_code=404,
                 code="RECIPIENT_NOT_FOUND",
                 message="That person was not found.",
                 recoverable=True,
             )
-        return self.recipient
+        return recipient
 
     async def save_recipient(
         self,
@@ -84,7 +87,7 @@ class MemoryContext(ContextOperations):
     ) -> RecipientResponse:
         self.user_ids.append(user_id)
         resolved_id = recipient_id or uuid.uuid4()
-        self.recipient = RecipientResponse(
+        recipient = RecipientResponse(
             id=resolved_id,
             display_name=body.display_name,
             relationship=body.relationship,
@@ -105,7 +108,10 @@ class MemoryContext(ContextOperations):
                 else []
             ),
         )
-        return self.recipient
+        self.recipients = [item for item in self.recipients if item.id != resolved_id]
+        self.recipients.append(recipient)
+        self.recipient = recipient
+        return recipient
 
     async def save_occasion(
         self,
@@ -114,14 +120,14 @@ class MemoryContext(ContextOperations):
         occasion_id: uuid.UUID | None = None,
     ) -> OccasionResponse:
         self.user_ids.append(user_id)
-        if self.recipient is None or self.recipient.id != body.recipient_id:
+        if not any(item.id == body.recipient_id for item in self.recipients):
             raise ApiError(
                 status_code=404,
                 code="RECIPIENT_NOT_FOUND",
                 message="That person was not found.",
                 recoverable=True,
             )
-        self.occasion = OccasionResponse(
+        occasion = OccasionResponse(
             id=occasion_id or uuid.uuid4(),
             recipient_id=body.recipient_id,
             kind=body.kind,
@@ -132,7 +138,31 @@ class MemoryContext(ContextOperations):
             recurring_frequency=body.recurring_frequency,
             required_arrival_date=body.required_arrival_date,
         )
-        return self.occasion
+        self.occasions = [item for item in self.occasions if item.id != occasion.id]
+        self.occasions.append(occasion)
+        self.occasion = occasion
+        return occasion
+
+    async def list_occasions(
+        self,
+        user_id: uuid.UUID,
+        recipient_id: uuid.UUID | None = None,
+    ) -> list[OccasionResponse]:
+        self.user_ids.append(user_id)
+        if recipient_id is not None and not any(
+            item.id == recipient_id for item in self.recipients
+        ):
+            raise ApiError(
+                status_code=404,
+                code="RECIPIENT_NOT_FOUND",
+                message="That person was not found.",
+                recoverable=True,
+            )
+        return [
+            item
+            for item in self.occasions
+            if recipient_id is None or item.recipient_id == recipient_id
+        ]
 
     async def get_home(self, user_id: uuid.UUID) -> HomeResponse:
         self.user_ids.append(user_id)
@@ -284,3 +314,27 @@ async def test_context_rejects_missing_auth_and_invalid_budget() -> None:
         assert invalid.status_code == 422
         assert invalid.json()["code"] == "VALIDATION_ERROR"
         assert "body.budget_minor" in invalid.json()["field_errors"]
+
+
+async def test_multiple_recipients_are_created_and_listed_without_replacement() -> None:
+    context = MemoryContext()
+    client, _user = await _context_client(context)
+    headers = {"Authorization": "Bearer valid-session"}
+    async with client:
+        for name in ("Zaid", "Sophie"):
+            response = await client.post(
+                "/v1/recipients",
+                headers=headers,
+                json={
+                    "display_name": name,
+                    "relationship": "Family",
+                    "interests": ["Gaming"],
+                    "dislikes": [],
+                },
+            )
+            assert response.status_code == 201
+
+        recipients = await client.get("/v1/recipients", headers=headers)
+
+    assert recipients.status_code == 200
+    assert [item["display_name"] for item in recipients.json()] == ["Zaid", "Sophie"]

@@ -17,6 +17,7 @@ from app.mandate import (
     MandateSetupFacts,
     MandateSetupRequest,
     MandateState,
+    _is_consumed_decline_replacement,
     _is_sandbox_unknown_replacement,
     _state_from_mandate_status,
 )
@@ -1256,6 +1257,34 @@ def test_sandbox_unknown_replacement_requires_exact_locked_attempt_and_new_produ
     assert allowed is True
     assert production is False
     assert same_product is False
+
+
+def test_consumed_decline_is_replaceable_only_with_matching_terminal_evidence() -> None:
+    allowed = _is_consumed_decline_replacement(
+        existing_state=MandateState.CONSUMED,
+        existing_merchant_outcome=MerchantCheckoutOutcome.DECLINED,
+        existing_merchant_order_id=None,
+        latest_charge_state=MandateChargeState.DECLINED,
+        latest_charge_merchant_outcome=MerchantCheckoutOutcome.DECLINED,
+    )
+    successful_order = _is_consumed_decline_replacement(
+        existing_state=MandateState.CONSUMED,
+        existing_merchant_outcome=MerchantCheckoutOutcome.ORDER_VERIFIED,
+        existing_merchant_order_id="order-verified",
+        latest_charge_state=MandateChargeState.SUCCEEDED,
+        latest_charge_merchant_outcome=MerchantCheckoutOutcome.ORDER_VERIFIED,
+    )
+    ambiguous_attempt = _is_consumed_decline_replacement(
+        existing_state=MandateState.CONSUMED,
+        existing_merchant_outcome=MerchantCheckoutOutcome.DECLINED,
+        existing_merchant_order_id=None,
+        latest_charge_state=MandateChargeState.UNKNOWN,
+        latest_charge_merchant_outcome=MerchantCheckoutOutcome.UNKNOWN,
+    )
+
+    assert allowed is True
+    assert successful_order is False
+    assert ambiguous_attempt is False
 
 
 async def test_setup_does_not_guess_when_multiple_active_cards_exist() -> None:

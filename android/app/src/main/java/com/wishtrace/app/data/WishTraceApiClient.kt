@@ -8,6 +8,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 class WishTraceApiClient(baseUrl: String) {
@@ -20,7 +21,7 @@ class WishTraceApiClient(baseUrl: String) {
         headers: Map<String, String> = emptyMap(),
         readTimeoutMillis: Int = DEFAULT_READ_TIMEOUT_MILLIS,
     ): JSONObject = withContext(Dispatchers.IO) {
-        execute(
+        executeObject(
             method = "POST",
             path = path,
             json = json,
@@ -35,7 +36,7 @@ class WishTraceApiClient(baseUrl: String) {
         json: JSONObject,
         accessToken: String,
     ): JSONObject = withContext(Dispatchers.IO) {
-        execute(
+        executeObject(
             method = "PUT",
             path = path,
             json = json,
@@ -49,7 +50,7 @@ class WishTraceApiClient(baseUrl: String) {
         path: String,
         accessToken: String,
     ): JSONObject = withContext(Dispatchers.IO) {
-        execute(
+        executeObject(
             method = "GET",
             path = path,
             json = null,
@@ -59,7 +60,22 @@ class WishTraceApiClient(baseUrl: String) {
         )
     }
 
-    private fun execute(
+    suspend fun getArray(
+        path: String,
+        accessToken: String,
+    ): JSONArray = withContext(Dispatchers.IO) {
+        val text = executeRaw(
+            method = "GET",
+            path = path,
+            json = null,
+            accessToken = accessToken,
+            headers = emptyMap(),
+            readTimeoutMillis = DEFAULT_READ_TIMEOUT_MILLIS,
+        )
+        if (text.isBlank()) JSONArray() else JSONArray(text)
+    }
+
+    private fun executeObject(
         method: String,
         path: String,
         json: JSONObject?,
@@ -67,6 +83,25 @@ class WishTraceApiClient(baseUrl: String) {
         headers: Map<String, String>,
         readTimeoutMillis: Int,
     ): JSONObject {
+        val text = executeRaw(
+            method = method,
+            path = path,
+            json = json,
+            accessToken = accessToken,
+            headers = headers,
+            readTimeoutMillis = readTimeoutMillis,
+        )
+        return if (text.isBlank()) JSONObject() else JSONObject(text)
+    }
+
+    private fun executeRaw(
+        method: String,
+        path: String,
+        json: JSONObject?,
+        accessToken: String?,
+        headers: Map<String, String>,
+        readTimeoutMillis: Int,
+    ): String {
         require(path.startsWith('/'))
         require(readTimeoutMillis in 1_000..180_000)
         val connection = URL(root + path).openConnection() as HttpURLConnection
@@ -102,7 +137,7 @@ class WishTraceApiClient(baseUrl: String) {
             if (status !in 200..299) {
                 throw apiFailure(status, text)
             }
-            return if (text.isBlank()) JSONObject() else JSONObject(text)
+            return text
         } catch (error: WishTraceApiException) {
             throw error
         } catch (error: IOException) {

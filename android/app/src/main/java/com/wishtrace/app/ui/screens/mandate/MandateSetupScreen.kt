@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,9 +17,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -484,24 +488,150 @@ private fun ProofComplete(state: MandateSetupUiState) {
 private fun ProofDeclined(state: MandateSetupUiState) {
     val merchantAttempted = state.mandate?.merchantOutcome == MandateMerchantOutcome.DECLINED
     val canRetryCard = state.mandate?.mintRetryAvailable == true
-    TerminalState(
-        title = if (merchantAttempted) {
-            "Sandbox merchant attempt recorded"
-        } else {
-            "Prava couldn't make the card"
-        },
-        message = if (merchantAttempted) {
-            "The real merchant declined the tokenized sandbox card, as expected. No order was created."
-        } else if (canRetryCard) {
+    if (!merchantAttempted) {
+        TerminalState(
+            title = "Prava couldn't make the card",
+            message = if (canRetryCard) {
             "Your approval is still active. No payment was submitted to Jackbox. You can try " +
                 "issuing the sandbox card once more without another passkey."
-        } else if (state.canChooseAnotherSandboxCard) {
+            } else if (state.canChooseAnotherSandboxCard) {
             "Prava couldn't create the one-time card after two tries. Choose another gift, then " +
                 "select a different approved test card in Prava."
-        } else {
+            } else {
             "No card was issued, no payment was submitted to Jackbox, and nothing was purchased."
-        },
-    )
+            },
+        )
+        return
+    }
+
+    val mandate = state.mandate
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = BrandIndigo,
+            contentColor = SurfaceWhite,
+            shape = RoundedCornerShape(28.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    color = SurfaceWhite.copy(alpha = 0.16f),
+                    contentColor = SurfaceWhite,
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(27.dp),
+                        )
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Sandbox proof captured",
+                        modifier = Modifier.semantics { heading() },
+                        style = MaterialTheme.typography.headlineLarge,
+                    )
+                    Text(
+                        text = "Expected processor decline",
+                        color = SurfaceWhite.copy(alpha = 0.78f),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(132.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(
+                modifier = Modifier
+                    .weight(1.35f)
+                    .fillMaxSize(),
+                color = BlueSurface,
+                contentColor = Ink,
+                shape = RoundedCornerShape(24.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Storefront,
+                        contentDescription = null,
+                        tint = BrandBlue,
+                    )
+                    Column {
+                        Text(
+                            text = mandate.merchantName,
+                            color = InkMuted,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = mandate.lastChargeAmountMinor?.asUsd()
+                                ?: mandate.itemPriceMinor.asUsd(),
+                            style = MaterialTheme.typography.headlineMedium,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize(),
+                color = LavenderSurface,
+                contentColor = Ink,
+                shape = RoundedCornerShape(24.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = null,
+                        tint = BrandIndigo,
+                    )
+                    Column {
+                        Text("ORDER", color = InkMuted, style = MaterialTheme.typography.labelSmall)
+                        Text("Not created", style = MaterialTheme.typography.titleSmall)
+                    }
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = SuccessSurface,
+            contentColor = Success,
+            shape = RoundedCornerShape(22.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.ReceiptLong, contentDescription = null)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("PRAVA RECORDED", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "No real money moved",
+                        color = Ink,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

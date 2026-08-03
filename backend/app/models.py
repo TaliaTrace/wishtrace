@@ -110,7 +110,6 @@ class AppSessionModel(Base):
 
 class RecipientModel(Base):
     __tablename__ = "recipients"
-    __table_args__ = (UniqueConstraint("user_id", name="uq_recipients_user_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
